@@ -1,0 +1,40 @@
+sudo: false
+
+language: php
+
+cache:
+  directories:
+    - $HOME/.composer/cache
+    - vendor
+
+matrix:
+  fast_finish: true
+  include:
+    - php: 7.0
+    - php: 7.0
+      env: 'DEPS=--prefer-lowest'
+    - php: 7.0
+      env: 'LOOP=ev'
+  allow_failures:
+    - env: 'LOOP=ev'
+
+before_install:
+  - 'composer selfupdate --no-interaction'
+
+install:
+  - curl -LS https://pecl.php.net/get/ev | tar -xz;
+    pushd ev-*;
+    phpize;
+    ./configure;
+    make;
+    make install;
+    popd;
+    echo "extension=ev.so" >> "$(php -r 'echo php_ini_loaded_file();')";
+  - 'travis_retry composer update --no-interaction --prefer-source $DEPS'
+  - 'composer info -i'
+
+script:
+  - './vendor/bin/phpunit -c "./test/phpunit.xml"'
+
+notifications:
+  email: false
