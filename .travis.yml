@@ -22,7 +22,9 @@ before_install:
   - 'composer selfupdate --no-interaction'
 
 install:
-  - curl -LS https://pecl.php.net/get/ev | tar -xz;
+  - >
+    if [[ "$LOOP" == "ev" ]]; then
+    curl -LS https://pecl.php.net/get/ev | tar -xz;
     pushd ev-*;
     phpize;
     ./configure;
@@ -30,6 +32,7 @@ install:
     make install;
     popd;
     echo "extension=ev.so" >> "$(php -r 'echo php_ini_loaded_file();')";
+    fi
   - 'travis_retry composer update --no-interaction --prefer-source $DEPS'
   - 'composer info -i'
 
