@@ -117,9 +117,9 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
             
             if ($available >= $length || !$fillBuffer) {
                 try {
-                    return substr($this->buffer, $this->offset, $length);
+                    return substr($this->buffer, $this->offset, min($length, $available));
                 } finally {
-                    $this->offset += $length;
+                    $this->offset += min($length, $available);
                 }
             }
             
