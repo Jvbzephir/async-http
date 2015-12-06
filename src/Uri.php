@@ -38,7 +38,7 @@ class Uri implements \JsonSerializable
 
     protected $uriString;
 
-    public function __construct($scheme = 'http', $host = '', $port = NULL, $path = '', $query = '', $fragment = '', $username = '', $password = '')
+    public function __construct(string $scheme = 'http', string $host = '', int $port = NULL, string $path = '', string $query = '', string $fragment = '', string $username = '', string $password = '')
     {
         $this->scheme = $this->filterScheme($scheme);
         $this->host = (string) $host;
@@ -61,12 +61,8 @@ class Uri implements \JsonSerializable
      * @param string $uri
      * @return Uri
      */
-    public static function parse($uri)
+    public static function parse(string $uri): Uri
     {
-        if (!is_string($uri) && !method_exists($uri, '__toString')) {
-            throw new \InvalidArgumentException('Invalid URI');
-        }
-        
         if (false === ($parts = parse_url((string) $uri))) {
             throw new \InvalidArgumentException('Seriously malformed URI detected');
         }
@@ -91,7 +87,7 @@ class Uri implements \JsonSerializable
      * 
      * @return string
      */
-    public function __toString()
+    public function __toString(): string
     {
         if ($this->uriString !== NULL) {
             return $this->uriString;
@@ -139,17 +135,17 @@ class Uri implements \JsonSerializable
      * 
      * @return string
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): string
     {
         return (string) $this;
     }
 
-    public function getScheme()
+    public function getScheme(): string
     {
         return $this->scheme;
     }
 
-    public function withScheme($scheme)
+    public function withScheme(string $scheme): Uri
     {
         $scheme = $this->filterScheme($scheme);
         
@@ -163,7 +159,7 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getUserInfo()
+    public function getUserInfo(): string
     {
         if (empty($this->password)) {
             return $this->username;
@@ -172,7 +168,7 @@ class Uri implements \JsonSerializable
         return sprintf('%s:%s', $this->username, $this->password);
     }
 
-    public function withUserInfo($user, $password = NULL)
+    public function withUserInfo(string $user, string $password = NULL): Uri
     {
         $user = trim($user);
         
@@ -189,7 +185,7 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getAuthority()
+    public function getAuthority(): string
     {
         $auth = '';
         
@@ -200,12 +196,12 @@ class Uri implements \JsonSerializable
         return $auth . $this->getHostWithPort();
     }
 
-    public function getHost()
+    public function getHost(): string
     {
         return empty($this->host) ? '' : $this->host;
     }
 
-    public function getHostWithPort($forcePort = false)
+    public function getHostWithPort(bool $forcePort = false): Uri
     {
         if (empty($this->host)) {
             return '';
@@ -228,7 +224,7 @@ class Uri implements \JsonSerializable
         return empty($port) ? $this->host : sprintf('%s:%u', $this->host, $port);
     }
 
-    public function withHost($host)
+    public function withHost(string $host): Uri
     {
         if (!is_string($host) && !method_exists($host, '__toString')) {
             throw new \InvalidArgumentException('Invalid URI host');
@@ -248,12 +244,12 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getPort()
+    public function getPort(): int
     {
         return $this->port;
     }
 
-    public function withPort($port)
+    public function withPort(int $port): Uri
     {
         if (is_string($port) && preg_match("'^[0-9]+$'", $port)) {
             $port = (int) $port;
@@ -277,12 +273,12 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getPath()
+    public function getPath(): string
     {
         return $this->path;
     }
 
-    public function withPath($path)
+    public function withPath(string $path): Uri
     {
         $path = $this->filterPath($path);
         
@@ -292,12 +288,12 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getQuery()
+    public function getQuery(): string
     {
         return $this->query;
     }
 
-    public function withQuery($query)
+    public function withQuery(string $query): Uri
     {
         $query = $this->filterQuery($query);
         
@@ -312,7 +308,7 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function hasQueryParam($name)
+    public function hasQueryParam(string $name): bool
     {
         if ($this->parsedQuery === NULL) {
             $this->parsedQuery = self::parseQuery($this->query);
@@ -321,7 +317,7 @@ class Uri implements \JsonSerializable
         return array_key_exists($name, $this->parsedQuery);
     }
 
-    public function getQueryParam($name)
+    public function getQueryParam(string $name)
     {
         if ($this->parsedQuery === NULL) {
             $this->parsedQuery = self::parseQuery($this->query);
@@ -338,7 +334,7 @@ class Uri implements \JsonSerializable
         throw new \OutOfBoundsException(sprintf('Query param not found: "%s"', $name));
     }
 
-    public function getQueryParams()
+    public function getQueryParams(): array
     {
         if ($this->parsedQuery === NULL) {
             $this->parsedQuery = self::parseQuery($this->query);
@@ -347,7 +343,7 @@ class Uri implements \JsonSerializable
         return $this->parsedQuery;
     }
 
-    public function withQueryParams(array $params)
+    public function withQueryParams(array $params): Uri
     {
         $uri = clone $this;
         $uri->parsedQuery = $params;
@@ -356,12 +352,12 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getFragment()
+    public function getFragment(): string
     {
         return $this->fragment ?: '';
     }
 
-    public function withFragment($fragment)
+    public function withFragment(string $fragment): Uri
     {
         $uri = clone $this;
         $uri->fragment = $this->filterFragment($fragment);
@@ -376,7 +372,7 @@ class Uri implements \JsonSerializable
      * @param bool $encodeSlashes Apply percent encoding to slashes?
      * @return string
      */
-    public static function encode($string, $encodeSlashes = true)
+    public static function encode(string $string, bool $encodeSlashes = true): string
     {
         return $encodeSlashes ? rawurlencode($string) : implode('/', array_map('rawurlencode', explode('/', (string) $string)));
     }
@@ -387,7 +383,7 @@ class Uri implements \JsonSerializable
      * @param string $string
      * @return string
      */
-    public static function decode($string)
+    public static function decode(string $string): string
     {
         return rawurldecode($string);
     }
@@ -398,7 +394,7 @@ class Uri implements \JsonSerializable
      * @param string $query
      * @return array<string, mixed>
      */
-    public static function parseQuery($query)
+    public static function parseQuery(string $query): array
     {
         $result = [];
         
@@ -413,12 +409,12 @@ class Uri implements \JsonSerializable
      * @param array<string, mixed> $query
      * @return string
      */
-    public static function buildQuery(array $query)
+    public static function buildQuery(array $query, bool $plusEncoded): string
     {
-        return empty($query) ? '' : str_replace('+', '%20', http_build_query($query, NULL, '&'));
+        return empty($query) ? '' : http_build_query($query, NULL, '&', $plusEncoded ? PHP_QUERY_RFC1738 : PHP_QUERY_RFC3986);
     }
 
-    protected function filterScheme($scheme)
+    protected function filterScheme(string $scheme): string
     {
         $scheme = strtolower(rtrim(trim($scheme), ':/'));
         
@@ -432,12 +428,8 @@ class Uri implements \JsonSerializable
         throw new \InvalidArgumentException(sprintf('Unsupported URL scheme: "%s"', $scheme));
     }
 
-    protected function filterPath($path)
+    protected function filterPath(string $path): string
     {
-        if (!is_string($path) && !method_exists($path, '__toString')) {
-            throw new \InvalidArgumentException('Invalid URI path');
-        }
-        
         $path = trim($path);
         
         if (false !== strpos($path, '?') || false !== strpos($path, '#')) {
@@ -459,12 +451,8 @@ class Uri implements \JsonSerializable
         return '/' . ltrim($path, '/');
     }
 
-    protected function filterQuery($query)
+    protected function filterQuery(string $query): string
     {
-        if (!is_string($query) && !method_exists($query, '__toString')) {
-            throw new \InvalidArgumentException('Invalid URI query string');
-        }
-        
         $query = ltrim(trim($query), '?');
         
         if (false !== strpos($query, '#')) {
@@ -487,30 +475,26 @@ class Uri implements \JsonSerializable
         return implode('&', $parts);
     }
 
-    protected function splitQueryValue($value)
+    protected function splitQueryValue(string $value): array
     {
         $data = explode('=', $value, 2);
         
         if (1 === count($data)) {
-            $data[] = null;
+            $data[] = NULL;
         }
         
         return $data;
     }
 
-    protected function filterQueryOrFragment($query)
+    protected function filterQueryOrFragment(string $query): string
     {
         return preg_replace_callback('/(?:[^a-zA-Z0-9_\-\.~!\$&\'\(\)\*\+,;=%:@\/\?]+|%(?![A-Fa-f0-9]{2}))/', function (array $m) {
             return rawurlencode($m[0]);
         }, $query);
     }
 
-    protected function filterFragment($fragment)
+    protected function filterFragment(string $fragment): string
     {
-        if (!is_string($fragment) && !method_exists($fragment, '__toString')) {
-            throw new \InvalidArgumentException('Invalid URI fragment');
-        }
-        
         return $this->filterQueryOrFragment(ltrim(trim($fragment), '#'));
     }
 }

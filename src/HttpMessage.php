@@ -16,16 +16,19 @@ namespace KoolKode\Async\Http;
  * 
  * @author Martin Schröder
  */
-abstract class Message
+abstract class HttpMessage
 {
     protected $protocolVersion;
 
     protected $headers;
+    
+    protected $body;
 
-    public function __construct(array $headers = [], $protocolVersion = '1.1')
+    public function __construct(array $headers = [], string $protocolVersion = '1.1')
     {
         $this->protocolVersion = (string) $protocolVersion;
         $this->headers = [];
+        $this->body = new \ArrayIterator([]);
         
         foreach ($headers as $k => $v) {
             if (is_object($v)) {
@@ -49,12 +52,12 @@ abstract class Message
         }
     }
 
-    public function getProtocolVersion()
+    public function getProtocolVersion(): string
     {
         return $this->protocolVersion;
     }
 
-    public function withProtocolVersion($version)
+    public function withProtocolVersion(string $version): HttpMessage
     {
         $message = clone $this;
         $message->protocolVersion = (string) $version;
@@ -62,7 +65,7 @@ abstract class Message
         return $message;
     }
 
-    public function getHeaders()
+    public function getHeaders(): array
     {
         $headers = [];
         
@@ -75,12 +78,12 @@ abstract class Message
         return $headers;
     }
 
-    public function hasHeader($name)
+    public function hasHeader(string $name): bool
     {
         return !empty($this->headers[strtolower($name)]);
     }
 
-    public function getHeader($name)
+    public function getHeader(string $name): array
     {
         $n = strtolower($name);
         
@@ -93,12 +96,12 @@ abstract class Message
         }, $this->headers[$n]);
     }
 
-    public function getHeaderLine($name)
+    public function getHeaderLine(string $name): string
     {
         return implode(',', $this->getHeader($name));
     }
 
-    public function withHeader($name, $value)
+    public function withHeader(string $name, $value): HttpMessage
     {
         if (is_string($value) || method_exists($value, '__toString')) {
             $value = [
@@ -127,7 +130,7 @@ abstract class Message
         return $message;
     }
 
-    public function withAddedHeader($name, $value)
+    public function withAddedHeader(string $name, $value): HttpMessage
     {
         if (is_string($value) || method_exists($value, '__toString')) {
             $value = [
@@ -158,15 +161,28 @@ abstract class Message
         return $message;
     }
 
-    public function withoutHeader($name)
+    public function withoutHeader(string $name): HttpMessage
     {
         $message = clone $this;
         unset($message->headers[strtolower($name)]);
         
         return $message;
     }
+    
+    public function getBody(): \Iterator
+    {
+        return $this->body;
+    }
+    
+    public function withBody(\Iterator $body): HttpMessage
+    {
+        $message = clone $this;
+        $message->body = $body;
+        
+        return $message;
+    }
 
-    protected function assertArrayOfStrings(array $strings)
+    protected function assertArrayOfStrings(array $strings): bool
     {
         foreach ($strings as $string) {
             if (!is_string($string) && !method_exists($string, '__toString')) {
@@ -177,7 +193,7 @@ abstract class Message
         return true;
     }
 
-    protected function filterHeaders(array $headers)
+    protected function filterHeaders(array $headers): array
     {
         $filtered = [];
         

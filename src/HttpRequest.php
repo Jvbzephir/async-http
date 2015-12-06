@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http;
  * 
  * @author Martin Schröder
  */
-class Request extends Message
+class HttpRequest extends HttpMessage
 {
     protected $method;
 
@@ -24,7 +24,7 @@ class Request extends Message
 
     protected $uri;
 
-    public function __construct(Uri $uri = NULL, $method = NULL, array $headers = [])
+    public function __construct(Uri $uri = NULL, string $method = NULL, array $headers = [])
     {
         parent::__construct($headers);
         
@@ -32,7 +32,7 @@ class Request extends Message
         $this->uri = $uri ?: new Uri();
     }
 
-    public function getRequestTarget()
+    public function getRequestTarget(): string
     {
         if (NULL !== $this->target) {
             return $this->target;
@@ -48,7 +48,7 @@ class Request extends Message
         return empty($target) ? '/' : $target;
     }
 
-    public function withRequestTarget($requestTarget)
+    public function withRequestTarget(string $requestTarget): HttpRequest
     {
         $requestTarget = trim($requestTarget);
         
@@ -62,12 +62,12 @@ class Request extends Message
         return $request;
     }
 
-    public function getMethod()
+    public function getMethod(): string
     {
         return $this->method ?: 'GET';
     }
 
-    public function withMethod($method)
+    public function withMethod(string $method): HttpRequest
     {
         $request = clone $this;
         $request->method = $this->filterMethod($method);
@@ -75,12 +75,12 @@ class Request extends Message
         return $request;
     }
 
-    public function getUri()
+    public function getUri(): Uri
     {
         return $this->uri;
     }
 
-    public function withUri(Uri $uri, $preserveHost = false)
+    public function withUri(Uri $uri, bool $preserveHost = false): HttpRequest
     {
         $request = clone $this;
         $request->uri = $uri;
@@ -102,7 +102,7 @@ class Request extends Message
         return $request;
     }
 
-    public function getHeader($name)
+    public function getHeader(string $name): array
     {
         $n = strtolower($name);
         
@@ -119,7 +119,7 @@ class Request extends Message
         return parent::getHeader($name);
     }
 
-    public function getHeaders()
+    public function getHeaders(): array
     {
         $headers = parent::getHeaders();
         
@@ -130,13 +130,9 @@ class Request extends Message
         return $headers;
     }
 
-    protected function filterMethod($method)
+    protected function filterMethod(string $method): string
     {
-        if (method_exists($method, '__toString')) {
-            $method = (string) $method;
-        }
-        
-        if (!is_string($method) || !preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
+        if (!preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
             throw new \InvalidArgumentException(sprintf('Invalid HTTP method'));
         }
         

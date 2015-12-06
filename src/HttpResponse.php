@@ -16,13 +16,13 @@ namespace KoolKode\Async\Http;
  * 
  * @author Martin Schröder
  */
-class Response extends Message
+class HttpResponse extends HttpMessage
 {
     protected $status;
 
     protected $reason;
 
-    public function __construct($status = NULL, array $headers = [])
+    public function __construct(int $status = NULL, array $headers = [])
     {
         parent::__construct($headers);
         
@@ -30,12 +30,17 @@ class Response extends Message
         $this->reason = '';
     }
 
-    public function getStatusCode()
+    public function getStatusCode(): int
     {
         return $this->status;
     }
 
-    public function withStatus($code, $reasonPhrase = '')
+    public function getReasonPhrase(): string
+    {
+        return $this->reason;
+    }
+    
+    public function withStatus(int $code, string $reasonPhrase = ''): HttpResponse
     {
         $response = clone $this;
         $response->status = $this->filterStatus($code);
@@ -43,23 +48,16 @@ class Response extends Message
         
         return $response;
     }
-
-    public function getReasonPhrase()
-    {
-        return $this->reason;
-    }
-
-    protected function filterStatus($status)
+    
+    protected function filterStatus(int $status): int
     {
         if (method_exists($status, '__toString')) {
             $status = (string) $status;
         }
         
-        if (!is_scalar($status) || (!is_int($status) && !preg_match("'^[1-5][0-9]{2}$'", $status))) {
+        if (!preg_match("'^[1-5][0-9]{2}$'", $status)) {
             throw new \InvalidArgumentException(sprintf('Invalid HTTP status code: %s', is_object($status) ? get_class($status) : gettype($status)));
         }
-        
-        $status = (int) $status;
         
         if ($status < 100 || $status > 599) {
             throw new \InvalidArgumentException(sprintf('HTTP status out of range: %u', $status));
