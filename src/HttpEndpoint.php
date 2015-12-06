@@ -16,7 +16,6 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Http\Http1\DirectUpgradeDuplexStream;
 use KoolKode\Async\Http\Http1\Http1Driver;
 use KoolKode\Async\Stream\SocketStream;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
@@ -292,10 +291,10 @@ class HttpEndpoint
      * Find an HTTP/1.1 upgrade handler that can upgrade the connection to the requested protocl.
      * 
      * @param string $protocol
-     * @param ServerRequestInterface $request
+     * @param HttpRequest $request
      * @return HttpUpgradeHandlerInterface or NULL when no such handler was found.
      */
-    public function findUpgradeHandler(string $protocol, ServerRequestInterface $request)
+    public function findUpgradeHandler(string $protocol, HttpRequest $request)
     {
         foreach ($this->upgradeHandlers as $handler) {
             if ($handler->isUpgradeSupported($protocol, $request)) {

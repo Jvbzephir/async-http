@@ -11,16 +11,15 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\K1\Http\DefaultHttpFactory;
-use KoolKode\K1\Http\Http;
-use KoolKode\K1\Http\HttpFactoryInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -31,13 +30,6 @@ use Psr\Log\LoggerInterface;
 class Http1Driver implements HttpDriverInterface
 {
     /**
-     * Lazy-loaded PSR HTTP object factory.
-     * 
-     * @var HttpFactoryInterface
-     */
-    protected $httpFactory;
-    
-    /**
      * Optional logger instance.
      * 
      * @var LoggerInterface
@@ -47,20 +39,6 @@ class Http1Driver implements HttpDriverInterface
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
-    }
-    
-    public function getHttpFactory(): HttpFactoryInterface
-    {
-        if ($this->httpFactory === NULL) {
-            $this->httpFactory = new DefaultHttpFactory();
-        }
-        
-        return $this->httpFactory;
-    }
-
-    public function setHttpFactory(HttpFactoryInterface $factory)
-    {
-        $this->httpFactory = $factory;
     }
 
     public function setLogger(LoggerInterface $logger = NULL)
@@ -139,7 +117,7 @@ class Http1Driver implements HttpDriverInterface
             $uri = $endpoint->isEncrypted() ? 'https://' : 'http://';
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
             
-            $uri = $this->getHttpFactory()->createUri($uri);
+            $uri = Uri::parse($uri);
             
             $server = [
                 'SERVER_PROTOCOL' => 'HTTP/' . $m[3],
@@ -157,6 +135,8 @@ class Http1Driver implements HttpDriverInterface
             parse_str($uri->getQuery(), $query);
             
             $request = $this->getHttpFactory()->createServerRequest($server, $query);
+            
+            $request = new HttpRequest();
             $request = $request->withProtocolVersion($m[3]);
             $request = $request->withUri($uri);
             
@@ -174,7 +154,7 @@ class Http1Driver implements HttpDriverInterface
                 ]);
             }
             
-            $response = $this->getHttpFactory()->createResponse();
+            $response = new HttpResponse();
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (\Throwable $e) {
             $socket->close();

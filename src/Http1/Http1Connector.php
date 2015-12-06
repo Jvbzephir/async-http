@@ -11,16 +11,13 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\K1\Http\DefaultHttpFactory;
-use KoolKode\K1\Http\Http;
-use KoolKode\K1\Http\HttpFactoryInterface;
-use KoolKode\Stream\ResourceInputStream;
-use Psr\Http\Message\RequestInterface;
 
 use function KoolKode\Async\createTempStream;
+use KoolKode\Async\Http\HttpRequest;
 
 /**
  * HTTP/1 client endpoint.
@@ -29,20 +26,13 @@ use function KoolKode\Async\createTempStream;
  */
 class Http1Connector
 {
-    protected $httpFactory;
-    
-    public function __construct(HttpFactoryInterface $factory = NULL)
-    {
-        $this->httpFactory = $factory ?? new DefaultHttpFactory();
-    }
-
     /**
      * Coroutine that sends an HTTP/1 request and returns the receved HTTP response.
      * 
-     * @param RequestInterface $request
+     * @param HttpRequest $request
      * @return Generator
      */
-    public function send(RequestInterface $request): \Generator
+    public function send(HttpRequest $request): \Generator
     {
         $uri = $request->getUri();
         $secure = $uri->getScheme() === 'https';
@@ -67,7 +57,7 @@ class Http1Connector
         }
     }
     
-    protected function prepareRequest(RequestInterface $request): RequestInterface
+    protected function prepareRequest(HttpRequest $request): HttpRequest
     {
         $request = $request->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
         $request = $request->withHeader('Connection', 'close');
@@ -100,7 +90,7 @@ class Http1Connector
      * 
      * @throws \RuntimeException
      */
-    protected function sendRequest(SocketStream $stream, RequestInterface $request): \Generator
+    protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
     {
         $body = $request->getBody();
         $size = $body->getSize();
