@@ -11,10 +11,6 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\OutputStreamInterface;
-use KoolKode\Async\Task;
-use function KoolKode\Async\await;
-
 /**
  * Implementation of a PSR-7 HTTP message base class.
  * 
@@ -33,13 +29,7 @@ abstract class HttpMessage
         $this->protocolVersion = (string) $protocolVersion;
         $this->headers = [];
         
-        $this->body = new class() extends HttpBody {
-
-            public abstract function send(OutputStreamInterface $out): \Generator
-            {
-                yield;
-            }
-        };
+        $this->body = new HttpBody(new \ArrayIterator([]));
         
         foreach ($headers as $k => $v) {
             if (is_object($v)) {

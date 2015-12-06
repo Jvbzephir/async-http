@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\ExecutorFactory;
 
 use function KoolKode\Async\await;
+use KoolKode\Async\Http\Http1\Http1Connector;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -84,6 +85,29 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             }
             
             $this->assertEquals('Hello world :)', $contents);
+        }));
+        
+        $executor->run();
+    }
+    
+    public function testClient()
+    {
+        $executor = (new ExecutorFactory())->createExecutor();
+        $executor->setErrorHanndler(function(\Throwable $e) {
+            fwrite(STDERR, $e . "\n\n");
+        });
+        
+        $executor->runNewTask(call_user_func(function () {
+            $connector = new Http1Connector();
+            
+            $request = new HttpRequest(Uri::parse('http://phpdeveloper.org/feed'));
+            $response = yield from $connector->send($request);
+            
+            $body = $response->getBody();
+            
+            while (!$body->eof()) {
+                yield from $body->read();
+            }
         }));
         
         $executor->run();

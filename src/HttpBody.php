@@ -37,6 +37,14 @@ class HttpBody implements InputStreamInterface
         $this->body = $body;
     }
     
+    public function __debugInfo(): array
+    {
+        return [
+            'buffer' => sprintf('%u bytes buffered', strlen($this->buffer)),
+            'body' => $this->body
+        ];
+    }
+    
     /**
      * {@inheritdoc}
      */
@@ -66,7 +74,7 @@ class HttpBody implements InputStreamInterface
                     $chunk = $this->readNextChunk(yield $chunk);
                 }
             
-                if (is_string($chunk)) {
+                if ($chunk instanceof HttpData) {
                     $this->buffer .= $chunk;
                 }
             
@@ -93,7 +101,7 @@ class HttpBody implements InputStreamInterface
                 $chunk = $this->readNextChunk(yield $chunk);
             }
             
-            if (is_string($chunk)) {
+            if ($chunk instanceof HttpData) {
                 $this->buffer .= $chunk;
                 
                 $chunk = substr($this->buffer, 0, $length);

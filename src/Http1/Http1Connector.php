@@ -12,12 +12,12 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
-
-use function KoolKode\Async\createTempStream;
-use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\HttpData;
 
 /**
  * HTTP/1 client endpoint.
@@ -76,7 +76,7 @@ class Http1Connector
         }
         
         if (function_exists('inflate_init')) {
-            $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+//             $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
         }
         
         return $request;
@@ -93,58 +93,45 @@ class Http1Connector
     protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
     {
         $body = $request->getBody();
-        $size = $body->getSize();
         
-        $in = $body->detach();
-        if (!is_resource($in)) {
-            throw new \RuntimeException('Cannot stream HTTP request body if detach() does not return a resource');
+        $chunk = yield from $body->read();
+        $chunked = false;
+        
+        if ($chunk === '') {
+            $request = $request->withHeader('Content-Length', '0');
+        } else {
+            $request = $request->withHeader('Transfer-Encoding', 'chunked');
+            $chunked = true;
         }
         
-        stream_set_blocking($in, 0);
-        $in = new SocketStream($in);
+        $message = sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
         
-        try {
-            $chunk = yield from $in->read();
-            $chunked = false;
-            
-            if ($size < 1 || ($size === NULL && $chunk !== '')) {
-                $request = $request->withHeader('Content-Length', '0');
-            } elseif ($size !== NULL) {
-                $request = $request->withHeader('Content-Length', (string) $size);
-            } else {
-                $request = $request->withHeader('Transfer-Encoding', 'chunked');
-                $chunked = true;
+        foreach ($request->getHeaders() as $name => $values) {
+            foreach ($values as $value) {
+                $message .= sprintf("%s: %s\n", $name, $value);
             }
+        }
+        
+        yield from $stream->write($message . "\r\n");
+        
+        if ($chunked) {
+            yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
             
-            $message = sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-            
-            foreach ($request->getHeaders() as $name => $values) {
-                foreach ($values as $value) {
-                    $message .= sprintf("%s: %s\n", $name, $value);
-                }
-            }
-            
-            yield from $stream->write($message . "\r\n");
-            
-            if ($chunked) {
-                yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+            while (!$body->eof()) {
+                $chunk = yield from $body->read();
                 
-                while (!$in->eof()) {
-                    $chunk = yield from $in->read();
-                    
+                if ($chunk !== '') {
                     yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
                 }
-                
-                yield from $stream->write("0\r\n\r\n");
-            } else {
-                yield from $stream->write($chunk);
-                
-                while (!$in->eof()) {
-                    yield from $stream->write(yield from $in->read());
-                }
             }
-        } finally {
-            $in->close();
+            
+            yield from $stream->write("0\r\n\r\n");
+        } else {
+            yield from $stream->write($chunk);
+            
+            while (!$body->eof()) {
+                yield from $stream->write(yield from $body->read());
+            }
         }
     }
     
@@ -152,11 +139,11 @@ class Http1Connector
      * Read and parse raw HTTP response.
      * 
      * @param DuplexStreamInterface $stream
-     * @param RequestInterface $request
+     * @param HttpRequest $request
      * 
      * @throws \RuntimeException
      */
-    protected function processResponse(DuplexStreamInterface $stream, RequestInterface $request): \Generator
+    protected function processResponse(DuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
         $stream = new BufferedDuplexStream($stream);
         $line = yield from $stream->readLine();
@@ -166,7 +153,7 @@ class Http1Connector
             throw new \RuntimeException('Response did not contain a valid HTTP status line');
         }
         
-        $response = $this->httpFactory->createResponse();
+        $response = new HttpResponse();
         $response = $response->withProtocolVersion($m[1]);
         $response = $response->withStatus((int) $m[2], trim($m[3]));
         
@@ -210,7 +197,7 @@ class Http1Connector
             $response = $response->withoutHeader($header);
         }
         
-        return $response->withBody(yield from $this->processResponseBody($stream, $dechunk, $zlib));
+        return $response->withBody($this->processResponseBody($stream, $dechunk, $zlib));
     }
     
     /**
@@ -222,6 +209,9 @@ class Http1Connector
      */
     protected function processResponseBody(DuplexStreamInterface $stream, bool $dechunk, $zlib = NULL): \Generator
     {
+        // Avoid processing first chunk of data on init.
+        yield;
+        
         $decoder = (object) [
             'zlib' => $zlib,
             'dechunk' => $dechunk,
@@ -229,32 +219,23 @@ class Http1Connector
             'buffer' => ''
         ];
         
-        $out = yield createTempStream();
-        
         if ($dechunk) {
             while (!$stream->eof()) {
                 foreach ($this->decodeChunkedData(yield from $stream->read(), $decoder) as $chunk) {
-                    yield from $out->write($chunk);
+                    yield new HttpData($chunk);
                 }
             }
         } else {
             while (!$stream->eof()) {
                 foreach ($this->decodeData(yield from $stream->read(), $decoder) as $chunk) {
-                    yield from $out->write($chunk);
+                    yield new HttpData($chunk);
                 }
             }
         }
         
         if ($decoder->zlib !== NULL) {
-            yield from $out->write(inflate_add($decoder->zlib, '', ZLIB_FINISH));
+            yield new HttpData(inflate_add($decoder->zlib, '', ZLIB_FINISH));
         }
-        
-        $out = $out->detach();
-        stream_set_blocking($out, 1);
-        
-        rewind($out);
-        
-        return new ResourceInputStream($out);
     }
     
     /**

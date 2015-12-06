@@ -201,7 +201,7 @@ class Uri implements \JsonSerializable
         return empty($this->host) ? '' : $this->host;
     }
 
-    public function getHostWithPort(bool $forcePort = false): Uri
+    public function getHostWithPort(bool $forcePort = false): string
     {
         if (empty($this->host)) {
             return '';
@@ -244,7 +244,7 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getPort(): int
+    public function getPort()
     {
         return $this->port;
     }
