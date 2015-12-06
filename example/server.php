@@ -13,13 +13,15 @@ use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Http2\Http2Driver;
 use KoolKode\Async\Log\Logger;
-use KoolKode\Async\SystemCall;
 use KoolKode\K1\App;
 use KoolKode\K1\K1;
 use KoolKode\Stream\ResourceInputStream;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LogLevel;
+
+use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\runTask;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -39,7 +41,7 @@ $executor->setErrorHanndler(function (\Throwable $e) {
 
 $executor->runNewTask(call_user_func(function () {
     
-    $logger = new Logger(yield SystemCall::newEventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
+    $logger = new Logger(yield newEventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
     
     $app = new App((new K1())->build());
     
@@ -104,7 +106,7 @@ $executor->runNewTask(call_user_func(function () {
         ];
     };
     
-    yield SystemCall::runTask($http->run($action), $http->getTitle());
+    yield runTask($http->run($action), $http->getTitle());
 }));
 
 $executor->run();

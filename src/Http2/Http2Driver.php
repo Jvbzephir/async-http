@@ -16,7 +16,6 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\SystemCall;
 use KoolKode\K1\Http\DefaultHttpFactory;
 use KoolKode\K1\Http\Http;
 use KoolKode\K1\Http\HttpFactoryInterface;
@@ -24,6 +23,10 @@ use KoolKode\Stream\ResourceInputStream;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
+
+use function KoolKode\Async\createTempStream;
+use function KoolKode\Async\newEventEmitter;
+
 /**
  * HTTP/2 driver.
  * 
@@ -190,7 +193,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
             yield from $socket->write($message);
             
-            $conn = new Connection(Connection::MODE_SERVER, $socket, yield SystemCall::newEventEmitter(), $this->logger);
+            $conn = new Connection(Connection::MODE_SERVER, $socket, yield newEventEmitter(), $this->logger);
             
             $preface = yield from $socket->read(strlen(Connection::PREFACE), true);
             
@@ -265,8 +268,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
                 'version' => $request->getProtocolVersion()
             ]);
         }
-    
-        $buffer = yield SystemCall::createTempStream();
+        
+        $buffer = yield createTempStream();
     
         while (!$event->body->eof()) {
             yield from $buffer->write(yield from $event->body->read());

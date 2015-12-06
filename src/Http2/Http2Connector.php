@@ -12,10 +12,12 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\SystemCall;
 use KoolKode\K1\Http\HttpFactoryInterface;
 use KoolKode\Stream\ResourceInputStream;
 use Psr\Http\Message\RequestInterface;
+
+use function KoolKode\Async\createTempStream;
+use function KoolKode\Async\runTask;
 
 class Http2Connector
 {
@@ -53,7 +55,7 @@ class Http2Connector
         
         $conn = yield from Connection::connectClient($socket);
         
-        yield SystemCall::runTask(call_user_func(function () use($conn) {
+        yield runTask(call_user_func(function () use($conn) {
             while (true) {
                 if (false === yield from $conn->handleNextFrame()) {
                     break;
@@ -76,7 +78,7 @@ class Http2Connector
             $response = $response->withAddedHeader($header[0], $header[1]);
         }
         
-        $buffer = yield SystemCall::createTempStream();
+        $buffer = yield createTempStream();
         
         while (!$event->body->eof()) {
             yield from $buffer->write(yield from $event->body->read());

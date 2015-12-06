@@ -14,12 +14,14 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\SocketException;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\SystemCall;
 use KoolKode\K1\Http\Http;
 use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
+
+use function KoolKode\Async\awaitAll;
+use function KoolKode\Async\newEventEmitter;
 
 /**
  * A bidirectional flow of frames within the HTTP/2 connection.
@@ -271,7 +273,7 @@ class Stream
     public function handleFrame(Frame $frame): \Generator
     {
         if ($this->body === NULL) {
-            $this->body = new Http2InputStream($this, yield SystemCall::newEventEmitter());
+            $this->body = new Http2InputStream($this, yield newEventEmitter());
         }
         
         try {
@@ -455,7 +457,7 @@ class Stream
      */
     public function incrementRemoteWindow(int $increment): \Generator
     {
-        yield SystemCall::awaitAll([
+        yield awaitAll([
             $this->conn->incrementRemoteWindow($increment),
             $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)))
         ]);

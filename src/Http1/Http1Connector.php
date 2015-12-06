@@ -14,12 +14,13 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\SystemCall;
 use KoolKode\K1\Http\DefaultHttpFactory;
 use KoolKode\K1\Http\Http;
 use KoolKode\K1\Http\HttpFactoryInterface;
 use KoolKode\Stream\ResourceInputStream;
 use Psr\Http\Message\RequestInterface;
+
+use function KoolKode\Async\createTempStream;
 
 /**
  * HTTP/1 client endpoint.
@@ -238,7 +239,7 @@ class Http1Connector
             'buffer' => ''
         ];
         
-        $out = yield SystemCall::createTempStream();
+        $out = yield createTempStream();
         
         if ($dechunk) {
             while (!$stream->eof()) {

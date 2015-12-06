@@ -16,9 +16,12 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Http\Http1\DirectUpgradeDuplexStream;
 use KoolKode\Async\Http\Http1\Http1Driver;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\SystemCall;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
+
+use function KoolKode\Async\awaitRead;
+use function KoolKode\Async\noop;
+use function KoolKode\Async\runTask;
 
 /**
  * HTTP server endpoint that provides at least HTTP/1 capabilities.
@@ -223,7 +226,7 @@ class HttpEndpoint
         
         while (true) {
             // Await client connection:
-            yield SystemCall::awaitRead($server);
+            yield awaitRead($server);
             
             $socket = @stream_socket_accept($server, 0);
             
@@ -245,7 +248,7 @@ class HttpEndpoint
                         if ((isset($crypto['alpn_protocol']))) {
                             foreach ($this->drivers as $driver) {
                                 if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
-                                    yield SystemCall::runTask($this->handleConnection($driver, $stream, $action));
+                                    yield runTask($this->handleConnection($driver, $stream, $action));
                                     
                                     continue 2;
                                 }
@@ -253,7 +256,7 @@ class HttpEndpoint
                         }
                     }
                     
-                    yield SystemCall::runTask($this->handleConnection($this->http1Driver, $stream, $action));
+                    yield runTask($this->handleConnection($this->http1Driver, $stream, $action));
                 } catch (\Throwable $e) {
                     $stream->close();
                 }
@@ -263,7 +266,7 @@ class HttpEndpoint
     
     protected function handleConnection(HttpDriverInterface $driver, SocketStream $stream, callable $action)
     {
-        yield SystemCall::noop();
+        yield noop();
         
         return yield from $driver->handleConnection($this, $stream, $action);
     }

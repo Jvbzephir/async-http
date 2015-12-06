@@ -13,7 +13,8 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\SystemCall;
+
+use function KoolKode\Async\runTask;
 
 /**
  * HTTP/2 body input stream utilizing flow control.
@@ -156,7 +157,7 @@ class Http2InputStream implements InputStreamInterface
         
         if (($this->eof && $this->drained > 0) || ($this->drained > 4096 && strlen($this->buffer) < $this->size)) {
             try {
-                yield SystemCall::runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), true);
+                yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), true);
             } finally {
                 $this->drained = 0;
             }
