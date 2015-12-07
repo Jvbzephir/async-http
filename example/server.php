@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of KoolKode Async.
+ * This file is part of KoolKode Async HTTP.
  *
  * (c) Martin Schröder <m.schroeder2007@gmail.com>
  *
@@ -15,11 +15,11 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Log\Logger;
+use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LogLevel;
 
 use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\runTask;
-use KoolKode\Async\Stream\SocketStream;
 
 error_reporting(-1);
 ini_set('display_errors', false);
