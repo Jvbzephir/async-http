@@ -2,36 +2,6 @@
 <html>
 <head>
 <title>Async Test Page</title>
-<script>
-	window.onload = function() {
-
-		var log = document.getElementById('chat-messages');
-		var ws = new WebSocket('wss://localhost:8000/chat');
-
-		ws.onopen = function() {
-			ws.send('PING :)');
-		};
-
-		ws.onerror = function(e) {
-			console.error(e);
-		};
-
-		ws.onmessage = function(m) {
-			var el = document.createElement('p');
-			el.appendChild(document.createTextNode(m.data));
-
-			log.appendChild(el);
-		};
-
-		var button = document.getElementById('user-submit');
-		button.onclick = function() {
-			var text = document.getElementById('user-message').value;
-			if (!!text) {
-				ws.send(text);
-			}
-		};
-	};
-</script>
 </head>
 <body>
 	<h1>Async Test Page</h1>
@@ -39,17 +9,7 @@
 		<img src="/img/bigbang.jpg" alt="" style="width: 590px;" />
 	</p>
 
-	<h2>WebSocket Chat Demo</h2>
-
-	<div id="chat-messages"></div>
-	<br />
-
-	<p>
-		<textarea id="user-message" rows="3" style="width: 590px;"></textarea>
-	</p>
-	<p>
-		<button type="button" id="user-submit">Schreiben</button>
-	</p>
+	<p>This page is served by KoolKode Async HTTP.</p>
 
 </body>
 </html>
