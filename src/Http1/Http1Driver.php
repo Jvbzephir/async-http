@@ -103,7 +103,7 @@ class Http1Driver implements HttpDriverInterface
             
             $headers = [];
             
-            while (!$reader->eof()) {
+            while (!yield from $reader->eof()) {
                 $line = yield from $reader->readLine();
                 
                 if ($line === '') {
@@ -251,7 +251,7 @@ class Http1Driver implements HttpDriverInterface
         $in = new SocketStream($in);
         
         try {
-            while (!$in->eof()) {
+            while (!yield from $in->eof()) {
                 $chunk = yield from $in->read(8184);
         
                 yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));

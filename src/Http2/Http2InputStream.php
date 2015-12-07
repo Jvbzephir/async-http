@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\InputStreamInterface;
 
+use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
 /**
@@ -92,7 +93,6 @@ class Http2InputStream implements InputStreamInterface
     {
         return [
             'stream' => $this->stream->getId(),
-            'eof' => $this->eof(),
             'buffer' => sprintf('%u / %s bytes buffered', strlen($this->buffer), $this->size),
             'drained' => $this->drained,
             'timeout' => $this->timeout
@@ -126,8 +126,10 @@ class Http2InputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function eof(): bool
+    public function eof(): \Generator
     {
+        yield noop();
+        
         return $this->eof && $this->buffer === '';
     }
     
@@ -142,7 +144,7 @@ class Http2InputStream implements InputStreamInterface
     public function read(int $length = 8192, bool $fillBuffer = false): \Generator
     {
         if ($fillBuffer) {
-            while (strlen($this->buffer) < $length && !$this->eof()) {
+            while (strlen($this->buffer) < $length && !($this->eof && $this->buffer === '')) {
                 yield from $this->events->await(DataReceivedEvent::class, $this->timeout);
             }
         } else {

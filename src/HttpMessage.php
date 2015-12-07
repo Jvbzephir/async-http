@@ -11,6 +11,9 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\SocketStream;
+
 /**
  * Implementation of a PSR-7 HTTP message base class.
  * 
@@ -28,8 +31,6 @@ abstract class HttpMessage
     {
         $this->protocolVersion = (string) $protocolVersion;
         $this->headers = [];
-        
-        $this->body = new HttpBody(new \ArrayIterator([]));
         
         foreach ($headers as $k => $v) {
             if (is_object($v)) {
@@ -51,6 +52,11 @@ abstract class HttpMessage
                 $this->headers[strtolower($k)] = $filtered;
             }
         }
+        
+        $fp = fopen('php://temp', 'r+b');
+        stream_set_blocking($fp, 0);
+        
+        $this->body = new SocketStream($fp);
     }
 
     public function getProtocolVersion(): string
@@ -170,15 +176,13 @@ abstract class HttpMessage
         return $message;
     }
     
-    public function getBody(): HttpBody
+    public function getBody(): InputStreamInterface
     {
         return $this->body;
     }
     
-    public function withBody($body): HttpMessage
+    public function withBody(InputStreamInterface $body): HttpMessage
     {
-        $body = new HttpBody($body);
-        
         $message = clone $this;
         $message->body = $body;
         

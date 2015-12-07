@@ -271,7 +271,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
         $buffer = yield createTempStream();
     
-        while (!$event->body->eof()) {
+        while (!yield from $event->body->eof()) {
             yield from $buffer->write(yield from $event->body->read());
         }
     
