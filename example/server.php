@@ -80,7 +80,7 @@ $executor->runNewTask(call_user_func(function () {
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
     
-//     $http->addDriver(new Http2Driver($logger));
+    $http->addDriver(new Http2Driver($logger));
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
         

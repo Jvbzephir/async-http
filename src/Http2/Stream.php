@@ -581,9 +581,7 @@ class Stream
                     $this->updateLocalWindow($delta);
                 }
                 
-                if ($chunk !== '') {
-                    yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
-                }
+                yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
             } while (!$eof);
         } finally {
             $in->close();
