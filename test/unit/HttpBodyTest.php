@@ -41,13 +41,13 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runNewTask(call_user_func(function () {
             $connector = new Http1Connector();
             
-            $request = new HttpRequest(Uri::parse('http://phpdeveloper.org/'));
+            $request = new HttpRequest(Uri::parse('https://httpbin.org/gzip'));
             $response = yield from $connector->send($request);
             
             $body = $response->getBody();
             
             while (!yield from $body->eof()) {
-                var_dump(yield from $body->read());
+                fwrite(STDERR, yield from $body->read());
             }
         }));
         

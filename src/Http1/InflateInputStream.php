@@ -148,7 +148,6 @@ class InflateInputStream implements InputStreamInterface
         
         if ($this->buffer === '') {
             if (yield from $this->stream->eof()) {
-                var_dump('FUPS!');
                 $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, '', ZLIB_FINISH);
                 $this->finished = true;
             } else {

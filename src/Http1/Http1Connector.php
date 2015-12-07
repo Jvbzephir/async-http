@@ -78,7 +78,7 @@ class Http1Connector
         }
         
         if (function_exists('inflate_init')) {
-//             $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+            $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
         }
         
         return $request;
@@ -206,7 +206,7 @@ class Http1Connector
         }
         
         if ($decompress) {
-            $body = new InflateInputStream($body); 
+            $body = new InflateInputStream($body, $decompress); 
         }
         
         return $response->withBody($body);
