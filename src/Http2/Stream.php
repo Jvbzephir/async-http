@@ -158,6 +158,14 @@ class Stream
         $this->hpack = $conn->getHPack();
     }
     
+    public function __debugInfo(): array
+    {
+        return [
+            'id' => $this->id,
+            'headerBuffer' => sprintf('%u bytes buffered', strlen($this->headers))
+        ];
+    }
+    
     public function getId(): int
     {
         return $this->id;
@@ -308,7 +316,7 @@ class Stream
                         try {
                             $this->handleMessage($this->headers, $this->body);
                         } finally {
-                            $this->headers = NULL;
+                            $this->headers = '';
                         }
                     }
                     
@@ -358,7 +366,7 @@ class Stream
                         try {
                             $this->handleMessage($this->headers, $this->body);
                         } finally {
-                            $this->headers = NULL;
+                            $this->headers = '';
                         }
                     }
                     
@@ -463,40 +471,36 @@ class Stream
     
     public function sendRequest(HttpRequest $request): \Generator
     {
-        try {
-            $uri = $request->getUri();
-            $path = '/' . ltrim($request->getRequestTarget(), '/');
-            
-            $headers = [
-                ':method' => [
-                    $request->getMethod()
-                ],
-                ':scheme' => [
-                    $uri->getScheme()
-                ],
-                ':authority' => [
-                    $uri->getAuthority()
-                ],
-                ':path' => [
-                    $path
-                ]
-            ];
-            
-            yield from $this->sendHeaders($request, $headers);
-            yield from $this->sendBody($request);
-            
-            if ($this->logger) {
-                $this->logger->debug('<< {method} {path} HTTP/{version}', [
-                    'method' => $request->getMethod(),
-                    'path' => $path,
-                    'version' => $request->getProtocolVersion()
-                ]);
-            }
-            
-            return yield from $this->events->await(MessageReceivedEvent::class);
-        } finally {
-            $this->conn->closeStream($this->id);
+        $uri = $request->getUri();
+        $path = '/' . ltrim($request->getRequestTarget(), '/');
+        
+        $headers = [
+            ':method' => [
+                $request->getMethod()
+            ],
+            ':scheme' => [
+                $uri->getScheme()
+            ],
+            ':authority' => [
+                $uri->getAuthority()
+            ],
+            ':path' => [
+                $path
+            ]
+        ];
+        
+        yield from $this->sendHeaders($request, $headers);
+        yield from $this->sendBody($request);
+        
+        if ($this->logger) {
+            $this->logger->debug('<< {method} {path} HTTP/{version}', [
+                'method' => $request->getMethod(),
+                'path' => $path,
+                'version' => $request->getProtocolVersion()
+            ]);
         }
+        
+        return yield from $this->events->await(MessageReceivedEvent::class);
     }
 
     public function sendResponse(HttpResponse $response): \Generator

@@ -93,6 +93,7 @@ class Http2InputStream implements InputStreamInterface
     {
         return [
             'stream' => $this->stream->getId(),
+            'eof' => $this->eof,
             'buffer' => sprintf('%u / %s bytes buffered', strlen($this->buffer), $this->size),
             'drained' => $this->drained,
             'timeout' => $this->timeout

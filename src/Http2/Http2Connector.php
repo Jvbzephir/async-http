@@ -11,26 +11,27 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\K1\Http\HttpFactoryInterface;
-use KoolKode\Stream\ResourceInputStream;
-use Psr\Http\Message\RequestInterface;
+use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\createTempStream;
+use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
 class Http2Connector
 {
-    protected $httpFactory;
+    protected $logger;
     
     protected $sockets = [];
     
-    public function __construct(HttpFactoryInterface $factory)
+    public function __construct(LoggerInterface $logger = NULL)
     {
-        $this->httpFactory = $factory;
+        $this->logger = $logger;
     }
-
-    public function send(RequestInterface $request): \Generator
+    
+    public function send(HttpRequest $request): \Generator
     {
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
@@ -53,7 +54,7 @@ class Http2Connector
             throw new \RuntimeException('Failed to negotiate encrypted HTTP/2.0 connection');
         }
         
-        $conn = yield from Connection::connectClient($socket);
+        $conn = yield from Connection::connectClient($socket, $this->logger);
         
         yield runTask(call_user_func(function () use($conn) {
             while (true) {
@@ -70,7 +71,9 @@ class Http2Connector
     
     protected function createResponse(MessageReceivedEvent $event): \Generator
     {
-        $response = $this->httpFactory->createResponse();
+        yield noop();
+        
+        $response = new HttpResponse();
         $response = $response->withProtocolVersion('2.0');
         $response = $response->withStatus($event->getHeaderValue(':status'));
         
@@ -78,17 +81,7 @@ class Http2Connector
             $response = $response->withAddedHeader($header[0], $header[1]);
         }
         
-        $buffer = yield createTempStream();
-        
-        while (!yield from $event->body->eof()) {
-            yield from $buffer->write(yield from $event->body->read());
-        }
-        
-        $buffer = $buffer->detach();
-        rewind($buffer);
-        stream_set_blocking($buffer, 1);
-        
-        $response = $response->withBody(new ResourceInputStream($buffer));
+        $response = $response->withBody($event->body);
         
         return $response;
     }

@@ -14,6 +14,10 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Http1\Http1Connector;
+use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Log\Logger;
+
+use function KoolKode\Async\newEventEmitter;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -34,16 +38,36 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         return $executor;
     }
 
-    public function testClient()
+    public function testHttp1Client()
     {
         $executor = $this->createExecutor();
         
         $executor->runNewTask(call_user_func(function () {
             $connector = new Http1Connector();
             
-            $request = new HttpRequest(Uri::parse('https://httpbin.org/gzip'));
+            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'));
             $response = yield from $connector->send($request);
             
+            $body = $response->getBody();
+            
+            while (!yield from $body->eof()) {
+                fwrite(STDERR, yield from $body->read());
+            }
+        }));
+        
+        $executor->run();
+    }
+    
+    public function testHttp2Client()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runNewTask(call_user_func(function () {
+            $connector = new Http2Connector(new Logger(yield newEventEmitter()));
+        
+            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'));
+            $response = yield from $connector->send($request);
+        
             $body = $response->getBody();
             
             while (!yield from $body->eof()) {
