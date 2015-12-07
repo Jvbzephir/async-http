@@ -62,16 +62,20 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     {
         $executor = $this->createExecutor();
         
-        $executor->runNewTask(call_user_func(function () {
-            $connector = new Http2Connector(new Logger(yield newEventEmitter()));
-        
-            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'));
-            $response = yield from $connector->send($request);
-        
-            $body = $response->getBody();
+        $executor->runNewTask(call_user_func(function () use($executor) {
+            $connector = new Http2Connector();
             
-            while (!yield from $body->eof()) {
-                fwrite(STDERR, yield from $body->read());
+            try {
+                $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'));
+                $response = yield from $connector->send($request);
+                
+                $body = $response->getBody();
+                
+                while (!yield from $body->eof()) {
+                    fwrite(STDERR, yield from $body->read());
+                }
+            } finally {
+                $connector->shutdown();
             }
         }));
         

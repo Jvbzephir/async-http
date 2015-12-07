@@ -16,7 +16,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\createTempStream;
 use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
@@ -24,11 +23,22 @@ class Http2Connector
 {
     protected $logger;
     
-    protected $sockets = [];
+    protected $tasks = [];
     
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
+    }
+    
+    public function shutdown()
+    {
+        try {
+            foreach ($this->tasks as $task) {
+                $task->cancel();
+            }
+        } finally {
+            $this->tasks = [];
+        }
     }
     
     public function send(HttpRequest $request): \Generator
@@ -56,19 +66,19 @@ class Http2Connector
         
         $conn = yield from Connection::connectClient($socket, $this->logger);
         
-        yield runTask(call_user_func(function () use($conn) {
+        $this->tasks[] = yield runTask(call_user_func(function () use ($conn) {
             while (true) {
                 if (false === yield from $conn->handleNextFrame()) {
                     break;
                 }
             }
-        }));
+        }), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
         
         $stream = yield from $conn->openStream();
         
         return yield from $this->createResponse(yield from $stream->sendRequest($request));
     }
-    
+
     protected function createResponse(MessageReceivedEvent $event): \Generator
     {
         yield noop();

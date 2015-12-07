@@ -154,7 +154,7 @@ class Http2InputStream implements InputStreamInterface
         
         if (($this->eof && $this->drained > 0) || ($this->drained > 4096 && strlen($this->buffer) < $this->size)) {
             try {
-                yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), true);
+                yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), 'HTTP/2 Remote Window Increment', true);
             } finally {
                 $this->drained = 0;
             }

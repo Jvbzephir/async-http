@@ -247,7 +247,7 @@ class HttpEndpoint
                         if ((isset($crypto['alpn_protocol']))) {
                             foreach ($this->drivers as $driver) {
                                 if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
-                                    yield runTask($this->handleConnection($driver, $stream, $action));
+                                    yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
                                     
                                     continue 2;
                                 }
@@ -255,7 +255,7 @@ class HttpEndpoint
                         }
                     }
                     
-                    yield runTask($this->handleConnection($this->http1Driver, $stream, $action));
+                    yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
                 } catch (\Throwable $e) {
                     $stream->close();
                 }
