@@ -20,6 +20,7 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use Psr\Log\LoggerInterface;
+use KoolKode\Async\Task;
 
 /**
  * HTTP/1 server endpoint.
@@ -173,6 +174,10 @@ class Http1Driver implements HttpDriverInterface
         
         try {
             $result = $action($request, $response);
+            
+            if ($result instanceof \Generator || $result instanceof Task) {
+                $result = yield from $result;
+            }
             
             return yield from $this->sendResponse($socket, $result[0]);
         } finally {

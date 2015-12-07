@@ -257,6 +257,10 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
         $response = $action($request, $response);
         
+        if ($response instanceof \Generator || $response instanceof Task) {
+            $response = yield from $response;
+        }
+        
         if (is_array($response)) {
             //             $push = $response[1];
             $response = $response[0];
