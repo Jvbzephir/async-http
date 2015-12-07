@@ -13,11 +13,10 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\HttpData;
 
 /**
  * HTTP/1 client endpoint.

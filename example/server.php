@@ -10,18 +10,16 @@
  */
 
 use KoolKode\Async\ExecutorFactory;
-use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Http2\Http2Driver;
+use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Log\Logger;
-use KoolKode\K1\App;
-use KoolKode\K1\K1;
-use KoolKode\Stream\ResourceInputStream;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LogLevel;
 
 use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\runTask;
+use KoolKode\Async\Stream\SocketStream;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -43,38 +41,38 @@ $executor->runNewTask(call_user_func(function () {
     
     $logger = new Logger(yield newEventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
     
-    $app = new App((new K1())->build());
+//     $app = new App((new K1())->build());
     
-    $app->route('index', '/', function (ServerRequestInterface $request) {
-        return sprintf('You are connected using HTTP/%s', $request->getProtocolVersion());
-    });
+//     $app->route('index', '/', function (ServerRequestInterface $request) {
+//         return sprintf('You are connected using HTTP/%s', $request->getProtocolVersion());
+//     });
     
-    $app->route('favicon', 'GET /favicon.ico', function (ResponseInterface $response) {
-        $response = $response->withHeader('Content-Type', 'image/vnd.microsoft.icon');
-        $response = $response->withHeader('Cache-Control', 'public,max-age=3600');
-        $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/favicon.ico'));
+//     $app->route('favicon', 'GET /favicon.ico', function (ResponseInterface $response) {
+//         $response = $response->withHeader('Content-Type', 'image/vnd.microsoft.icon');
+//         $response = $response->withHeader('Cache-Control', 'public,max-age=3600');
+//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/favicon.ico'));
         
-        return $response;
-    });
+//         return $response;
+//     });
     
-    $app->route('html', 'GET /test.html', function (ResponseInterface $response) use($app) {
-        $response = $response->withHeader('Content-Type', 'text/html');
-        $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/test.html'));
+//     $app->route('html', 'GET /test.html', function (ResponseInterface $response) use($app) {
+//         $response = $response->withHeader('Content-Type', 'text/html');
+//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/test.html'));
         
-        return $response->withAddedHeader('K1-Push-Promise', 'bigbang');
-    });
+//         return $response->withAddedHeader('K1-Push-Promise', 'bigbang');
+//     });
     
-    $app->route('greeting', '/greet/{name}', function ($name) {
-        return sprintf('Hello %s', $name);
-    });
+//     $app->route('greeting', '/greet/{name}', function ($name) {
+//         return sprintf('Hello %s', $name);
+//     });
     
-    $app->route('bigbang', 'GET /img/bigbang.jpg', function (ResponseInterface $response) {
-        $response = $response->withHeader('Content-Type', 'image/jpeg');
-        $response = $response->withHeader('Cache-Control', 'public,max-age=30');
-        $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/big-bang-theory.jpg'));
+//     $app->route('bigbang', 'GET /img/bigbang.jpg', function (ResponseInterface $response) {
+//         $response = $response->withHeader('Content-Type', 'image/jpeg');
+//         $response = $response->withHeader('Cache-Control', 'public,max-age=30');
+//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/big-bang-theory.jpg'));
         
-        return $response;
-    });
+//         return $response;
+//     });
     
     $http = new HttpEndpoint(8000, '0.0.0.0', 'test.k1');
     $http->setCertificate(__DIR__ . '/cert.pem', true);
@@ -82,28 +80,39 @@ $executor->runNewTask(call_user_func(function () {
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
     
-    $http->addDriver(new Http2Driver($logger));
+//     $http->addDriver(new Http2Driver($logger));
     
-    $action = function ($request, $response) use ($app, $http) {
-        $response = $app($request, $response);
+    $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
         
-        $factory = $http->getHttp1Driver()->getHttpFactory();
-        $base = $request->getUri();
-        $push = [];
+        var_dump($request->getRequestTarget());
         
-        foreach ($response->getHeader('K1-Push-Promise') as $route) {
-            $uri = $factory->createUri($app->resolve($route));
-            $uri = $uri->withScheme($base->getScheme());
-            $uri = $uri->withHost($base->getHost());
-            $uri = $uri->withPort($base->getPort());
-            
-            $push[] = $app($factory->createServerRequest()->withUri($uri)->withRequestTarget($uri->getPath()), $factory->createResponse());
-        }
+        $text = fopen('php://temp', 'r+b');
+        
+        fwrite($text, 'Hello KK :)');
+        rewind($text);
+        stream_set_blocking($text, 0);
         
         return [
-            $response->withoutHeader('K1-Push-Promise'),
-            $push
-        ];
+            $response->withBody(new SocketStream($text))
+        ];        
+        
+//         $factory = $http->getHttp1Driver()->getHttpFactory();
+//         $base = $request->getUri();
+//         $push = [];
+        
+//         foreach ($response->getHeader('K1-Push-Promise') as $route) {
+//             $uri = $factory->createUri($app->resolve($route));
+//             $uri = $uri->withScheme($base->getScheme());
+//             $uri = $uri->withHost($base->getHost());
+//             $uri = $uri->withPort($base->getPort());
+            
+//             $push[] = $app($factory->createServerRequest()->withUri($uri)->withRequestTarget($uri->getPath()), $factory->createResponse());
+//         }
+        
+//         return [
+//             $response->withoutHeader('K1-Push-Promise'),
+//             $push
+//         ];
     };
     
     yield runTask($http->run($action), $http->getTitle());

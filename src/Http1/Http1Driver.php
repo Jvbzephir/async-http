@@ -19,7 +19,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -119,24 +118,23 @@ class Http1Driver implements HttpDriverInterface
             
             $uri = Uri::parse($uri);
             
-            $server = [
-                'SERVER_PROTOCOL' => 'HTTP/' . $m[3],
-                'REQUEST_METHOD' => $m[1],
-                'REQUEST_URI' => '/' . ltrim($m[2], '/'),
-                'SCRIPT_NAME' => '',
-                'SERVER_NAME' => $endpoint->getPeerName(),
-                'SERVER_PORT' => $endpoint->getPort(),
-                'REQUEST_TIME' => time(),
-                'REQUEST_TIME_FLOAT' => microtime(true),
-                'HTTP_HOST' => empty($headers['host'][0][1]) ? $endpoint->getPeerName() : $headers['host'][0][1]
-            ];
+//             $server = [
+//                 'SERVER_PROTOCOL' => 'HTTP/' . $m[3],
+//                 'REQUEST_METHOD' => $m[1],
+//                 'REQUEST_URI' => '/' . ltrim($m[2], '/'),
+//                 'SCRIPT_NAME' => '',
+//                 'SERVER_NAME' => $endpoint->getPeerName(),
+//                 'SERVER_PORT' => $endpoint->getPort(),
+//                 'REQUEST_TIME' => time(),
+//                 'REQUEST_TIME_FLOAT' => microtime(true),
+//                 'HTTP_HOST' => empty($headers['host'][0][1]) ? $endpoint->getPeerName() : $headers['host'][0][1]
+//             ];
             
-            $query = [];
-            parse_str($uri->getQuery(), $query);
-            
-            $request = $this->getHttpFactory()->createServerRequest($server, $query);
+//             $query = [];
+//             parse_str($uri->getQuery(), $query);
             
             $request = new HttpRequest();
+            $request = $request->withMethod($m[1]);
             $request = $request->withProtocolVersion($m[3]);
             $request = $request->withUri($uri);
             
@@ -185,11 +183,11 @@ class Http1Driver implements HttpDriverInterface
     /**
      * Search for an appropriate HTTP/1 upgrade handler.
      * 
-     * @param ServerRequestInterface $request
+     * @param HttpRequest $request
      * @param HttpEndpoint $endpoint
      * @return HttpUpgradeHandlerInterface or NULL when no such handler was found.
      */
-    protected function findUpgradeHandler(ServerRequestInterface $request, HttpEndpoint $endpoint)
+    protected function findUpgradeHandler(HttpRequest $request, HttpEndpoint $endpoint)
     {
         if (!in_array('upgrade', $this->splitHeaderValues($request->getHeaderLine('Connection')), true)) {
             return;
@@ -226,10 +224,10 @@ class Http1Driver implements HttpDriverInterface
      * Serialize HTTP response and transmit data over the wire.
      * 
      * @param DuplexStreamInterface $socket
-     * @param ResponseInterface $response
+     * @param HttpResponse $response
      * @return Generator
      */
-    protected function sendResponse(DuplexStreamInterface $socket, ResponseInterface $response): \Generator
+    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response): \Generator
     {
         $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
         $response = $response->withHeader('Connection', 'close');
@@ -245,16 +243,15 @@ class Http1Driver implements HttpDriverInterface
         
         yield from $socket->write($message . "\r\n");
         
-        $in = $response->getBody()->detach();
-        
-        stream_set_blocking($in, 0);
-        $in = new SocketStream($in);
+        $in = $response->getBody();
         
         try {
             while (!yield from $in->eof()) {
                 $chunk = yield from $in->read(8184);
-        
-                yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                
+                if ($chunk !== '') {
+                    yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                }
             }
         
             yield from $socket->write("0\r\n\r\n");
