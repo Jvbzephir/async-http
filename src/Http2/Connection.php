@@ -17,6 +17,7 @@ use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\readBuffer;
 
 /**
  * A transport-layer connection between two endpoints.
@@ -190,7 +191,7 @@ class Connection
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
-        $preface = yield from $socket->read(strlen(self::PREFACE), true);
+        $preface = yield readBuffer($socket, strlen(self::PREFACE));
     
         if ($preface !== self::PREFACE) {
             throw new \RuntimeException('Client did not send valid HTTP/2 connection preface');
@@ -250,7 +251,7 @@ class Connection
      */
     public function readNextFrame(): \Generator
     {
-        $header = yield from $this->socket->read(9, true);
+        $header = yield readBuffer($this->socket, 9);
         
         if (strlen($header) !== 9) {
             throw new SocketException('Connection terminated');
@@ -286,7 +287,7 @@ class Connection
                 throw (new StreamException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR))->setStreamId($stream);
             }
             
-            $data = yield from $this->socket->read($length, true);
+            $data = yield readBuffer($this->socket, $length);
         } else {
             $data = '';
         }

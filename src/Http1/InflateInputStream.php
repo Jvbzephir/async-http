@@ -134,7 +134,7 @@ class InflateInputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function read(int $length = 8192, bool $fillBuffer = false): \Generator
+    public function read(int $length = 8192): \Generator
     {
         if ($this->stream === NULL) {
             throw new \RuntimeException(sprintf('Cannot read from detached stream'));
@@ -143,8 +143,6 @@ class InflateInputStream implements InputStreamInterface
         if ($this->finished || $length == 0) {
             return '';
         }
-        
-        // TODO: fillBuffer?!
         
         if ($this->buffer === '') {
             if (yield from $this->stream->eof()) {

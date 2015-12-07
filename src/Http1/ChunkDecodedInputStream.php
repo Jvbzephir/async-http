@@ -103,7 +103,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function read(int $length = 8192, bool $fillBuffer = false): \Generator
+    public function read(int $length = 8192): \Generator
     {
         if ($this->stream === NULL) {
             throw new \RuntimeException('Cannot read from detached stream');
@@ -120,8 +120,6 @@ class ChunkDecodedInputStream implements InputStreamInterface
         if ($this->ended) {
             return '';
         }
-        
-        // TODO: fillBuffer?!
         
         $chunk = (string) substr($this->buffer, 0, min($length, $this->remainder));
         $length = strlen($chunk);

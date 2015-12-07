@@ -26,6 +26,7 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\createTempStream;
 use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\readBuffer;
 
 /**
  * HTTP/2 driver.
@@ -139,7 +140,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             return false;
         }
         
-        return Connection::PREFACE === yield from $stream->read(strlen(Connection::PREFACE), true);
+        return Connection::PREFACE === yield readBuffer($stream, strlen(Connection::PREFACE));
     }
     
     /**
@@ -195,7 +196,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             
             $conn = new Connection(Connection::MODE_SERVER, $socket, yield newEventEmitter(), $this->logger);
             
-            $preface = yield from $socket->read(strlen(Connection::PREFACE), true);
+            $preface = yield readBuffer($socket, strlen(Connection::PREFACE));
             
             if ($preface !== self::PREFACE) {
                 if ($this->logger) {

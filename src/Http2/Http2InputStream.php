@@ -141,16 +141,10 @@ class Http2InputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function read(int $length = 8192, bool $fillBuffer = false): \Generator
+    public function read(int $length = 8192): \Generator
     {
-        if ($fillBuffer) {
-            while (strlen($this->buffer) < $length && !($this->eof && $this->buffer === '')) {
-                yield from $this->events->await(DataReceivedEvent::class, $this->timeout);
-            }
-        } else {
-            while ($this->buffer === '' && !$this->eof) {
-                yield from $this->events->await(DataReceivedEvent::class, $this->timeout);
-            }
+        while ($this->buffer === '' && !$this->eof) {
+            yield from $this->events->await(DataReceivedEvent::class, $this->timeout);
         }
         
         $chunk = substr($this->buffer, 0, $length);
