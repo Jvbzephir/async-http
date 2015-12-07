@@ -95,44 +95,48 @@ class Http1Connector
     {
         $body = $request->getBody();
         
-        $chunk = yield from $body->read();
-        $chunked = false;
-        
-        if ($chunk === '') {
-            $request = $request->withHeader('Content-Length', '0');
-        } else {
-            $request = $request->withHeader('Transfer-Encoding', 'chunked');
-            $chunked = true;
-        }
-        
-        $message = sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        
-        foreach ($request->getHeaders() as $name => $values) {
-            foreach ($values as $value) {
-                $message .= sprintf("%s: %s\n", $name, $value);
-            }
-        }
-        
-        yield from $stream->write($message . "\r\n");
-        
-        if ($chunked) {
-            yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+        try {
+            $chunk = yield from $body->read();
+            $chunked = false;
             
-            while (!yield from $body->eof()) {
-                $chunk = yield from $body->read();
-                
-                if ($chunk !== '') {
-                    yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+            if ($chunk === '') {
+                $request = $request->withHeader('Content-Length', '0');
+            } else {
+                $request = $request->withHeader('Transfer-Encoding', 'chunked');
+                $chunked = true;
+            }
+            
+            $message = sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
+            
+            foreach ($request->getHeaders() as $name => $values) {
+                foreach ($values as $value) {
+                    $message .= sprintf("%s: %s\n", $name, $value);
                 }
             }
             
-            yield from $stream->write("0\r\n\r\n");
-        } else {
-            yield from $stream->write($chunk);
+            yield from $stream->write($message . "\r\n");
             
-            while (!yield from $body->eof()) {
-                yield from $stream->write(yield from $body->read());
+            if ($chunked) {
+                yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+                
+                while (!yield from $body->eof()) {
+                    $chunk = yield from $body->read();
+                    
+                    if ($chunk !== '') {
+                        yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+                    }
+                }
+                
+                yield from $stream->write("0\r\n\r\n");
+            } else {
+                yield from $stream->write($chunk);
+                
+                while (!yield from $body->eof()) {
+                    yield from $stream->write(yield from $body->read());
+                }
             }
+        } finally {
+            $body->close();
         }
     }
     

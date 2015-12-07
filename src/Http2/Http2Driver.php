@@ -11,20 +11,17 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\K1\Http\DefaultHttpFactory;
-use KoolKode\K1\Http\Http;
-use KoolKode\K1\Http\HttpFactoryInterface;
-use KoolKode\Stream\ResourceInputStream;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\createTempStream;
 use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\readBuffer;
 
@@ -57,20 +54,6 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
      * @var array
      */
     protected $conns = [];
-    
-    public function getHttpFactory(): HttpFactoryInterface
-    {
-        if ($this->httpFactory === NULL) {
-            $this->httpFactory = new DefaultHttpFactory();
-        }
-        
-        return $this->httpFactory;
-    }
-    
-    public function setHttpFactory(HttpFactoryInterface $factory)
-    {
-        $this->httpFactory = $factory;
-    }
     
     public function setLogger(LoggerInterface $logger = NULL)
     {
@@ -146,7 +129,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function isUpgradeSupported(string $protocol, ServerRequestInterface $request): bool
+    public function isUpgradeSupported(string $protocol, HttpRequest $request): bool
     {
         if (!$this->upgradeEnabled) {
             return false;
@@ -179,7 +162,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function upgradeConnection(ServerRequestInterface $request, ResponseInterface $response, HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
+    public function upgradeConnection(HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
     {
         $settings = @base64_decode($request->getHeaderLine('HTTP2-Settings'));
         if ($settings === false) {
@@ -230,31 +213,28 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     
     public function handleMessage(MessageReceivedEvent $event, HttpEndpoint $endpoint, callable $action): \Generator
     {
-        $factory = $this->getHttpFactory();
-        
         $authority = $event->getHeaderValue(':authority');
         $path = ltrim($event->getHeaderValue(':path'), '/');
+        
+        $uri = Uri::parse(sprintf('%s://%s/%s', $endpoint->isEncrypted() ? 'https' : 'http', $authority, $path));
     
-        $uri = $factory->createUri(sprintf('%s://%s/%s', $endpoint->isEncrypted() ? 'https' : 'http', $authority, $path));
+//         $server = [
+//             'SERVER_PROTOCOL' => 'HTTP/2.0',
+//             'REQUEST_METHOD' => $event->getHeaderValue(':method'),
+//             'REQUEST_URI' => '/' . $path,
+//             'SCRIPT_NAME' => '',
+//             'SERVER_NAME' => $endpoint->getPeerName(),
+//             'SERVER_PORT' => $endpoint->getPort(),
+//             'REQUEST_TIME' => time(),
+//             'REQUEST_TIME_FLOAT' => microtime(true),
+//             'HTTP_HOST' => $uri->getHost() ?? $this->getPeerName()
+//         ];
     
-        $server = [
-            'SERVER_PROTOCOL' => 'HTTP/2.0',
-            'REQUEST_METHOD' => $event->getHeaderValue(':method'),
-            'REQUEST_URI' => '/' . $path,
-            'SCRIPT_NAME' => '',
-            'SERVER_NAME' => $endpoint->getPeerName(),
-            'SERVER_PORT' => $endpoint->getPort(),
-            'REQUEST_TIME' => time(),
-            'REQUEST_TIME_FLOAT' => microtime(true),
-            'HTTP_HOST' => $uri->getHost() ?? $this->getPeerName()
-        ];
-    
-        $query = [];
-        parse_str($uri->getQuery(), $query);
-    
-        yield;
-    
-        $request = $factory->createServerRequest($server, $query);
+//         $query = [];
+//         parse_str($uri->getQuery(), $query);
+
+        $request = new HttpRequest();
+        $request = $request->withMethod($event->getHeaderValue(':method'));
         $request = $request->withProtocolVersion('2.0');
         $request = $request->withUri($uri);
     
@@ -270,25 +250,19 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $buffer = yield createTempStream();
-    
-        while (!yield from $event->body->eof()) {
-            yield from $buffer->write(yield from $event->body->read());
-        }
-    
-        $buffer = $buffer->detach();
-        rewind($buffer);
-        stream_set_blocking($buffer, 1);
-    
-        $request = $request->withBody(new ResourceInputStream($buffer));
-    
-        //         $push = [];
-        $response = $action($request, $factory->createResponse());
-    
+        $request = $request->withBody($event->body);
+        
+        $response = new HttpResponse();
+        $response = $response->withProtocolVersion('2.0');
+        
+        $response = $action($request, $response);
+        
         if (is_array($response)) {
             //             $push = $response[1];
             $response = $response[0];
         }
+        
+        $response = $response->withProtocolVersion('2.0');
     
         yield from $event->stream->sendResponse($response);
     }

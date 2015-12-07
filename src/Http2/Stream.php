@@ -12,12 +12,10 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
-use KoolKode\Async\Stream\SocketException;
-use KoolKode\Async\Stream\SocketStream;
-use KoolKode\K1\Http\Http;
-use Psr\Http\Message\MessageInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpMessage;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
@@ -463,7 +461,7 @@ class Stream
         ]);
     }
     
-    public function sendRequest(RequestInterface $request): \Generator
+    public function sendRequest(HttpRequest $request): \Generator
     {
         try {
             $uri = $request->getUri();
@@ -501,7 +499,7 @@ class Stream
         }
     }
 
-    public function sendResponse(ResponseInterface $response): \Generator
+    public function sendResponse(HttpResponse $response): \Generator
     {
         try {
             $headers = [
@@ -525,7 +523,7 @@ class Stream
         }
     }
     
-    protected function sendHeaders(MessageInterface $message, array $headers): \Generator
+    protected function sendHeaders(HttpMessage $message, array $headers): \Generator
     {
         $headers = HPack::encode(array_merge($headers, array_change_key_case($message->getHeaders(), CASE_LOWER)));
         
@@ -548,16 +546,9 @@ class Stream
         }
     }
     
-    protected function sendBody(MessageInterface $message): \Generator
+    protected function sendBody(HttpMessage $message): \Generator
     {
-        $in = $message->getBody()->detach();
-        
-        if (!is_resource($in)) {
-            throw new SocketException('Unable to convert HTTP body into a streamable resource');
-        }
-        
-        stream_set_blocking($in, 0);
-        $in = new SocketStream($in);
+        $in = $message->getBody();
         
         try {
             do {
@@ -586,7 +577,9 @@ class Stream
                     $this->updateLocalWindow($delta);
                 }
                 
-                yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
+                if ($chunk !== '') {
+                    yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
+                }
             } while (!$eof);
         } finally {
             $in->close();
