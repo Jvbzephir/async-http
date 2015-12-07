@@ -39,6 +39,13 @@ class Http2InputStream implements InputStreamInterface
     protected $events;
     
     /**
+     * Close HTTP/2 stream?
+     * 
+     * @var bool
+     */
+    protected $close;
+    
+    /**
      * Has END_STREAM flag been received yet?
      * 
      * @var bool
@@ -81,10 +88,11 @@ class Http2InputStream implements InputStreamInterface
      * @param int $size Max in-memory buffer size (in bytes).
      * @param float $timeout Read timeout (in seconds).
      */
-    public function __construct(Stream $stream, EventEmitter $events, int $size = Stream::INITIAL_WINDOW_SIZE, float $timeout = 5)
+    public function __construct(Stream $stream, EventEmitter $events, bool $close, int $size = Stream::INITIAL_WINDOW_SIZE, float $timeout = 5)
     {
         $this->stream = $stream;
         $this->events = $events;
+        $this->close = $close;
         $this->size = $size;
         $this->timeout = $timeout;
     }
@@ -122,6 +130,10 @@ class Http2InputStream implements InputStreamInterface
     public function close()
     {
         $this->eof = true;
+        
+        if($this->close) {
+            $this->stream->close();
+        }
     }
     
     /**

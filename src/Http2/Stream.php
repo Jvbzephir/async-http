@@ -20,6 +20,7 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\currentTask;
 
 /**
  * A bidirectional flow of frames within the HTTP/2 connection.
@@ -147,6 +148,8 @@ class Stream
      */
     protected $hpack;
     
+    protected $tasks = [];
+    
     public function __construct(int $id, Connection $conn, EventEmitter $events, LoggerInterface $logger = NULL)
     {
         $this->id = $id;
@@ -164,6 +167,17 @@ class Stream
             'id' => $this->id,
             'headerBuffer' => sprintf('%u bytes buffered', strlen($this->headers))
         ];
+    }
+    
+    public function close()
+    {
+        try {
+            foreach ($this->tasks as $task) {
+                $task->cancel();
+            }
+        } finally {
+            $this->tasks = [];
+        }
     }
     
     public function getId(): int
@@ -279,7 +293,7 @@ class Stream
     public function handleFrame(Frame $frame): \Generator
     {
         if ($this->body === NULL) {
-            $this->body = new Http2InputStream($this, yield newEventEmitter());
+            $this->body = new Http2InputStream($this, yield newEventEmitter(), ($this->id % 2) !== 0);
         }
         
         try {
@@ -383,6 +397,14 @@ class Stream
                 case Frame::PUSH_PROMISE:
                     break;
                 case Frame::RST_STREAM:
+                    try {
+                        foreach ($this->tasks as $task) {
+                            $task->cancel();
+                        }
+                    } finally {
+                        $this->tasks = [];
+                    }
+                    
                     if ($this->state === self::IDLE) {
                         throw new ConnectionException('Cannot reset stream in idle state', Frame::PROTOCOL_ERROR);
                     }
@@ -463,10 +485,19 @@ class Stream
      */
     public function incrementRemoteWindow(int $increment): \Generator
     {
-        yield awaitAll([
-            $this->conn->incrementRemoteWindow($increment),
-            $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)))
-        ]);
+        $task = yield currentTask();
+        $this->tasks[$task->id] = $task;
+        
+        try {
+            yield from $this->conn->incrementRemoteWindow($increment);
+            yield from $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)));
+//             yield awaitAll([
+//                 $this->conn->incrementRemoteWindow($increment),
+//                 $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)))
+//             ]);
+        } finally {
+            unset($this->tasks[$task->id]);
+        }
     }
     
     public function sendRequest(HttpRequest $request): \Generator
