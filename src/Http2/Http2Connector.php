@@ -49,7 +49,7 @@ class Http2Connector
         $port = $uri->getPort() ?: ($secure ? 443 : 80);
         
         $context = [];
-        if (defined('OPENSSL_VERSION_NUMBER') && OPENSSL_VERSION_NUMBER >= 0x10002000) {
+        if (SocketStream::isAlpnSupported()) {
             $context['ssl']['alpn_protocols'] = 'h2';
         }
         

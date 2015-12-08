@@ -176,7 +176,7 @@ class Connection
     
         yield from $socket->write(self::PREFACE);
         yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', Connection::SETTING_INITIAL_WINDOW_SIZE, Stream::INITIAL_WINDOW_SIZE)), 500);
-    
+        
         return $conn;
     }
     
@@ -255,6 +255,11 @@ class Connection
         
         if (strlen($header) !== 9) {
             throw new SocketException('Connection terminated');
+        }
+        
+        $m = NULL;
+        if (preg_match("'^HTTP/(1.[0-1])\s+'i", $header, $m)) {
+            throw new ConnectionException(sprintf('Received HTTP/%s response', $m[1]));
         }
         
         $stream = unpack('N', substr($header, 5, 4))[1];

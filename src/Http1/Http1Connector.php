@@ -17,6 +17,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
+use Psr\Log\LoggerInterface;
 
 /**
  * HTTP/1 client endpoint.
@@ -25,6 +26,13 @@ use KoolKode\Async\Stream\SocketStream;
  */
 class Http1Connector
 {
+    protected $logger;
+    
+    public function __construct(LoggerInterface $logger = NULL)
+    {
+        $this->logger = $logger;
+    }
+    
     /**
      * Coroutine that sends an HTTP/1 request and returns the receved HTTP response.
      * 
@@ -135,6 +143,14 @@ class Http1Connector
                     yield from $stream->write(yield from $body->read());
                 }
             }
+            
+            if ($this->logger) {
+                $this->logger->debug('<< {method} {target} HTTP/{version}', [
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'version' => $request->getProtocolVersion()
+                ]);
+            }
         } finally {
             $body->close();
         }
@@ -210,6 +226,14 @@ class Http1Connector
         
         if ($decompress) {
             $body = new InflateInputStream($body, $decompress); 
+        }
+        
+        if ($this->logger) {
+            $this->logger->debug('>> HTTP/{version} {status} {reason}', [
+                'version' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'reason' => $response->getReasonPhrase()
+            ]);
         }
         
         return $response->withBody($body);

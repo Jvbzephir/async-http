@@ -321,7 +321,7 @@ class HttpEndpoint
             $alpn = array_merge($alpn, $driver->getProtocols());
         }
         
-        if (!empty($alpn) && defined('OPENSSL_VERSION_NUMBER') && OPENSSL_VERSION_NUMBER >= 0x10002000) {
+        if (!empty($alpn) && SocketStream::isAlpnSupported()) {
             $sslOptions['alpn_protocols'] = implode(',', array_unique($alpn));
         }
         
