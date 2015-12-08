@@ -22,10 +22,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     {
         $executor = (new ExecutorFactory())->createExecutor();
         
-        $executor->setErrorHanndler(function (\Throwable $e) {
-            fwrite(STDERR, $e . "\n\n");
-        });
-        
         $file = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'config.local.php';
         
         if (is_file($file)) {
