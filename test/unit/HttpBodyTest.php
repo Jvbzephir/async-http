@@ -68,10 +68,9 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             try {
                 $body = $response->getBody();
                 
-                // FIXME: Reading body contents blocks the executor... investigate this.
-//                 while (!yield from $body->eof()) {
-//                     yield from $body->read();
-//                 }
+                while (!yield from $body->eof()) {
+                    yield from $body->read();
+                }
             } finally {
                 $body->close();
                 $connector->shutdown();
