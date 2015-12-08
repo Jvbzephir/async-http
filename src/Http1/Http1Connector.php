@@ -95,7 +95,7 @@ class Http1Connector
      * Assemble and stream request data to the remote endpoint.
      * 
      * @param SocketStream $stream
-     * @param RequestInterface $request
+     * @param HttpRequest $request
      * 
      * @throws \RuntimeException
      */

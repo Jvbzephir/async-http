@@ -78,7 +78,7 @@ class Http1Driver implements HttpDriverInterface
             $cached = false;
             $response = yield from $handler->upgradeDirectConnection($endpoint, $socket, $action);
             
-            if ($response instanceof ResponseInterface) {
+            if ($response instanceof HttpResponse) {
                 return yield from $this->sendResponse($socket, $response);
             }
             
@@ -166,7 +166,7 @@ class Http1Driver implements HttpDriverInterface
         if (NULL !== ($handler = $this->findUpgradeHandler($request, $endpoint))) {
             $response = yield from $handler->upgradeConnection($request, $response, $endpoint, $reader, $action);
             
-            if ($response instanceof ResponseInterface) {
+            if ($response instanceof HttpResponse) {
                 return yield from $this->sendResponse($socket, $response);
             }
             
