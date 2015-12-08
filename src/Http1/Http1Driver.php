@@ -79,7 +79,11 @@ class Http1Driver implements HttpDriverInterface
             $response = yield from $handler->upgradeDirectConnection($endpoint, $socket, $action);
             
             if ($response instanceof HttpResponse) {
-                return yield from $this->sendResponse($socket, $response);
+                try {
+                    return yield from $this->sendResponse($socket, $response);
+                } finally {
+                    $socket->close();
+                }
             }
             
             return;
