@@ -22,6 +22,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\is_runnable;
 use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\readBuffer;
 
@@ -257,8 +258,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
         $response = $action($request, $response);
         
-        if ($response instanceof \Generator || $response instanceof Task) {
-            $response = yield from $response;
+        if (is_runnable($response)) {
+            $response = yield $response;
         }
         
         if (is_array($response)) {
