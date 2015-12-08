@@ -53,7 +53,7 @@ abstract class HttpMessage
             }
         }
         
-        $fp = fopen('php://temp', 'r+b');
+        $fp = tmpfile();
         stream_set_blocking($fp, 0);
         
         $this->body = new SocketStream($fp);

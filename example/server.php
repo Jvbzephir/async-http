@@ -86,7 +86,7 @@ $executor->runNewTask(call_user_func(function () {
         
         var_dump($request->getRequestTarget());
         
-        $text = fopen('php://temp', 'r+b');
+        $text = tmpfile();
         
         fwrite($text, 'Hello KK :)');
         rewind($text);
