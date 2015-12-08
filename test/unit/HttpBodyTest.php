@@ -15,6 +15,7 @@ use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Stream\SocketStream;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -53,6 +54,10 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     public function testHttp2Client()
     {
+        if (!SocketStream::isAlpnSupported()) {
+            return $this->markTestSkipped('Test requires ALPN support');
+        }
+        
         $executor = $this->createExecutor();
         
         $executor->runNewTask(call_user_func(function () use ($executor) {
