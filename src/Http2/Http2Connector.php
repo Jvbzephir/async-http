@@ -59,11 +59,6 @@ class Http2Connector
             yield from $socket->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);
         }
         
-        $meta = $socket->getMetadata();
-        if (empty($meta['crypto']['alpn_protocol']) || $meta['crypto']['alpn_protocol'] !== 'h2') {
-            throw new \RuntimeException('Failed to negotiate encrypted HTTP/2.0 connection');
-        }
-        
         $conn = yield from Connection::connectClient($socket, $this->logger);
         
         $this->tasks[] = yield runTask(call_user_func(function () use ($conn) {
