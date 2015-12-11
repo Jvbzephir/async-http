@@ -108,7 +108,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function read(int $length = 8192): \Generator
+    public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         $read = 0;
         
@@ -127,7 +127,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
         }
         
         if ($this->cache) {
-            $this->buffer .= yield from $this->stream->read($length - $read);
+            $this->buffer .= yield from $this->stream->read($length - $read, $timeout);
             
             $chunk = substr($this->buffer, $this->offset, $length);
             $this->offset += strlen($chunk);
@@ -135,7 +135,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
             return $chunk;
         }
         
-        $chunk = substr($this->buffer, $this->offset) . yield from $this->stream->read($length - $read);
+        $chunk = substr($this->buffer, $this->offset) . yield from $this->stream->read($length - $read, $timeout);
         $this->offset += strlen($chunk);
         
         return $chunk;

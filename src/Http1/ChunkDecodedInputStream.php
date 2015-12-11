@@ -103,7 +103,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function read(int $length = 8192): \Generator
+    public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL) {
             throw new \RuntimeException('Cannot read from detached stream');
@@ -114,7 +114,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         }
         
         if ($this->remainder === 0) {
-            yield from $this->loadBuffer();
+            yield from $this->loadBuffer($timeout);
         }
         
         if ($this->ended) {
@@ -133,7 +133,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
     /**
      * Load data of the next chunk into memory.
      */
-    protected function loadBuffer(): \Generator
+    protected function loadBuffer(float $timeout = 0): \Generator
     {
         $this->remainder = 0;
         
@@ -142,7 +142,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         }
         
         while (strlen($this->buffer) < 8192 && !yield from $this->stream->eof()) {
-            $this->buffer .= yield from $this->stream->read(8192);
+            $this->buffer .= yield from $this->stream->read(8192, $timeout);
         }
         
         $m = NULL;
@@ -156,7 +156,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
                 $this->ended = true;
             } else {
                 while (strlen($this->buffer) < $this->remainder && !yield from $this->stream->eof()) {
-                    $this->buffer .= yield from $this->stream->read($this->remainder);
+                    $this->buffer .= yield from $this->stream->read($this->remainder, $timeout);
                 }
                 
                 if (strlen($this->buffer) < $this->remainder) {
