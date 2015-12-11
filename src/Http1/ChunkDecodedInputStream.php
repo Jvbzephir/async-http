@@ -83,11 +83,11 @@ class ChunkDecodedInputStream implements InputStreamInterface
         $this->ended = true;
         $this->remainder = 0;
         
-        if ($this->strean !== NULL) {
+        if ($this->stream !== NULL) {
             try {
-                $this->strean->close();
+                $this->stream->close();
             } finally {
-                $this->strean = NULL;
+                $this->stream = NULL;
             }
         }
     }
