@@ -43,9 +43,25 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     protected $buffer = '';
 
-    public function __construct(InputStreamInterface $stream)
+    public function __construct(InputStreamInterface $stream, string $buffer)
     {
         $this->stream = $stream;
+        $this->buffer = $buffer;
+        
+        $m = NULL;
+        
+        if (preg_match("'^([a-fA-F0-9]+).*\r\n'", $this->buffer, $m)) {
+            $this->remainder = hexdec($m[1]);
+            $this->buffer = (string) substr($this->buffer, strlen($m[0]));
+        
+            if ($this->remainder === 0) {
+                $this->buffer = '';
+                $this->ended = true;
+            }
+        } else {
+            $this->buffer = '';
+            $this->ended = true;
+        }
     }
 
     /**
@@ -79,25 +95,13 @@ class ChunkDecodedInputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function eof(): \Generator
+    public function eof(): bool
     {
-        if ($this->ended) {
+        if ($this->ended || $this->remainder === 0) {
             return true;
         }
         
-        if ($this->buffer !== '') {
-            return false;
-        }
-        
-        if ($this->remainder === 0) {
-            if ($this->stream === NULL) {
-                return true;
-            }
-            
-            yield from $this->loadBuffer();
-        }
-        
-        return $this->remainder === 0;
+        return $this->buffer === '';
     }
 
     /**
@@ -113,8 +117,8 @@ class ChunkDecodedInputStream implements InputStreamInterface
             return '';
         }
         
-        if ($this->remainder === 0) {
-            yield from $this->loadBuffer($timeout);
+        while (strlen($this->buffer) < $this->remainder) {
+            $this->buffer .= yield from $this->stream->read($this->remainder - strlen($this->buffer), $timeout);
         }
         
         if ($this->ended) {
@@ -126,6 +130,10 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         $this->buffer = (string) substr($this->buffer, $length);
         $this->remainder -= $length;
+        
+        if ($this->remainder === 0) {
+            yield from $this->loadBuffer($timeout);
+        }
         
         return $chunk;
     }
@@ -141,7 +149,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
             return;
         }
         
-        while (strlen($this->buffer) < 8192 && !yield from $this->stream->eof()) {
+        while (strlen($this->buffer) < 8192 && !$this->stream->eof()) {
             $this->buffer .= yield from $this->stream->read(8192, $timeout);
         }
         
@@ -155,7 +163,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
                 $this->buffer = '';
                 $this->ended = true;
             } else {
-                while (strlen($this->buffer) < $this->remainder && !yield from $this->stream->eof()) {
+                while (strlen($this->buffer) < $this->remainder && !$this->stream->eof()) {
                     $this->buffer .= yield from $this->stream->read($this->remainder, $timeout);
                 }
                 

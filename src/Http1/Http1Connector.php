@@ -19,6 +19,8 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\readBuffer;
+
 /**
  * HTTP/1 client endpoint.
  * 
@@ -85,7 +87,7 @@ class Http1Connector
         }
         
         if (function_exists('inflate_init')) {
-            $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+//             $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
         }
         
         return $request;
@@ -127,7 +129,7 @@ class Http1Connector
             if ($chunked) {
                 yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
                 
-                while (!yield from $body->eof()) {
+                while (!$body->eof()) {
                     $chunk = yield from $body->read();
                     
                     if ($chunk !== '') {
@@ -139,7 +141,7 @@ class Http1Connector
             } else {
                 yield from $stream->write($chunk);
                 
-                while (!yield from $body->eof()) {
+                while (!$body->eof()) {
                     yield from $stream->write(yield from $body->read());
                 }
             }
@@ -178,7 +180,7 @@ class Http1Connector
         $response = $response->withProtocolVersion($m[1]);
         $response = $response->withStatus((int) $m[2], trim($m[3]));
         
-        while (!yield from $stream->eof()) {
+        while (!$stream->eof()) {
             $line = yield from $stream->readLine();
             
             if ($line === '') {
@@ -221,7 +223,7 @@ class Http1Connector
         $body = $stream;
         
         if ($dechunk) {
-            $body = new ChunkDecodedInputStream($body);
+            $body = new ChunkDecodedInputStream($body, yield readBuffer($body, 8192));
         }
         
         if ($decompress) {

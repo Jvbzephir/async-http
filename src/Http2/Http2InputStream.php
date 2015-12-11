@@ -139,10 +139,8 @@ class Http2InputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function eof(): \Generator
+    public function eof(): bool
     {
-        yield noop();
-        
         return $this->eof && $this->buffer === '';
     }
     

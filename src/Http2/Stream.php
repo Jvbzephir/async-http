@@ -323,7 +323,7 @@ class Stream
                     $this->headers .= $frame->data;
                     
                     if ($frame->flags & Frame::END_HEADERS) {
-                        if (yield from $this->body->eof()) {
+                        if ($this->body->eof()) {
                             $this->changeState(self::HALF_CLOSED_REMOTE);
                         }
                         
@@ -604,7 +604,7 @@ class Stream
                 $this->updateLocalWindow(-1 * $len);
                 
                 $chunk = yield from $in->read($len);
-                $eof = yield from $in->eof();
+                $eof = $in->eof();
                 
                 // Increase local flow control window in case response body does not return the desired number of bytes.
                 $delta = $len - strlen($chunk);

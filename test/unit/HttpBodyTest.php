@@ -44,8 +44,12 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             
             $body = $response->getBody();
             
-            while (!yield from $body->eof()) {
-                yield from $body->read();
+            try {
+                while (!$body->eof()) {
+                    yield from $body->read();
+                }
+            } finally {
+                $body->close();
             }
         }));
         
@@ -69,7 +73,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             try {
                 $body = $response->getBody();
                 
-                while (!yield from $body->eof()) {
+                while (!$body->eof()) {
                     yield from $body->read();
                 }
             } finally {

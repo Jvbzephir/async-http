@@ -120,13 +120,11 @@ class InflateInputStream implements InputStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function eof(): \Generator
+    public function eof(): bool
     {
         if ($this->stream === NULL) {
             return true;
         }
-        
-        yield noop();
         
         return $this->buffer === '' && $this->finished;
     }
@@ -145,7 +143,7 @@ class InflateInputStream implements InputStreamInterface
         }
         
         if ($this->buffer === '') {
-            if (yield from $this->stream->eof()) {
+            if ($this->stream->eof()) {
                 $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, '', ZLIB_FINISH);
                 $this->finished = true;
             } else {
@@ -159,7 +157,7 @@ class InflateInputStream implements InputStreamInterface
                             break;
                         }
                     }
-                } while (!yield from $this->stream->eof());
+                } while (!$this->stream->eof());
             }
         }
         

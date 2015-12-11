@@ -100,9 +100,9 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
     /**
      * {@inheritdoc}
      */
-    public function eof(): \Generator
+    public function eof(): bool
     {
-        return $this->offset >= strlen($this->buffer) && yield from $this->stream->eof();
+        return $this->offset >= strlen($this->buffer) && $this->stream->eof();
     }
     
     /**

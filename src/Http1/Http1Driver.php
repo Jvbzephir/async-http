@@ -108,7 +108,7 @@ class Http1Driver implements HttpDriverInterface
             
             $headers = [];
             
-            while (!yield from $reader->eof()) {
+            while (!$reader->eof()) {
                 $line = yield from $reader->readLine();
                 
                 if ($line === '') {
@@ -256,7 +256,7 @@ class Http1Driver implements HttpDriverInterface
         $in = $response->getBody();
         
         try {
-            while (!yield from $in->eof()) {
+            while (!$in->eof()) {
                 $chunk = yield from $in->read(8184);
                 
                 if ($chunk !== '') {
