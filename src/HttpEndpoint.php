@@ -113,7 +113,7 @@ class HttpEndpoint
     {
         $this->port = $port;
         $this->address = $address;
-        $this->sslOptions['peer_name'] = $peerName;
+        $this->sslOptions['peer_name'] = $peerName ?? gethostbyname(gethostname());
         
         $this->http1Driver = new Http1Driver();
     }
