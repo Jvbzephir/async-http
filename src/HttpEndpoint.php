@@ -235,7 +235,9 @@ class HttpEndpoint
                 $stream = new SocketStream($socket);
                 
                 if ($this->logger) {
-                    $this->logger->debug('Accepted HTTP client connection');
+                    $this->logger->debug('Accepted HTTP client connection from {peer}', [
+                        'peer' => stream_socket_get_name($socket, true)
+                    ]);
                 }
                 
                 try {
