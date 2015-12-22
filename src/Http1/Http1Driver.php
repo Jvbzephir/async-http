@@ -123,6 +123,7 @@ class Http1Driver implements HttpDriverInterface
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
             
             $uri = Uri::parse($uri);
+            $uri = $uri->withPort($endpoint->getPort());
             
 //             $server = [
 //                 'SERVER_PROTOCOL' => 'HTTP/' . $m[3],
