@@ -42,15 +42,24 @@ class LimitInputStream implements InputStreamInterface
     protected $offset = 0;
     
     /**
+     * Cascade call to close to wrapped stream?
+     * 
+     * @var bool
+     */
+    protected $cascadeClose;
+    
+    /**
      * Create a length-limited input stream.
      * 
      * @param InputStreamInterface $stream
      * @param int $limit
+     * @param bool $cascadeClose
      */
-    public function __construct(InputStreamInterface $stream, int $limit)
+    public function __construct(InputStreamInterface $stream, int $limit, bool $cascadeClose = true)
     {
         $this->stream = $stream;
         $this->limit = $limit;
+        $this->cascadeClose = $cascadeClose;
     }
     
     /**
@@ -58,7 +67,9 @@ class LimitInputStream implements InputStreamInterface
      */
     public function close()
     {
-        $this->stream->close();
+        if ($this->cascadeClose) {
+            $this->stream->close();
+        }
     }
     
     /**
