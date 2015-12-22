@@ -151,6 +151,11 @@ class Http1Driver implements HttpDriverInterface
                 }
             }
             
+            $len = (int) $request->getHeaderLine('Content-Length', '0');
+            if ($len > 0) {
+                $request = $request->withBody(new LimitInputStream($reader, $len));
+            }
+            
             if ($this->logger) {
                 $this->logger->debug('>> {method} {target} HTTP/{version}', [
                     'method' => $request->getMethod(),
