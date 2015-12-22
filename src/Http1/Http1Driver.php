@@ -248,7 +248,7 @@ class Http1Driver implements HttpDriverInterface
         
         foreach ($response->getHeaders() as $name => $values) {
             foreach ($values as $value) {
-                $message .= sprintf("%s: %s\n", $name, $value);
+                $message .= sprintf("%s: %s\r\n", $name, $value);
             }
         }
         
