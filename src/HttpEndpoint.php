@@ -214,54 +214,58 @@ class HttpEndpoint
             throw new \RuntimeException(sprintf('Unable to start HTTP endpoint "%s"', $host));
         }
         
-        stream_set_blocking($server, 0);
-        
-        if ($this->logger) {
-            $this->logger->info('Started HTTP endpoint {address}:{port}', [
-                'address' => $this->address,
-                'port' => $this->port
-            ]);
-        }
-        
-        while (true) {
-            // Await client connection:
-            yield awaitRead($server);
+        try {
+            stream_set_blocking($server, 0);
             
-            $socket = @stream_socket_accept($server, 0);
+            if ($this->logger) {
+                $this->logger->info('Started HTTP endpoint {address}:{port}', [
+                    'address' => $this->address,
+                    'port' => $this->port
+                ]);
+            }
             
-            if ($socket !== false) {
-                stream_set_blocking($socket, 0);
+            while (true) {
+                // Await client connection:
+                yield awaitRead($server);
                 
-                $stream = new SocketStream($socket);
+                $socket = @stream_socket_accept($server, 0);
                 
-                if ($this->logger) {
-                    $this->logger->debug('Accepted HTTP client connection from {peer}', [
-                        'peer' => stream_socket_get_name($socket, true)
-                    ]);
-                }
-                
-                try {
-                    if (isset($this->sslOptions['local_cert'])) {
-                        yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
-                        
-                        // Driver selection is based on negotiated TLS ALPN protocol.
-                        $crypto = (array) @stream_get_meta_data($socket)['crypto'];
-                        if ((isset($crypto['alpn_protocol']))) {
-                            foreach ($this->drivers as $driver) {
-                                if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
-                                    yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
-                                    
-                                    continue 2;
+                if ($socket !== false) {
+                    stream_set_blocking($socket, 0);
+                    
+                    $stream = new SocketStream($socket);
+                    
+                    if ($this->logger) {
+                        $this->logger->debug('Accepted HTTP client connection from {peer}', [
+                            'peer' => stream_socket_get_name($socket, true)
+                        ]);
+                    }
+                    
+                    try {
+                        if (isset($this->sslOptions['local_cert'])) {
+                            yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
+                            
+                            // Driver selection is based on negotiated TLS ALPN protocol.
+                            $crypto = (array) @stream_get_meta_data($socket)['crypto'];
+                            if ((isset($crypto['alpn_protocol']))) {
+                                foreach ($this->drivers as $driver) {
+                                    if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
+                                        yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
+                                        
+                                        continue 2;
+                                    }
                                 }
                             }
                         }
+                        
+                        yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
+                    } catch (\Throwable $e) {
+                        $stream->close();
                     }
-                    
-                    yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
-                } catch (\Throwable $e) {
-                    $stream->close();
                 }
             }
+        } finally {
+            @fclose($server);
         }
     }
     
