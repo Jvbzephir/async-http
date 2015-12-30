@@ -19,6 +19,7 @@ use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
+use function KoolKode\Async\captureError;
 use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
@@ -241,31 +242,44 @@ class HttpEndpoint
                         ]);
                     }
                     
-                    try {
-                        if (isset($this->sslOptions['local_cert'])) {
-                            yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
-                            
-                            // Driver selection is based on negotiated TLS ALPN protocol.
-                            $crypto = (array) @stream_get_meta_data($socket)['crypto'];
-                            if ((isset($crypto['alpn_protocol']))) {
-                                foreach ($this->drivers as $driver) {
-                                    if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
-                                        yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
-                                        
-                                        continue 2;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
-                    } catch (\Throwable $e) {
-                        $stream->close();
-                    }
+                    yield from $this->handleClient($stream, $action);
                 }
             }
         } finally {
             @fclose($server);
+        }
+    }
+    
+    /**
+     * Handle a new connection initiated by a client.
+     * 
+     * @param SocketStream $stream
+     * @param callable $action
+     */
+    protected function handleClient(SocketStream $stream, callable $action): \Generator
+    {
+        try {
+            if (isset($this->sslOptions['local_cert'])) {
+                yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
+                
+                // Driver selection is based on negotiated TLS ALPN protocol.
+                $crypto = (array)$stream->getMetadata()['crypto'];
+                if ((isset($crypto['alpn_protocol']))) {
+                    foreach ($this->drivers as $driver) {
+                        if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
+                            yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
+                            
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
+        } catch (\Throwable $e) {
+            $stream->close();
+            
+            yield captureError($e);
         }
     }
     

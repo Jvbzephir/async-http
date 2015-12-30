@@ -16,6 +16,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\captureError;
 use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\readBuffer;
 
@@ -320,6 +321,8 @@ class Connection
         try {
             list ($id, $frame) = yield from $this->readNextFrame();
         } catch (SocketException $e) {
+            yield captureError($e);
+            
             return false;
         }
         
@@ -327,8 +330,11 @@ class Connection
             try {
                 return yield from $this->handleFrame($frame);
             } catch (SocketException $e) {
+                yield captureError($e);
+                
                 return false;
             } catch (ConnectionException $e) {
+                yield captureError($e);
                 yield from $this->writeFrame(new Frame(Frame::GOAWAY, $e->getCode()), 1000);
                 
                 return false;

@@ -36,7 +36,7 @@ class Http1Connector
     }
     
     /**
-     * Coroutine that sends an HTTP/1 request and returns the receved HTTP response.
+     * Coroutine that sends an HTTP/1 request and returns the received HTTP response.
      * 
      * @param HttpRequest $request
      * @return Generator
