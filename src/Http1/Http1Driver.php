@@ -247,16 +247,20 @@ class Http1Driver implements HttpDriverInterface
      */
     protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response): \Generator
     {
+        $remove = [
+            'Transfer-Encoding',
+            'Content-Encoding',
+            'Keep-Alive'
+        ];
+        
+        foreach ($remove as $name) {
+            $response = $response->withoutHeader($name);
+        }
+        
         $chunked = ($response->getProtocolVersion() !== '1.0');
         
         $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
         $response = $response->withHeader('Connection', 'close');
-        
-        if ($chunked) {
-            $response = $response->withHeader('Transfer-Encoding', 'chunked');
-        } else {
-            $response = $response->withoutHeader('Transfer-Encoding');
-        }
         
         $message = sprintf("HTTP/%s %03u %s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), $response->getReasonPhrase());
         
@@ -266,7 +270,16 @@ class Http1Driver implements HttpDriverInterface
             }
         }
         
-        if (!$chunked) {
+        if ($chunked) {
+            $in = $response->getBody();
+            $chunk = yield from $in->read(1);
+            
+            if ($chunk === '') {
+                $message .= "Content-Length: 0\r\n";
+            } else {
+                $message .= "Transfer-Encoding: chunked\r\n";
+            }
+        } else {
             $in = $response->getBody();
             $body = yield createTempStream();
             $length = 0;
@@ -293,18 +306,22 @@ class Http1Driver implements HttpDriverInterface
         yield from $socket->write($message . "\r\n");
         
         if ($chunked) {
-            $in = $response->getBody();
-            
             try {
-                while (!$in->eof()) {
-                    $chunk = yield from $in->read(8184);
+                if ($chunk !== '') {
+                    do {
+                        $chunk .= yield from $in->read(8184 - strlen($chunk));
+                        
+                        if ($chunk !== '') {
+                            try {
+                                yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                            } finally {
+                                $chunk = '';
+                            }
+                        }
+                    } while (!$in->eof());
                     
-                    if ($chunk !== '') {
-                        yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
-                    }
+                    yield from $socket->write("0\r\n\r\n");
                 }
-                
-                yield from $socket->write("0\r\n\r\n");
             } finally {
                 $in->close();
             }
