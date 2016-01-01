@@ -19,7 +19,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\is_runnable;
