@@ -121,6 +121,11 @@ class Http1Driver implements HttpDriverInterface
                 $headers[strtolower($header[0])][] = $header;
             }
             
+            $n = NULL;
+            if (preg_match("'^(https?)://([^/]+)/(.*)$'i", $m[2], $n)) {
+                $m[2] = $n[3];
+            }
+            
             $uri = $endpoint->isEncrypted() ? 'https://' : 'http://';
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
             
