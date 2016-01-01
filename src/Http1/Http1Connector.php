@@ -141,13 +141,13 @@ class Http1Connector
             yield from $stream->write($message . "\r\n");
             
             if ($chunked) {
-                yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+                yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                 
                 while (!$body->eof()) {
                     $chunk = yield from $body->read();
                     
                     if ($chunk !== '') {
-                        yield from $stream->write(sprintf('%x\r\n%s\r\n', strlen($chunk), $chunk));
+                        yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                     }
                 }
                 
