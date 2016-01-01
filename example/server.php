@@ -18,7 +18,7 @@ use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LogLevel;
 
-use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\eventEmitter;
 use function KoolKode\Async\runTask;
 
 error_reporting(-1);
@@ -39,7 +39,7 @@ $executor->setErrorHanndler(function (\Throwable $e) {
 
 $executor->runNewTask(call_user_func(function () {
     
-    $logger = new Logger(yield newEventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
+    $logger = new Logger(yield eventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
     
 //     $app = new App((new K1())->build());
     

@@ -22,8 +22,8 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\createTempStream;
 use function KoolKode\Async\is_runnable;
+use function KoolKode\Async\tempStream;
 
 /**
  * HTTP/1 server endpoint.
@@ -286,15 +286,12 @@ class Http1Driver implements HttpDriverInterface
             }
         } else {
             $in = $response->getBody();
-            $body = yield createTempStream();
+            $body = yield tempStream();
             $length = 0;
             
             try {
                 while (!$in->eof()) {
-                    $chunk = yield from $in->read();
-                    $length += strlen($chunk);
-                    
-                    yield from $body->write($chunk);
+                    $length += yield from $body->write(yield from $in->read());
                 }
             } finally {
                 $in->close();
@@ -302,10 +299,7 @@ class Http1Driver implements HttpDriverInterface
             
             $message .= sprintf("Content-Length: %u\r\n", $length);
             
-            $body = $body->detach();
-            rewind($body);
-            
-            $body = new SocketStream($body);
+            $body->rewind();
         }
         
         yield from $socket->write($message . "\r\n");

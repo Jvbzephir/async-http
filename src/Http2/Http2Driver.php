@@ -22,8 +22,8 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\eventEmitter;
 use function KoolKode\Async\is_runnable;
-use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\readBuffer;
 
 /**
@@ -178,7 +178,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
             yield from $socket->write($message);
             
-            $conn = new Connection(Connection::MODE_SERVER, $socket, yield newEventEmitter(), $this->logger);
+            $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
             
             $preface = yield readBuffer($socket, strlen(Connection::PREFACE));
             

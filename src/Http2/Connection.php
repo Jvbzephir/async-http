@@ -17,7 +17,7 @@ use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
-use function KoolKode\Async\newEventEmitter;
+use function KoolKode\Async\eventEmitter;
 use function KoolKode\Async\readBuffer;
 
 /**
@@ -173,7 +173,7 @@ class Connection
      */
     public static function connectClient(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
-        $conn = new static(self::MODE_CLIENT, $socket, yield newEventEmitter(), $logger);
+        $conn = new static(self::MODE_CLIENT, $socket, yield eventEmitter(), $logger);
     
         yield from $socket->write(self::PREFACE);
         yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', Connection::SETTING_INITIAL_WINDOW_SIZE, Stream::INITIAL_WINDOW_SIZE)), 500);
@@ -198,7 +198,7 @@ class Connection
             throw new \RuntimeException('Client did not send valid HTTP/2 connection preface');
         }
     
-        $conn = new static(self::MODE_SERVER, $socket, yield newEventEmitter(), $logger);
+        $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
     
         list ($id, $frame) = yield from $conn->readNextFrame();
         if ($id !== 0 || $frame->type !== Frame::SETTINGS) {
@@ -436,7 +436,7 @@ class Connection
                         throw new ConnectionException('Streams opened by a client must be assigned an uneven ID', Frame::PROTOCOL_ERROR);
                     }
                     
-                    $this->streams[$id] = new Stream($id, $this, yield newEventEmitter(), $this->logger);
+                    $this->streams[$id] = new Stream($id, $this, yield eventEmitter(), $this->logger);
                     break;
                 default:
                     throw new ConnectionException('HEADERS frame is required', Frame::PROTOCOL_ERROR);
@@ -458,7 +458,7 @@ class Connection
                 continue;
             }
             
-            return $this->streams[$i] = new Stream($i, $this, yield newEventEmitter(), $this->logger);
+            return $this->streams[$i] = new Stream($i, $this, yield eventEmitter(), $this->logger);
         }
         
         throw new \RuntimeException('Maximum number of concurrent streams exceeded');

@@ -19,8 +19,8 @@ use KoolKode\Async\Http\HttpResponse;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
-use function KoolKode\Async\newEventEmitter;
 use function KoolKode\Async\currentTask;
+use function KoolKode\Async\eventEmitter;
 
 /**
  * A bidirectional flow of frames within the HTTP/2 connection.
@@ -293,7 +293,7 @@ class Stream
     public function handleFrame(Frame $frame): \Generator
     {
         if ($this->body === NULL) {
-            $this->body = new Http2InputStream($this, yield newEventEmitter(), ($this->id % 2) !== 0);
+            $this->body = new Http2InputStream($this, yield eventEmitter(), ($this->id % 2) !== 0);
         }
         
         try {
