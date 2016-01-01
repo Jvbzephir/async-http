@@ -266,6 +266,10 @@ class Http1Driver implements HttpDriverInterface
         $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
         $response = $response->withHeader('Connection', 'close');
         
+        if ('' === trim($response->getReasonPhrase())) {
+            $response = $response->withStatus($response->getStatusCode(), Http::getReason($response->getStatusCode(), ''));
+        }
+        
         $message = sprintf("HTTP/%s %03u %s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), $response->getReasonPhrase());
         
         foreach ($response->getHeaders() as $name => $values) {
