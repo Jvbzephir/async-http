@@ -19,6 +19,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\createTempStream;
 use function KoolKode\Async\readBuffer;
 
 /**
@@ -110,7 +111,21 @@ class Http1Connector
             $chunked = false;
             
             if ($chunk === '') {
+                $tmp = yield createTempStream();
                 $request = $request->withHeader('Content-Length', '0');
+            } elseif ($request->getProtocolVersion() === '1.0') {
+                $tmp = yield createTempStream();
+                $size = yield from $tmp->write($chunk);
+                
+                while (!$body->eof()) {
+                    $size += yield from $tmp->write(yield from $body->read());
+                }
+                
+                $tmp = $tmp->detach();
+                rewind($tmp);
+                
+                $tmp = new SocketStream($tmp);
+                $request = $request->withHeader('Content-Length', (string) $size);
             } else {
                 $request = $request->withHeader('Transfer-Encoding', 'chunked');
                 $chunked = true;
@@ -139,10 +154,12 @@ class Http1Connector
                 
                 yield from $stream->write("0\r\n\r\n");
             } else {
-                yield from $stream->write($chunk);
-                
-                while (!$body->eof()) {
-                    yield from $stream->write(yield from $body->read());
+                try {
+                    while (!$tmp->eof()) {
+                        yield from $stream->write(yield from $tmp->read());
+                    }
+                } finally {
+                    $tmp->close();
                 }
             }
             
