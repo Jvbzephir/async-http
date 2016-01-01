@@ -87,7 +87,7 @@ class Http1Connector
         }
         
         if (function_exists('inflate_init')) {
-//             $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+            $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
         }
         
         return $request;

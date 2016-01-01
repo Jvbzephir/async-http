@@ -108,11 +108,11 @@ class InflateInputStream implements InputStreamInterface
         $this->context = NULL;
         $this->finished = true;
         
-        if ($this->strean !== NULL) {
+        if ($this->stream !== NULL) {
             try {
-                $this->strean->close();
+                $this->stream->close();
             } finally {
-                $this->strean = NULL;
+                $this->stream = NULL;
             }
         }
     }
