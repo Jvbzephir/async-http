@@ -15,11 +15,11 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Log\Logger;
-use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LogLevel;
 
 use function KoolKode\Async\eventEmitter;
 use function KoolKode\Async\runTask;
+use function KoolKode\Async\tempStream;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -84,16 +84,10 @@ $executor->runNewTask(call_user_func(function () {
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
         
-        var_dump($request->getRequestTarget());
-        
-        $text = tmpfile();
-        
-        fwrite($text, 'Hello KK :)');
-        rewind($text);
-        stream_set_blocking($text, 0);
+//         printf("REQUESTED: \"%s\"\n", $request->getRequestTarget());
         
         return [
-            $response->withBody(new SocketStream($text))
+            $response->withBody(yield tempStream('KoolKode Async HTTP :)'))
         ];        
         
 //         $factory = $http->getHttp1Driver()->getHttpFactory();
@@ -115,7 +109,10 @@ $executor->runNewTask(call_user_func(function () {
 //         ];
     };
     
+    $fcgi = new \KoolKode\Async\Http\Fcgi\FcgiEndpoint(4000, '0.0.0.0', $logger);
+    
     yield runTask($http->run($action), $http->getTitle());
+    yield runTask($fcgi->run($action), $fcgi->getTitle());
 }));
 
 $executor->run();

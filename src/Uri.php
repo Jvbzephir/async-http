@@ -76,10 +76,7 @@ class Uri implements \JsonSerializable
         $query = isset($parts['query']) ? $parts['query'] : '';
         $fragment = isset($parts['fragment']) ? $parts['fragment'] : '';
         
-        $uri = new static($scheme, $host, $port, $path, $query, $fragment, $user, $pass);
-        $uri->uriString = (string) $uri;
-        
-        return $uri;
+        return new static($scheme, $host, $port, $path, $query, $fragment, $user, $pass);
     }
 
     /**

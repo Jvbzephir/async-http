@@ -113,7 +113,7 @@ class HttpEndpoint
     public function __construct(int $port, string $address = '0.0.0.0', string $peerName = NULL)
     {
         $this->port = $port;
-        $this->address = $address;
+        $this->address = (strpos($address, ':') === false) ? $address : '[' . trim($address, '][') . ']';
         $this->sslOptions['peer_name'] = $peerName ?? gethostbyname(gethostname());
         
         $this->http1Driver = new Http1Driver();
@@ -226,7 +226,6 @@ class HttpEndpoint
             }
             
             while (true) {
-                // Await client connection:
                 yield awaitRead($server);
                 
                 $socket = @stream_socket_accept($server, 0);
