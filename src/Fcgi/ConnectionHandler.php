@@ -318,7 +318,7 @@ class ConnectionHandler
         $request = new HttpRequest($uri, $params['REQUEST_METHOD'] ?? 'GET');
         $m = NULL;
         
-        if (preg_match("'^HTTP/(1\\.[0-1])$'i", $params['SERVER_PROTOCOL'] ?? '', $m)) {
+        if (preg_match("'^HTTP/([1-9]\\.[0-9])$'i", $params['SERVER_PROTOCOL'] ?? '', $m)) {
             $request = $request->withProtocolVersion($m[1]);
         }
         
