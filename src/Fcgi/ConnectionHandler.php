@@ -353,11 +353,13 @@ class ConnectionHandler
     protected function writeResponse(int $requestId, HttpRequest $request, HttpResponse $response): \Generator
     {
         $remove = [
-            'Transfer-Encoding',
+            'Connection',
             'Content-Encoding',
             'Content-Length',
             'Keep-Alive',
-            'Connection'
+            'Trailer',
+            'Transfer-Encoding',
+            'Upgrade'
         ];
         
         foreach ($remove as $name) {
