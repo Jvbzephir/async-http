@@ -68,7 +68,7 @@ class Http2Connector
         return yield from $this->createResponse(yield from $stream->sendRequest($request));
     }
     
-    protected function handleConnectionFrames(Connection $conn)
+    protected function handleConnectionFrames(Connection $conn): \Generator
     {
         while (true) {
             if (false === yield from $conn->handleNextFrame()) {

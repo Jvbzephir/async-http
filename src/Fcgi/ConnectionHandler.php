@@ -11,14 +11,20 @@
 
 namespace KoolKode\Async\Http\Fcgi;
 
+use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
+use KoolKode\Async\Task;
+use KoolKode\Async\TaskInterruptedException;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\awaitRead;
+use function KoolKode\Async\captureError;
+use function KoolKode\Async\currentTask;
 use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\runTask;
 use function KoolKode\Async\tempStream;
@@ -127,6 +133,20 @@ class ConnectionHandler
     protected $stream;
     
     /**
+     * Max number of HTTP requests to be processed before closing the connection.
+     * 
+     * @var int
+     */
+    protected $maxRequests = 0;
+    
+    /**
+     * Number of HTTP requests that habe been processed.
+     * 
+     * @var int
+     */
+    protected $processed = 0;
+    
+    /**
      * PSR logger isntance or NULL.
      * 
      * @var LoggerInterface
@@ -141,6 +161,20 @@ class ConnectionHandler
     protected $requests = [];
     
     /**
+     * The main loop.
+     * 
+     * @var Task
+     */
+    protected $task;
+    
+    /**
+     * Worker tasks still processing requests.
+     * 
+     * @var array
+     */
+    protected $workers = [];
+    
+    /**
      * Create a new FastCGI connection handler using the given stream as transport.
      * 
      * @param DuplexStreamInterface $stream
@@ -153,6 +187,18 @@ class ConnectionHandler
     }
     
     /**
+     * Set max number of HTTP requests to be processed by the handler.
+     * 
+     * A value of "0" will never close the handler.
+     * 
+     * @param int $maxRequests
+     */
+    public function setMaxRequests(int $maxRequests)
+    {
+        $this->maxRequests = max(0, $maxRequests);
+    }
+    
+    /**
      * Coroutine being used to dispatch incoming requests.
      * 
      * @param callable $action
@@ -161,6 +207,8 @@ class ConnectionHandler
     public function run(callable $action): \Generator
     {
         static $hf = 'Cversion/Ctype/nrequestId/ncontentLength/CpaddingLength/x';
+        
+        $this->task = yield currentTask();
         
         try {
             while (true) {
@@ -180,9 +228,11 @@ class ConnectionHandler
                     break;
                 }
             }
+        } catch (TaskInterruptedException $e) {
+            // Bail out due to max requests reached.
         } finally {
-            foreach ($this->requests as $pending) {
-                $pending['stdin']->close();
+            if (!empty($this->workers)) {
+                yield awaitAll($this->workers);
             }
             
             $this->stream->close();
@@ -200,10 +250,16 @@ class ConnectionHandler
     protected function handleRecord(Record $record, callable $action): \Generator
     {
         if ($record->type === Record::FCGI_BEGIN_REQUEST) {
+            if ($this->processed > $this->maxRequests) {
+                return yield from $this->endRequest($record->requestId);
+            }
+            
             return yield from $this->handleBeginRecord($record);
         }
+     
+        $requestId = $record->requestId;
         
-        if ($record->requestId < 0) {
+        if ($requestId < 0) {
             throw new \RuntimeException('FCGI record is missing request ID');
         }
         
@@ -212,20 +268,40 @@ class ConnectionHandler
                 $buffer = $record->data;
                 
                 while ($buffer !== '') {
-                    $this->readNameValuePair($buffer, $this->requests[$record->requestId]['params']);
+                    $this->readNameValuePair($buffer, $this->requests[$requestId]['params']);
                 }
                 break;
             case Record::FCGI_STDIN:
                 if ($record->data === '') {
-                    yield runTask($this->dispatch($record->requestId, $action), 'FCGI Worker');
-                } else {
-                    yield from $this->requests[$record->requestId]['stdin']->write($record->data);
+                    $worker = yield runTask($this->dispatch($requestId, $action), 'FCGI Worker');
+                    $this->workers[$worker->id] = $worker;
                     
-                    return 1;
+                    $worker->onComplete(function (ExecutorInterface $executor, Task $worker) {
+                        unset($this->workers[$worker->id]);
+                    });
+                    
+                    $worker->onError(function (ExecutorInterface $executor, Task $worker, \Throwable $e) use($requestId) {
+                        try {
+                            yield captureError($e);
+                            yield from $this->endRequest($requestId);
+                        } finally {
+                            
+                        }
+                    });
+                    
+                    $worker->onCancel(function (ExecutorInterface $executor, Task $worker) use($requestId) {
+                        try {
+                            yield from $this->endRequest($requestId);
+                        } finally {
+                            unset($this->workers[$worker->id]);
+                        }
+                    });
+                } else {
+                    yield from $this->requests[$requestId]['stdin']->write($record->data);
                 }
                 break;
             case Record::FCGI_ABORT_REQUEST:
-                return yield from $this->endRequest($record->requestId);
+                yield from $this->endRequest($requestId);
             default:
                 throw new \RuntimeException('Unexpected record received');
         }
@@ -266,6 +342,10 @@ class ConnectionHandler
     protected function dispatch(int $requestId, callable $action): \Generator
     {
         yield;
+        
+        if ($this->maxRequests > 0){
+            $this->processed++;
+        }
         
         $request = $this->createHttpRequest($requestId);
         
@@ -456,14 +536,25 @@ class ConnectionHandler
         
         yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $requestId, $content));
         
-        $keep = $this->requests[$requestId]['keep-alive'];
-        
-        $this->requests[$requestId]['stdin']->close();
-        
-        unset($this->requests[$requestId]);
-        
-        if (!$keep) {
-            return false;
+        if (isset($this->requests[$requestId])) {
+            $keep = $this->requests[$requestId]['keep-alive'];
+            
+            $this->requests[$requestId]['stdin']->close();
+            
+            unset($this->requests[$requestId]);
+            
+            if (!$keep || ($this->maxRequests > 0 && $this->processed >= $this->maxRequests)) {
+                $this->processed = PHP_INT_MAX;
+                
+                if ($this->task !== NULL) {
+                    $task = $this->task;
+                    $this->task = NULL;
+                    
+                    unset($this->workers[(yield currentTask())->id]);
+                    
+                    $task->notify();
+                }
+            }
         }
     }
 
