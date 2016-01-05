@@ -61,17 +61,20 @@ class Http2Connector
         
         $conn = yield from Connection::connectClient($socket, $this->logger);
         
-        $this->tasks[] = yield runTask(call_user_func(function () use ($conn) {
-            while (true) {
-                if (false === yield from $conn->handleNextFrame()) {
-                    break;
-                }
-            }
-        }), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
+        $this->tasks[] = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
         
         $stream = yield from $conn->openStream();
         
         return yield from $this->createResponse(yield from $stream->sendRequest($request));
+    }
+    
+    protected function handleConnectionFrames(Connection $conn)
+    {
+        while (true) {
+            if (false === yield from $conn->handleNextFrame()) {
+                break;
+            }
+        }
     }
 
     protected function createResponse(MessageReceivedEvent $event): \Generator
