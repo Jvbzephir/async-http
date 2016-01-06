@@ -259,7 +259,7 @@ class Http1Driver implements HttpDriverInterface
         
         if ($chunked) {
             $in = $response->getBody();
-            $chunk = yield from $in->read(1);
+            $chunk = $in->eof() ? '' : yield from $in->read();
             
             if ($chunk === '') {
                 $message .= "Content-Length: 0\r\n";
@@ -292,12 +292,10 @@ class Http1Driver implements HttpDriverInterface
                     do {
                         $chunk .= yield from $in->read(8184 - strlen($chunk));
                         
-                        if ($chunk !== '') {
-                            try {
-                                yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
-                            } finally {
-                                $chunk = '';
-                            }
+                        try {
+                            yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                        } finally {
+                            $chunk = '';
                         }
                     } while (!$in->eof());
                     
