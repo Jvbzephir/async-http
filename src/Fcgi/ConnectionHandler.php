@@ -566,6 +566,11 @@ class ConnectionHandler
     protected function writeRecord(Record $record): \Generator
     {
         $len = strlen($record->data);
+        
+        if ($len === 0) {
+            return;
+        }
+        
         $header = pack('CCnnxx', $record->version, $record->type, $record->requestId, $len);
         
         yield from $this->stream->write($header);
