@@ -131,36 +131,15 @@ class Http1Driver implements HttpDriverInterface
             $uri = Uri::parse($uri);
             $uri = $uri->withPort($endpoint->getPort());
             
-//             $server = [
-//                 'SERVER_PROTOCOL' => 'HTTP/' . $m[3],
-//                 'REQUEST_METHOD' => $m[1],
-//                 'REQUEST_URI' => '/' . ltrim($m[2], '/'),
-//                 'SCRIPT_NAME' => '',
-//                 'SERVER_NAME' => $endpoint->getPeerName(),
-//                 'SERVER_PORT' => $endpoint->getPort(),
-//                 'REQUEST_TIME' => time(),
-//                 'REQUEST_TIME_FLOAT' => microtime(true),
-//                 'HTTP_HOST' => empty($headers['host'][0][1]) ? $endpoint->getPeerName() : $headers['host'][0][1]
-//             ];
-            
-//             $query = [];
-//             parse_str($uri->getQuery(), $query);
-            
-            $request = new HttpRequest();
-            $request = $request->withMethod($m[1]);
-            $request = $request->withProtocolVersion($m[3]);
-            $request = $request->withUri($uri);
-            
-            foreach ($headers as $header) {
-                foreach ($header as $data) {
-                    $request = $request->withHeader(Http::normalizeHeaderName($data[0]), $data[1]);
+            if (isset($headers['content-length'])) {
+                $len = (int) implode(', ', $headers['content-length']);
+                if ($len > 0) {
+                    $reader = new LimitInputStream($reader, $len, false);
                 }
             }
             
-            $len = (int) $request->getHeaderLine('Content-Length', '0');
-            if ($len > 0) {
-                $request = $request->withBody(new LimitInputStream($reader, $len, false));
-            }
+            $request = new HttpRequest($uri, $reader, $m[1], $headers);
+            $request = $request->withProtocolVersion($m[3]);
             
             if ($this->logger) {
                 $this->logger->debug('>> {method} {target} HTTP/{version}', [
@@ -170,7 +149,7 @@ class Http1Driver implements HttpDriverInterface
                 ]);
             }
             
-            $response = new HttpResponse();
+            $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (\Throwable $e) {
             $socket->close();

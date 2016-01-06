@@ -17,6 +17,8 @@ use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
 use KoolKode\Async\Stream\SocketStream;
 
+use function KoolKode\Async\tempStream;
+
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
     protected function createExecutor(): ExecutorInterface
@@ -39,7 +41,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runNewTask(call_user_func(function () {
             $connector = new Http1Connector();
             
-            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'));
+            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield tempStream());
             $response = yield from $connector->send($request);
             
             $body = $response->getBody();
@@ -67,7 +69,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runNewTask(call_user_func(function () use ($executor) {
             $connector = new Http2Connector();
             
-            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'));
+            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield tempStream());
             $response = yield from $connector->send($request);
             
             try {

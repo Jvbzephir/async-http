@@ -109,7 +109,7 @@ class Http1Connector
         $body = $request->getBody();
         
         try {
-            $chunk = yield from $body->read();
+            $chunk = $body->eof() ? '' : yield from $body->read();
             $chunked = false;
             
             if ($chunk === '') {
@@ -185,16 +185,15 @@ class Http1Connector
     protected function processResponse(DuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
         $stream = new BufferedDuplexStream($stream);
-        $line = yield from $stream->readLine();
         
+        $line = yield from $stream->readLine();
         $m = NULL;
+        
         if (!preg_match("'^HTTP/(1\\.[0-1])\s+([0-9]{3})\s*(.*)$'i", $line, $m)) {
             throw new \RuntimeException('Response did not contain a valid HTTP status line');
         }
         
-        $response = new HttpResponse();
-        $response = $response->withProtocolVersion($m[1]);
-        $response = $response->withStatus((int) $m[2], trim($m[3]));
+        $headers = [];
         
         while (!$stream->eof()) {
             $line = yield from $stream->readLine();
@@ -204,47 +203,55 @@ class Http1Connector
             }
             
             $header = array_map('trim', explode(':', $line, 2));
-            $response = $response->withAddedHeader($header[0], $header[1]);
+            $headers[strtolower($header[0])][] = $header[1];
         }
         
         $dechunk = false;
         $decompress = NULL;
         
-        if ('chunked' === strtolower($response->getHeaderLine('Transfer-Encoding', ''))) {
-            $dechunk = true;
+        if (isset($headers['transfer-encoding'])) {
+            if ('chunked' === strtolower(implode(', ', $headers['transfer-encoding']))) {
+                $dechunk = true;
+            }
         }
         
-        switch ($response->getHeaderLine('Content-Encoding')) {
-            case 'gzip':
-                $decompress = InflateInputStream::GZIP;
-                break;
-            case 'deflate':
-                $decompress = InflateInputStream::DEFLATE;
-                break;
+        if (isset($headers['content-encoding'])) {
+            switch (implode(', ', $headers['content-encoding'])) {
+                case 'gzip':
+                    $decompress = InflateInputStream::GZIP;
+                    break;
+                case 'deflate':
+                    $decompress = InflateInputStream::DEFLATE;
+                    break;
+            }
         }
         
         $remove = [
-            'Connection',
-            'Content-Encoding',
-            'Content-Length',
-            'Keep-Alive',
-            'Trailer',
-            'Transfer-Encoding'
+            'connection',
+            'content-encoding',
+            'content-length',
+            'keep-alive',
+            'trailer',
+            'transfer-encoding'
         ];
         
-        foreach ($remove as $header) {
-            $response = $response->withoutHeader($header);
+        foreach ($remove as $name) {
+            if (isset($headers[$name])) {
+                unset($headers[$name]);
+            }
         }
         
-        $body = $stream;
-        
         if ($dechunk) {
-            $body = new ChunkDecodedInputStream($body, yield readBuffer($body, 8192));
+            $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
         }
         
         if ($decompress) {
-            $body = new InflateInputStream($body, $decompress); 
+            $stream = new InflateInputStream($stream, $decompress); 
         }
+        
+        $response = new HttpResponse((int) $m[2], $stream, $headers);
+        $response = $response->withProtocolVersion($m[1]);
+        $response = $response->withStatus((int) $m[2], trim($m[3]));
         
         if ($this->logger) {
             $this->logger->debug('>> HTTP/{version} {status} {reason}', [
@@ -254,6 +261,6 @@ class Http1Connector
             ]);
         }
         
-        return $response->withBody($body);
+        return $response;
     }
 }

@@ -357,7 +357,7 @@ class ConnectionHandler
             ]);
         }
         
-        $response = new HttpResponse();
+        $response = new HttpResponse(Http::CODE_OK, yield tempStream());
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         
         $response = $action($request, $response);
@@ -395,7 +395,7 @@ class ConnectionHandler
         
         $uri = Uri::parse($uri . '/' . ltrim($params['REQUEST_URI'] ?? '', '/'));
         
-        $request = new HttpRequest($uri, $params['REQUEST_METHOD'] ?? 'GET');
+        $request = new HttpRequest($uri, $this->requests[$requestId]['stdin']->rewind(), $params['REQUEST_METHOD'] ?? 'GET');
         $m = NULL;
         
         if (preg_match("'^HTTP/([1-9]\\.[0-9])$'i", $params['SERVER_PROTOCOL'] ?? '', $m)) {
@@ -420,7 +420,7 @@ class ConnectionHandler
             $request = $request->withHeader('Content-MD5', $params['CONTENT_MD5']);
         }
         
-        return $request->withBody($this->requests[$requestId]['stdin']->rewind());
+        return $request;
     }
     
     /**

@@ -586,7 +586,9 @@ class Stream
         $in = $message->getBody();
         
         try {
-            do {
+            $eof = $in->eof();
+            
+            while (!$eof) {
                 $window = min($this->window, $this->conn->getWindow());
                 $len = min(8183, $window);
                 
@@ -613,7 +615,7 @@ class Stream
                 }
                 
                 yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
-            } while (!$eof);
+            }
         } finally {
             $in->close();
         }

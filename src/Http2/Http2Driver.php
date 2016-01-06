@@ -25,6 +25,7 @@ use Psr\Log\LoggerInterface;
 use function KoolKode\Async\eventEmitter;
 use function KoolKode\Async\is_runnable;
 use function KoolKode\Async\readBuffer;
+use function KoolKode\Async\tempStream;
 
 /**
  * HTTP/2 driver.
@@ -218,26 +219,9 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         $path = ltrim($event->getHeaderValue(':path'), '/');
         
         $uri = Uri::parse(sprintf('%s://%s/%s', $endpoint->isEncrypted() ? 'https' : 'http', $authority, $path));
-    
-//         $server = [
-//             'SERVER_PROTOCOL' => 'HTTP/2.0',
-//             'REQUEST_METHOD' => $event->getHeaderValue(':method'),
-//             'REQUEST_URI' => '/' . $path,
-//             'SCRIPT_NAME' => '',
-//             'SERVER_NAME' => $endpoint->getPeerName(),
-//             'SERVER_PORT' => $endpoint->getPort(),
-//             'REQUEST_TIME' => time(),
-//             'REQUEST_TIME_FLOAT' => microtime(true),
-//             'HTTP_HOST' => $uri->getHost() ?? $this->getPeerName()
-//         ];
-    
-//         $query = [];
-//         parse_str($uri->getQuery(), $query);
-
-        $request = new HttpRequest();
-        $request = $request->withMethod($event->getHeaderValue(':method'));
+        
+        $request = new HttpRequest($uri, $event->body, $event->getHeaderValue(':method'));
         $request = $request->withProtocolVersion('2.0');
-        $request = $request->withUri($uri);
     
         foreach ($event->headers as $header) {
             $request = $request->withAddedHeader($header[0], $header[1]);
@@ -251,9 +235,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $request = $request->withBody($event->body);
-        
-        $response = new HttpResponse();
+        $response = new HttpResponse(Http::CODE_OK, yield tempStream());
         $response = $response->withProtocolVersion('2.0');
         
         $response = $action($request, $response);

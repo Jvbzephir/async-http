@@ -16,7 +16,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
 class Http2Connector
@@ -79,17 +78,14 @@ class Http2Connector
 
     protected function createResponse(MessageReceivedEvent $event): \Generator
     {
-        yield noop();
+        yield;
         
-        $response = new HttpResponse();
+        $response = new HttpResponse($event->getHeaderValue(':status'), $event->body);
         $response = $response->withProtocolVersion('2.0');
-        $response = $response->withStatus($event->getHeaderValue(':status'));
         
         foreach ($event->headers as $header) {
             $response = $response->withAddedHeader($header[0], $header[1]);
         }
-        
-        $response = $response->withBody($event->body);
         
         return $response;
     }
