@@ -188,14 +188,14 @@ class Connection
      * @param LoggerInterface $logger
      * @return Connection
      * 
-     * @throws \RuntimeException When the client did not send an HTTP/2 connection preface.
+     * @throws SocketException When the client did not send an HTTP/2 connection preface.
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield readBuffer($socket, strlen(self::PREFACE));
     
         if ($preface !== self::PREFACE) {
-            throw new \RuntimeException('Client did not send valid HTTP/2 connection preface');
+            throw new SocketException('Client did not send valid HTTP/2 connection preface');
         }
     
         $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
@@ -321,27 +321,39 @@ class Connection
         try {
             list ($id, $frame) = yield from $this->readNextFrame();
         } catch (SocketException $e) {
-            yield captureError($e);
+            if ($this->logger) {
+                $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]);
+            }
             
             return false;
         }
         
-        if ($id === 0) {
-            try {
+        try {
+            if ($id === 0) {
                 return yield from $this->handleFrame($frame);
-            } catch (SocketException $e) {
-                yield captureError($e);
-                
-                return false;
-            } catch (ConnectionException $e) {
-                yield captureError($e);
-                yield from $this->writeFrame(new Frame(Frame::GOAWAY, $e->getCode()), 1000);
-                
-                return false;
+            } else {
+                return yield from $this->handleStreamFrame($id, $frame);
             }
+        } catch (ConnectionException $e) {
+            yield captureError($e);
+            yield from $this->writeFrame(new Frame(Frame::GOAWAY, $e->getCode()), 1000);
+            
+            return false;
+        } catch (SocketException $e) {
+            if ($this->logger) {
+                $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]);
+            }
+            
+            return false;
         }
-        
-        return yield from $this->handleStreamFrame($id, $frame);
     }
     
     /**
@@ -461,7 +473,7 @@ class Connection
             return $this->streams[$i] = new Stream($i, $this, yield eventEmitter(), $this->logger);
         }
         
-        throw new \RuntimeException('Maximum number of concurrent streams exceeded');
+        throw new SocketException('Maximum number of concurrent streams exceeded');
     }
     
     /**

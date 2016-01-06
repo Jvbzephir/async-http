@@ -19,6 +19,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
+use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\is_runnable;
@@ -151,6 +152,18 @@ class Http1Driver implements HttpDriverInterface
             
             $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
+        } catch (SocketException $e) {
+            $socket->close();
+            
+            if ($this->logger) {
+                $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]);
+            }
+            
+            return;
         } catch (\Throwable $e) {
             $socket->close();
             
@@ -284,42 +297,50 @@ class Http1Driver implements HttpDriverInterface
             $body->rewind();
         }
         
-        yield from $socket->write($message . "\r\n");
-        
-        if ($chunked) {
-            try {
-                if ($chunk !== '') {
-                    do {
-                        $chunk .= yield from $in->read(8184 - strlen($chunk));
+        try {
+            yield from $socket->write($message . "\r\n");
+            
+            if ($chunked) {
+                try {
+                    if ($chunk !== '') {
+                        yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                         
-                        try {
+                        while (!$in->eof()) {
+                            $chunk = yield from $in->read(8184);
+                            
                             yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
-                        } finally {
-                            $chunk = '';
                         }
-                    } while (!$in->eof());
-                    
-                    yield from $socket->write("0\r\n\r\n");
+                        
+                        yield from $socket->write("0\r\n\r\n");
+                    }
+                } finally {
+                    $in->close();
                 }
-            } finally {
-                $in->close();
-            }
-        } else {
-            try {
-                while (!$body->eof()) {
-                    yield from $socket->write(yield from $body->read());
+            } else {
+                try {
+                    while (!$body->eof()) {
+                        yield from $socket->write(yield from $body->read());
+                    }
+                } finally  {
+                    $body->close();
                 }
-            } finally  {
-                $body->close();
             }
-        }
-        
-        if ($this->logger) {
-            $this->logger->debug('<< HTTP/{version} {status} {reason}', [
-                'version' => $response->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'reason' => $response->getReasonPhrase()
-            ]);
+            
+            if ($this->logger) {
+                $this->logger->debug('<< HTTP/{version} {status} {reason}', [
+                    'version' => $response->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'reason' => $response->getReasonPhrase()
+                ]);
+            }
+        } catch (SocketException $e) {
+            if ($this->logger) {
+                $this->logger->debug('Dropped client connection due to socket error: {error} in {file} at line {line}', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]);
+            }
         }
     }
 }

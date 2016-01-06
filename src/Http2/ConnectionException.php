@@ -11,9 +11,11 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Stream\SocketException;
+
 /**
  * A connection error is any error that prevents further processing of the frame layer or corrupts any connection state.
  * 
  * @author Martin Schröder
  */
-class ConnectionException extends \RuntimeException { }
+class ConnectionException extends SocketException { }

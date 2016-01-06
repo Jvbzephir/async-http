@@ -11,12 +11,14 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Stream\SocketException;
+
 /**
  * A stream error is an error related to a specific stream that does not affect processing of other streams.
  * 
  * @author Martin Schröder
  */
-class StreamException extends \RuntimeException
+class StreamException extends SocketException
 {
     protected $streamId;
     
