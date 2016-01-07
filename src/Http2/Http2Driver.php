@@ -24,7 +24,6 @@ use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
-use function KoolKode\Async\is_runnable;
 use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
 
@@ -249,8 +248,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
         $response = $action($request, $response);
         
-        if (is_runnable($response)) {
-            $response = yield $response;
+        if ($response instanceof \Generator) {
+            $response = yield from $response;
         }
         
         if (is_array($response)) {

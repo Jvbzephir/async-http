@@ -22,7 +22,6 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\is_runnable;
 use function KoolKode\Async\tempStream;
 
 /**
@@ -184,8 +183,8 @@ class Http1Driver implements HttpDriverInterface
         try {
             $result = $action($request, $response);
             
-            if (is_runnable($result)) {
-                $result = yield $result;
+            if ($result instanceof \Generator) {
+                $result = yield from $result;
             }
             
             return yield from $this->sendResponse($socket, $result[0]);
