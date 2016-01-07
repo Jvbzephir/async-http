@@ -19,11 +19,14 @@ class MessageReceivedEvent
     
     public $body;
     
-    public function __construct(Stream $stream, array $headers, Http2InputStream $body)
+    public $started;
+    
+    public function __construct(Stream $stream, array $headers, Http2InputStream $body, float $started = NULL)
     {
         $this->stream = $stream;
         $this->headers = $headers;
         $this->body = $body;
+        $this->started = $started ?? microtime(true);
     }
 
     public function getHeaderValue(string $name): string

@@ -150,12 +150,15 @@ class Stream
     
     protected $tasks = [];
     
+    protected $started;
+    
     public function __construct(int $id, Connection $conn, EventEmitter $events, LoggerInterface $logger = NULL)
     {
         $this->id = $id;
         $this->conn = $conn;
         $this->events = $events;
         $this->logger = $logger;
+        $this->started = microtime(true);
         
         $this->socket = $conn->getSocket();
         $this->hpack = $conn->getHPack();
@@ -469,7 +472,7 @@ class Stream
             throw new StreamException('Invalid HTTP headers received', Frame::COMPRESSION_ERROR);
         }
         
-        $event = new MessageReceivedEvent($this, $headers, $this->body);
+        $event = new MessageReceivedEvent($this, $headers, $this->body, $this->started);
         
         $this->events->emit($event);
         $this->conn->getEvents()->emit($event);
@@ -534,8 +537,12 @@ class Stream
         return yield from $this->events->await(MessageReceivedEvent::class);
     }
 
-    public function sendResponse(HttpResponse $response): \Generator
+    public function sendResponse(HttpResponse $response, float $started = NULL): \Generator
     {
+        if ($started === NULL) {
+            $started = microtime(true);
+        }
+        
         try {
             $headers = [
                 ':status' => [
@@ -547,10 +554,11 @@ class Stream
             yield from $this->sendBody($response);
             
             if ($this->logger) {
-                $this->logger->debug('<< HTTP/{version} {status} {reason}', [
+                $this->logger->debug('<< HTTP/{version} {status} {reason} << {duration} ms', [
                     'version' => $response->getProtocolVersion(),
                     'status' => $response->getStatusCode(),
-                    'reason' => $response->getReasonPhrase() ?  : Http::getReason($response->getStatusCode())
+                    'reason' => $response->getReasonPhrase() ?  : Http::getReason($response->getStatusCode()),
+                    'duration' => round((microtime(true) - $started) * 1000)
                 ]);
             }
         } finally {

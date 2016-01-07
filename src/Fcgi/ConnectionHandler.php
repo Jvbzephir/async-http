@@ -323,6 +323,7 @@ class ConnectionHandler
         $content = unpack('nrole/Cflags/x5', $record->data);
         
         $this->requests[$record->requestId] = [
+            'started' => microtime(true),
             'keep-alive' => ($content['flags'] & self::FCGI_KEEP_CONNECTION) ? true : false,
             'params' => [],
             'stdin' => yield tempStream()
@@ -348,6 +349,7 @@ class ConnectionHandler
         }
         
         $request = $this->createHttpRequest($requestId);
+        $started = $this->requests[$requestId]['started'] ?? microtime(true);
         
         if ($this->logger) {
             $this->logger->debug('>> {method} {target} HTTP/{version}', [
@@ -371,10 +373,18 @@ class ConnectionHandler
         }
         
         $response = $response->withProtocolVersion($request->getProtocolVersion());
+        $response = yield from $this->writeResponse($requestId, $request, $response);
         
-        yield from $this->writeResponse($requestId, $request, $response);
+        yield from $this->endRequest($requestId);
         
-        return yield from $this->endRequest($requestId);
+        if ($this->logger) {
+            $this->logger->debug('<< HTTP/{version} {status} {reason} << {duration} ms', [
+                'version' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'reason' => $response->getReasonPhrase(),
+                'duration' => round((microtime(true) - $started) * 1000)
+            ]);
+        }
     }
     
     /**
@@ -429,6 +439,7 @@ class ConnectionHandler
      * @param int $requestId
      * @param HttpRequest $request
      * @param HttpResponse $response
+     * @return HttpResponse
      */
     protected function writeResponse(int $requestId, HttpRequest $request, HttpResponse $response): \Generator
     {
@@ -474,13 +485,7 @@ class ConnectionHandler
             $body->close();
         }
         
-        if ($this->logger) {
-            $this->logger->debug('<< HTTP/{version} {status} {reason}', [
-                'version' => $response->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'reason' => $response->getReasonPhrase()
-            ]);
-        }
+        return $response;
     }
     
     /**

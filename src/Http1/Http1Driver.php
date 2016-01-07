@@ -71,6 +71,7 @@ class Http1Driver implements HttpDriverInterface
      */
     public function handleConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
     {
+        $started = microtime(true);
         $cached = true;
         $socket = new DirectUpgradeDuplexStream($socket, $cached);
         
@@ -81,7 +82,7 @@ class Http1Driver implements HttpDriverInterface
             
             if ($response instanceof HttpResponse) {
                 try {
-                    return yield from $this->sendResponse($socket, $response);
+                    return yield from $this->sendResponse($socket, $response, $started);
                 } finally {
                     $socket->close();
                 }
@@ -174,7 +175,7 @@ class Http1Driver implements HttpDriverInterface
             $response = yield from $handler->upgradeConnection($request, $response, $endpoint, $reader, $action);
             
             if ($response instanceof HttpResponse) {
-                return yield from $this->sendResponse($socket, $response);
+                return yield from $this->sendResponse($socket, $response, $started);
             }
             
             return;
@@ -187,7 +188,7 @@ class Http1Driver implements HttpDriverInterface
                 $result = yield from $result;
             }
             
-            return yield from $this->sendResponse($socket, $result[0]);
+            return yield from $this->sendResponse($socket, $result[0], $started);
         } finally {
             $socket->close();
         }
@@ -240,8 +241,12 @@ class Http1Driver implements HttpDriverInterface
      * @param HttpResponse $response
      * @return Generator
      */
-    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response): \Generator
+    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response, float $started = NULL): \Generator
     {
+        if ($started === NULL) {
+            $started = microtime(true);
+        }
+        
         $remove = [
             'Transfer-Encoding',
             'Content-Encoding',
@@ -326,10 +331,11 @@ class Http1Driver implements HttpDriverInterface
             }
             
             if ($this->logger) {
-                $this->logger->debug('<< HTTP/{version} {status} {reason}', [
+                $this->logger->debug('<< HTTP/{version} {status} {reason} << {duration} ms', [
                     'version' => $response->getProtocolVersion(),
                     'status' => $response->getStatusCode(),
-                    'reason' => $response->getReasonPhrase()
+                    'reason' => $response->getReasonPhrase(),
+                    'duration' => round((microtime(true) - $started) * 1000)
                 ]);
             }
         } catch (SocketException $e) {
