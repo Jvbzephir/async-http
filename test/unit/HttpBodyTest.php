@@ -38,7 +38,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     {
         $executor = $this->createExecutor();
         
-        $executor->runNewTask(call_user_func(function () {
+        $executor->runCallback(function () {
             $connector = new Http1Connector();
             
             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield tempStream());
@@ -53,7 +53,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             } finally {
                 $body->close();
             }
-        }));
+        });
         
         $executor->run();
     }
@@ -66,7 +66,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         
         $executor = $this->createExecutor();
         
-        $executor->runNewTask(call_user_func(function () use ($executor) {
+        $executor->runCallback(function () use ($executor) {
             $connector = new Http2Connector();
             
             $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield tempStream());
@@ -82,7 +82,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $body->close();
                 $connector->shutdown();
             }
-        }));
+        });
         
         $executor->run();
     }
