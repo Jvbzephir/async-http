@@ -68,7 +68,6 @@ class HttpEndpoint
         'allow_self_signed' => false,
         'verify_depth' => 10,
         'disable_compression' => true,
-        'capture_session_meta' => true,
         'SNI_enabled' => true,
         'single_ecdh_use' => false,
         'ecdh_curve' => 'prime256v1',
