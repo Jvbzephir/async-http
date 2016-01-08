@@ -13,8 +13,6 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
 
-use function KoolKode\Async\noop;
-
 /**
  * Decompresses output as it is being read.
  * 
@@ -52,7 +50,7 @@ class InflateInputStream implements InputStreamInterface
      * @var bool
      */
     protected $finished = false;
-    
+
     /**
      * Error handler callback.
      *
@@ -128,7 +126,7 @@ class InflateInputStream implements InputStreamInterface
         
         return $this->buffer === '' && $this->finished;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -168,7 +166,7 @@ class InflateInputStream implements InputStreamInterface
         
         return $chunk;
     }
-    
+
     /**
      * Initialize and return the error handler callback.
      *
@@ -176,16 +174,15 @@ class InflateInputStream implements InputStreamInterface
      */
     protected static function handleError()
     {
-        if(self::$errorHandler === NULL)
-        {
+        if (self::$errorHandler === NULL) {
             self::$errorHandler = function ($type, $message, $file, $line) {
                 throw new \RuntimeException($message);
             };
         }
-    
+        
         return self::$errorHandler;
     }
-    
+
     /**
      * Invoke the given callback handling all errors / warnings using exceptions.
      *
@@ -195,21 +192,17 @@ class InflateInputStream implements InputStreamInterface
      */
     protected static function invokeWithErrorHandler(callable $callback, ...$args)
     {
-        if(self::$errorHandler === NULL)
-        {
+        if (self::$errorHandler === NULL) {
             self::$errorHandler = function ($type, $message, $file, $line) {
                 throw new \RuntimeException($message);
             };
         }
-    
+        
         set_error_handler(self::$errorHandler);
-    
-        try
-        {
+        
+        try {
             return $callback(...$args);
-        }
-        finally
-        {
+        } finally {
             restore_error_handler();
         }
     }

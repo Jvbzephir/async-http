@@ -26,28 +26,28 @@ class LimitInputStream implements InputStreamInterface
      * @var InputStreamInterface
      */
     protected $stream;
-    
+
     /**
      * Maximum number of bytes to be read.
      * 
      * @var int
      */
     protected $limit;
-    
+
     /**
      * Current read offset.
      * 
      * @var int
      */
     protected $offset = 0;
-    
+
     /**
      * Cascade call to close to wrapped stream?
      * 
      * @var bool
      */
     protected $cascadeClose;
-    
+
     /**
      * Create a length-limited input stream.
      * 
@@ -61,7 +61,7 @@ class LimitInputStream implements InputStreamInterface
         $this->limit = $limit;
         $this->cascadeClose = $cascadeClose;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -71,7 +71,7 @@ class LimitInputStream implements InputStreamInterface
             $this->stream->close();
         }
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -79,7 +79,7 @@ class LimitInputStream implements InputStreamInterface
     {
         return $this->offset >= $this->limit || $this->stream->eof();
     }
-    
+
     /**
      * {@inheritdoc}
      */
