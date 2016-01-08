@@ -138,7 +138,7 @@ class Http1Driver implements HttpDriverInterface
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $reader = new ChunkDecodedInputStream($reader, yield from $reader->read(), false);
+                    $body = new ChunkDecodedInputStream($reader, yield from $reader->read(), false);
                 } else {
                     throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
                 }
@@ -149,10 +149,10 @@ class Http1Driver implements HttpDriverInterface
                     throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
-                $reader = ($len === 0) ? yield tempStream() : new LimitInputStream($reader, $len, false);
+                $body = ($len === 0) ? yield tempStream() : new LimitInputStream($reader, $len, false);
             } else {
                 // Dropping request body if neighter content-length nor chunked encoding are specified.
-                $reader = yield tempStream();
+                $body = yield tempStream();
             }
             
             $remove = [
@@ -165,7 +165,7 @@ class Http1Driver implements HttpDriverInterface
                 unset($headers[$name]);
             }
             
-            $request = new HttpRequest($uri, $reader, $m[1], $headers);
+            $request = new HttpRequest($uri, $body, $m[1], $headers);
             $request = $request->withProtocolVersion($m[3]);
             
             if ($this->logger) {
