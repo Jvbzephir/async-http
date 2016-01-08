@@ -215,13 +215,17 @@ class Http1Driver implements HttpDriverInterface
         }
         
         try {
-            $result = $action($request, $response);
+            $response = $action($request, $response);
             
-            if ($result instanceof \Generator) {
-                $result = yield from $result;
+            if ($response instanceof \Generator) {
+                $response = yield from $response;
             }
             
-            return yield from $this->sendResponse($socket, $result[0], $started);
+            if (!$response instanceof HttpResponse) {
+                throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
+            }
+            
+            return yield from $this->sendResponse($socket, $response, $started);
         } finally {
             $socket->close();
         }

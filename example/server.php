@@ -83,30 +83,7 @@ $executor->runNewTask(call_user_func(function () {
     $http->addDriver(new Http2Driver($logger));
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
-        
-//         printf("REQUESTED: \"%s\"\n", $request->getRequestTarget());
-        
-        return [
-            $response->withBody(yield tempStream('KoolKode Async HTTP :)'))
-        ];        
-        
-//         $factory = $http->getHttp1Driver()->getHttpFactory();
-//         $base = $request->getUri();
-//         $push = [];
-        
-//         foreach ($response->getHeader('K1-Push-Promise') as $route) {
-//             $uri = $factory->createUri($app->resolve($route));
-//             $uri = $uri->withScheme($base->getScheme());
-//             $uri = $uri->withHost($base->getHost());
-//             $uri = $uri->withPort($base->getPort());
-            
-//             $push[] = $app($factory->createServerRequest()->withUri($uri)->withRequestTarget($uri->getPath()), $factory->createResponse());
-//         }
-        
-//         return [
-//             $response->withoutHeader('K1-Push-Promise'),
-//             $push
-//         ];
+        return $response->withBody(yield tempStream('KoolKode Async HTTP :)'));
     };
     
     $fcgi = new \KoolKode\Async\Http\Fcgi\FcgiEndpoint(4000, '0.0.0.0', $logger);

@@ -274,6 +274,7 @@ class HttpEndpoint
                 
                 // Driver selection is based on negotiated TLS ALPN protocol.
                 $crypto = (array)$stream->getMetadata()['crypto'];
+                
                 if ((isset($crypto['alpn_protocol']))) {
                     foreach ($this->drivers as $driver) {
                         if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
@@ -349,9 +350,9 @@ class HttpEndpoint
         }
         
         $alpn = [];
-        foreach (array_merge([
+        foreach (array_merge($this->drivers, [
             $this->http1Driver
-        ], $this->drivers) as $driver) {
+        ]) as $driver) {
             $alpn = array_merge($alpn, $driver->getProtocols());
         }
         

@@ -252,9 +252,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             $response = yield from $response;
         }
         
-        if (is_array($response)) {
-            //             $push = $response[1];
-            $response = $response[0];
+        if (!$response instanceof HttpResponse) {
+            throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
         }
         
         $response = $response->withProtocolVersion('2.0');

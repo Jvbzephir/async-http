@@ -85,9 +85,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $server = new HttpEndpoint(12345);
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
-                return [
-                    $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))))
-                ];
+                $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))));
             }), 'Test Server', true);
             
             try {
