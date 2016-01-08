@@ -414,7 +414,16 @@ class ConnectionHandler
         
         foreach ($params as $k => $v) {
             if ('HTTP_' === substr($k, 0, 5)) {
-                $request = $request->withAddedHeader(Http::normalizeHeaderName(str_replace('_', '-', substr($k, 5))), (string) $v);
+                switch ($k) {
+                    case 'HTTP_CONNECTION':
+                    case 'HTTP_TRANSFER_ENCODING':
+                    case 'HTTP_CONTENT_ENCODING':
+                    case 'HTTP_KEEP_ALIVE':
+                        // Skip these headers.
+                        break;
+                    default:
+                        $request = $request->withAddedHeader(Http::normalizeHeaderName(str_replace('_', '-', substr($k, 5))), (string) $v);
+                }
             }
         }
         
