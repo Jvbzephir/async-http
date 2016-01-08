@@ -155,16 +155,6 @@ class Http1Driver implements HttpDriverInterface
                 $body = yield tempStream();
             }
             
-            $remove = [
-                'transfer-encoding',
-                'content-encoding',
-                'keep-alive'
-            ];
-            
-            foreach ($remove as $name) {
-                unset($headers[$name]);
-            }
-            
             $request = new HttpRequest($uri, $body, $m[1], $headers);
             $request = $request->withProtocolVersion($m[3]);
             
@@ -214,6 +204,17 @@ class Http1Driver implements HttpDriverInterface
         }
         
         try {
+            $remove = [
+                'Connection',
+                'Transfer-Encoding',
+                'Content-Encoding',
+                'Keep-Alive'
+            ];
+            
+            foreach ($remove as $name) {
+                $request = $request->withoutHeader($name);
+            }
+            
             $response = $action($request, $response);
             
             if ($response instanceof \Generator) {
