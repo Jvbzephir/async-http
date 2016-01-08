@@ -146,7 +146,7 @@ class Http1Driver implements HttpDriverInterface
                 try {
                     $len = Http::parseContentLength(implode(', ', $headers['content-length']));
                 } catch (\Throwable $e) {
-                    throw new StatusException(Http::CODE_BAD_REQUEST);
+                    throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
                 $reader = ($len === 0) ? yield tempStream() : new LimitInputStream($reader, $len, false);
