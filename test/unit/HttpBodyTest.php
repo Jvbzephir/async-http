@@ -86,14 +86,14 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 return [
                     $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))))
                 ];
-            }));
+            }), 'Test Server', true);
             
             try {
                 $connector = new Http1Connector();
                 
                 $message = 'Hi there!';
                 $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield tempStream($message), 'POST');
-                $response = yield from $connector->send($request, .2);
+                $response = yield from $connector->send($request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
