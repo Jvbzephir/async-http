@@ -77,7 +77,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     public function testHttp1Server()
     {
-        return $this->markTestSkipped('Server Test skipped due to Travis CI');
+//         return $this->markTestSkipped('Server Test skipped due to Travis CI');
         
         $executor = $this->createExecutor();
         
@@ -85,7 +85,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $server = new HttpEndpoint(12345);
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
-                $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))));
+                return $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))));
             }), 'Test Server', true);
             
             try {

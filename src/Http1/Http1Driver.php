@@ -23,6 +23,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
 
 /**
@@ -138,7 +139,7 @@ class Http1Driver implements HttpDriverInterface
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $body = new ChunkDecodedInputStream($reader, yield from $reader->read(), false);
+                    $body = new ChunkDecodedInputStream($reader, yield readBuffer($reader, 8192), false);
                 } else {
                     throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
                 }
