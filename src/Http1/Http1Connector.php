@@ -31,9 +31,23 @@ class Http1Connector
 {
     protected $logger;
     
+    protected $chunkedRequests = true;
+    
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
+    }
+    
+    /**
+     * Enable / disable sending non-empty request bodies using HTTP chunk encoding.
+     * 
+     * This is enabled by default, but can be disabled in case remote peers do not support it.
+     * 
+     * @param bool $chunked
+     */
+    public function setChunkedRequests(bool $chunked)
+    {
+        $this->chunkedRequests = $chunked;
     }
     
     /**
@@ -61,6 +75,7 @@ class Http1Connector
             
             yield from $this->sendRequest($stream, $request);
             
+            // Shutdown sender here to indicate read EOF to servers that rely on it.
             $stream->shutdownSender();
             
             return yield from $this->processResponse($stream, $request);
@@ -115,7 +130,7 @@ class Http1Connector
             if ($chunk === '') {
                 $tmp = yield tempStream();
                 $request = $request->withHeader('Content-Length', '0');
-            } elseif ($request->getProtocolVersion() === '1.0') {
+            } elseif (!$this->chunkedRequests || $request->getProtocolVersion() === '1.0') {
                 $tmp = yield tempStream();
                 $size = yield from $tmp->write($chunk);
                 
@@ -133,6 +148,8 @@ class Http1Connector
             $message = sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
             
             foreach ($request->getHeaders() as $name => $values) {
+                $name = Http::normalizeHeaderName($name);
+                
                 foreach ($values as $value) {
                     $message .= sprintf("%s: %s\n", $name, $value);
                 }
@@ -204,23 +221,33 @@ class Http1Connector
             $headers[strtolower($header[0])][] = $header[1];
         }
         
-        $dechunk = false;
-        $decompress = NULL;
-        
         if (isset($headers['transfer-encoding'])) {
-            if ('chunked' === strtolower(implode(', ', $headers['transfer-encoding']))) {
-                $dechunk = true;
+            $encodings = strtolower(implode(',', $headers['transfer-encoding']));
+            $encodings = array_map('trim', explode(',', $encodings));
+            
+            if (in_array('chunked', $encodings)) {
+                $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
+            } else {
+                throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
             }
+        } elseif (isset($headers['content-length'])) {
+            $len = Http::parseContentLength(implode(', ', $headers['content-length']));
+            
+            $stream = ($len === 0) ? yield tempStream() : new LimitInputStream($stream, $len);
+        } else {
+            throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
         }
         
         if (isset($headers['content-encoding'])) {
             switch (implode(', ', $headers['content-encoding'])) {
                 case 'gzip':
-                    $decompress = InflateInputStream::GZIP;
+                    $stream = new InflateInputStream($stream, InflateInputStream::GZIP);
                     break;
                 case 'deflate':
-                    $decompress = InflateInputStream::DEFLATE;
+                    $stream = new InflateInputStream($stream, InflateInputStream::DEFLATE);
                     break;
+                default:
+                    throw new \RuntimeException(sprintf('Unsupported content-encoding: "%s"', implode(', ', $headers['content-encoding'])));
             }
         }
         
@@ -237,14 +264,6 @@ class Http1Connector
             if (isset($headers[$name])) {
                 unset($headers[$name]);
             }
-        }
-        
-        if ($dechunk) {
-            $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
-        }
-        
-        if ($decompress) {
-            $stream = new InflateInputStream($stream, $decompress); 
         }
         
         $response = new HttpResponse((int) $m[2], $stream, $headers);

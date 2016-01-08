@@ -16,6 +16,7 @@ use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
@@ -105,7 +106,7 @@ class Http1Driver implements HttpDriverInterface
             $m = NULL;
             
             if (!preg_match("'^(\S+)\s+(.+)\s+HTTP/(1\\.[01])$'i", $line, $m)) {
-                throw new \RuntimeException('Bad Request');
+                throw new StatusException(Http::CODE_BAD_REQUEST);
             }
             
             $headers = [];
@@ -118,7 +119,7 @@ class Http1Driver implements HttpDriverInterface
                 }
                 
                 $header = array_map('trim', explode(':', $line, 2));
-                $headers[strtolower($header[0])][] = $header;
+                $headers[strtolower($header[0])][] = $header[1];
             }
             
             $n = NULL;
@@ -132,11 +133,37 @@ class Http1Driver implements HttpDriverInterface
             $uri = Uri::parse($uri);
             $uri = $uri->withPort($endpoint->getPort());
             
-            if (isset($headers['content-length'])) {
-                $len = (int) implode(', ', $headers['content-length']);
-                if ($len > 0) {
-                    $reader = new LimitInputStream($reader, $len, false);
+            if (isset($headers['transfer-encoding'])) {
+                $encodings = strtolower(implode(',', $headers['transfer-encoding']));
+                $encodings = array_map('trim', explode(',', $encodings));
+                
+                if (in_array('chunked', $encodings)) {
+                    $reader = new ChunkDecodedInputStream($reader, yield from $reader->read(), false);
+                } else {
+                    throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
                 }
+            } elseif (isset($headers['content-length'])) {
+                try {
+                    $len = Http::parseContentLength(implode(', ', $headers['content-length']));
+                } catch (\Throwable $e) {
+                    throw new StatusException(Http::CODE_BAD_REQUEST);
+                }
+                
+                $reader = ($len === 0) ? yield tempStream() : new LimitInputStream($reader, $len, false);
+            } else {
+                // Dropping request body if neighter content-length nor chunked encoding are specified.
+                $reader = yield tempStream();
+            }
+            
+            $remove = [
+                'connection',
+                'transfer-encoding',
+                'content-encoding',
+                'keep-alive'
+            ];
+            
+            foreach ($remove as $name) {
+                unset($headers[$name]);
             }
             
             $request = new HttpRequest($uri, $reader, $m[1], $headers);
@@ -152,6 +179,12 @@ class Http1Driver implements HttpDriverInterface
             
             $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
+        } catch (StatusException $e) {
+            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), $started);
+            
+            $socket->close();
+            
+            return;
         } catch (SocketException $e) {
             $socket->close();
             
@@ -269,6 +302,8 @@ class Http1Driver implements HttpDriverInterface
         $message = sprintf("HTTP/%s %03u %s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), $response->getReasonPhrase());
         
         foreach ($response->getHeaders() as $name => $values) {
+            $name = Http::normalizeHeaderName($name);
+            
             foreach ($values as $value) {
                 $message .= sprintf("%s: %s\r\n", $name, $value);
             }

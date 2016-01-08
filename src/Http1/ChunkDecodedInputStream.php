@@ -35,6 +35,8 @@ class ChunkDecodedInputStream implements InputStreamInterface
      * @var bool
      */
     protected $ended = false;
+    
+    protected $cascadeClose;
 
     /**
      * Current read buffer.
@@ -43,10 +45,11 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     protected $buffer = '';
 
-    public function __construct(InputStreamInterface $stream, string $buffer)
+    public function __construct(InputStreamInterface $stream, string $buffer, bool $cascadeClose = true)
     {
         $this->stream = $stream;
         $this->buffer = $buffer;
+        $this->cascadeClose = $cascadeClose;
         
         $m = NULL;
         
@@ -85,7 +88,9 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         if ($this->stream !== NULL) {
             try {
-                $this->stream->close();
+                if ($this->cascadeClose) {
+                    $this->stream->close();
+                }
             } finally {
                 $this->stream = NULL;
             }
