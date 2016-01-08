@@ -415,7 +415,6 @@ class ConnectionHandler
         foreach ($params as $k => $v) {
             if ('HTTP_' === substr($k, 0, 5)) {
                 switch ($k) {
-                    case 'HTTP_CONNECTION':
                     case 'HTTP_TRANSFER_ENCODING':
                     case 'HTTP_CONTENT_ENCODING':
                     case 'HTTP_KEEP_ALIVE':

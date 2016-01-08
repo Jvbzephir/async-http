@@ -156,7 +156,6 @@ class Http1Driver implements HttpDriverInterface
             }
             
             $remove = [
-                'connection',
                 'transfer-encoding',
                 'content-encoding',
                 'keep-alive'
