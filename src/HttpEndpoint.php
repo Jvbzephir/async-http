@@ -342,12 +342,16 @@ class HttpEndpoint
     protected function createStreamContext(string $host)
     {
         $sslOptions = $this->sslOptions;
-        foreach ($this->drivers as $driver) {
+        foreach (array_merge([
+            $this->http1Driver
+        ], $this->drivers) as $driver) {
             $sslOptions = array_merge($sslOptions, $driver->getSslOptions());
         }
         
         $alpn = [];
-        foreach ($this->drivers as $driver) {
+        foreach (array_merge([
+            $this->http1Driver
+        ], $this->drivers) as $driver) {
             $alpn = array_merge($alpn, $driver->getProtocols());
         }
         

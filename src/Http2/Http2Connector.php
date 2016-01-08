@@ -40,7 +40,7 @@ class Http2Connector
         }
     }
     
-    public function send(HttpRequest $request): \Generator
+    public function send(HttpRequest $request, float $timeout = 5): \Generator
     {
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
@@ -52,7 +52,7 @@ class Http2Connector
             $context['ssl']['alpn_protocols'] = 'h2';
         }
         
-        $socket = yield from SocketStream::connect($host, $port, 'tcp', 0, $context);
+        $socket = yield from SocketStream::connect($host, $port, 'tcp', $timeout, $context);
         
         if ($secure) {
             yield from $socket->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);

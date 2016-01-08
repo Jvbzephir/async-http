@@ -54,9 +54,10 @@ class Http1Connector
      * Coroutine that sends an HTTP/1 request and returns the received HTTP response.
      * 
      * @param HttpRequest $request
+     * @param float $timeout Connect timeout in seconds.
      * @return Generator
      */
-    public function send(HttpRequest $request): \Generator
+    public function send(HttpRequest $request, float $timeout = 5): \Generator
     {
         $uri = $request->getUri();
         $secure = $uri->getScheme() === 'https';
@@ -64,7 +65,7 @@ class Http1Connector
         $host = $uri->getHost();
         $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
         
-        $stream = yield from SocketStream::connect($host, $port);
+        $stream = yield from SocketStream::connect($host, $port, 'tcp', $timeout);
         
         try {
             if ($secure) {
@@ -254,7 +255,6 @@ class Http1Connector
         $remove = [
             'connection',
             'content-encoding',
-            'content-length',
             'keep-alive',
             'trailer',
             'transfer-encoding'

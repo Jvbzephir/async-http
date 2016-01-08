@@ -15,9 +15,11 @@ use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 
 use function KoolKode\Async\tempStream;
+use function KoolKode\Async\runTask;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -32,6 +34,21 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         }
         
         return $executor;
+    }
+
+    protected function readContents(InputStreamInterface $in): \Generator
+    {
+        try {
+            $buffer = '';
+            
+            while (!$in->eof()) {
+                $buffer .= yield from $in->read();
+            }
+            
+            return $buffer;
+        } finally {
+            $in->close();
+        }
     }
 
     public function testHttp1Client()
@@ -52,6 +69,37 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 }
             } finally {
                 $body->close();
+            }
+        });
+        
+        $executor->run();
+    }
+    
+    public function testHttp1Server()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runCallback(function () {
+            $server = new HttpEndpoint(12345);
+            
+            $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
+                return [
+                    $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))))
+                ];
+            }));
+            
+            try {
+                $connector = new Http1Connector();
+                
+                $message = 'Hi there!';
+                $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield tempStream($message), 'POST');
+                $response = yield from $connector->send($request, .2);
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
+                $this->assertEquals('RECEIVED: ' . $message, yield from $this->readContents($response->getBody()));
+            } finally {
+                $worker->cancel();
             }
         });
         

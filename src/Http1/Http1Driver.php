@@ -100,7 +100,7 @@ class Http1Driver implements HttpDriverInterface
             $line = yield from $reader->readLine();
             
             if ($line === false) {
-                return;
+                throw new StatusException(Http::CODE_BAD_REQUEST);
             }
             
             $m = NULL;
