@@ -206,7 +206,6 @@ class Http1Connector
         $m = NULL;
         
         if (!preg_match("'^HTTP/(1\\.[0-1])\s+([0-9]{3})\s*(.*)$'i", $line, $m)) {
-            var_dump($line);
             throw new \RuntimeException('Response did not contain a valid HTTP status line');
         }
         
