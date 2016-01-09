@@ -76,9 +76,6 @@ class Http1Connector
             
             yield from $this->sendRequest($stream, $request);
             
-            // Shutdown sender here to indicate read EOF to servers that rely on it.
-            $stream->shutdownSender();
-            
             return yield from $this->processResponse($stream, $request);
         } catch (\Throwable $e) {
             $stream->close();
