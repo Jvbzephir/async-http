@@ -84,7 +84,7 @@ class Http1Driver implements HttpDriverInterface
             
             if ($response instanceof HttpResponse) {
                 try {
-                    return yield from $this->sendResponse($socket, $response, $started);
+                    return yield from $this->sendResponse($socket, $response, false, $started);
                 } finally {
                     $socket->close();
                 }
@@ -170,7 +170,7 @@ class Http1Driver implements HttpDriverInterface
             $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
-            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), $started);
+            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
@@ -198,7 +198,7 @@ class Http1Driver implements HttpDriverInterface
             $response = yield from $handler->upgradeConnection($request, $response, $endpoint, $reader, $action);
             
             if ($response instanceof HttpResponse) {
-                return yield from $this->sendResponse($socket, $response, $started);
+                return yield from $this->sendResponse($socket, $response, false, $started);
             }
             
             return;
@@ -226,7 +226,7 @@ class Http1Driver implements HttpDriverInterface
                 throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
             }
             
-            return yield from $this->sendResponse($socket, $response, $started);
+            return yield from $this->sendResponse($socket, $response, $request->getMethod() == 'HEAD', $started);
         } finally {
             $socket->close();
         }
@@ -279,7 +279,7 @@ class Http1Driver implements HttpDriverInterface
      * @param HttpResponse $response
      * @return Generator
      */
-    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response, float $started = NULL): \Generator
+    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response, bool $head = false, float $started = NULL): \Generator
     {
         if ($started === NULL) {
             $started = microtime(true);
@@ -295,7 +295,7 @@ class Http1Driver implements HttpDriverInterface
             $response = $response->withoutHeader($name);
         }
         
-        $chunked = ($response->getProtocolVersion() !== '1.0');
+        $chunked = (!$head && $response->getProtocolVersion() !== '1.0');
         
         $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
         $response = $response->withHeader('Connection', 'close');
@@ -362,8 +362,10 @@ class Http1Driver implements HttpDriverInterface
                 }
             } else {
                 try {
-                    while (!$body->eof()) {
-                        yield from $socket->write(yield from $body->read());
+                    if (!$head) {
+                        while (!$body->eof()) {
+                            yield from $socket->write(yield from $body->read());
+                        }
                     }
                 } finally  {
                     $body->close();
