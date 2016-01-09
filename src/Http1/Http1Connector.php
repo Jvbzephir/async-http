@@ -219,33 +219,37 @@ class Http1Connector
             $headers[strtolower($header[0])][] = $header[1];
         }
         
-        if (isset($headers['transfer-encoding'])) {
-            $encodings = strtolower(implode(',', $headers['transfer-encoding']));
-            $encodings = array_map('trim', explode(',', $encodings));
-            
-            if (in_array('chunked', $encodings)) {
-                $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
-            } else {
-                throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
-            }
-        } elseif (isset($headers['content-length'])) {
-            $len = Http::parseContentLength(implode(', ', $headers['content-length']));
-            
-            $stream = ($len === 0) ? yield tempStream() : new LimitInputStream($stream, $len);
+        if ($request->getMethod() == 'HEAD') {
+            $stream = yield tempStream();
         } else {
-            throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
-        }
-        
-        if (isset($headers['content-encoding'])) {
-            switch (implode(', ', $headers['content-encoding'])) {
-                case 'gzip':
-                    $stream = new InflateInputStream($stream, InflateInputStream::GZIP);
-                    break;
-                case 'deflate':
-                    $stream = new InflateInputStream($stream, InflateInputStream::DEFLATE);
-                    break;
-                default:
-                    throw new \RuntimeException(sprintf('Unsupported content-encoding: "%s"', implode(', ', $headers['content-encoding'])));
+            if (isset($headers['transfer-encoding'])) {
+                $encodings = strtolower(implode(',', $headers['transfer-encoding']));
+                $encodings = array_map('trim', explode(',', $encodings));
+                
+                if (in_array('chunked', $encodings)) {
+                    $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
+                } else {
+                    throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
+                }
+            } elseif (isset($headers['content-length'])) {
+                $len = Http::parseContentLength(implode(', ', $headers['content-length']));
+                
+                $stream = ($len === 0) ? yield tempStream() : new LimitInputStream($stream, $len);
+            } else {
+                throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
+            }
+            
+            if (isset($headers['content-encoding'])) {
+                switch (implode(', ', $headers['content-encoding'])) {
+                    case 'gzip':
+                        $stream = new InflateInputStream($stream, InflateInputStream::GZIP);
+                        break;
+                    case 'deflate':
+                        $stream = new InflateInputStream($stream, InflateInputStream::DEFLATE);
+                        break;
+                    default:
+                        throw new \RuntimeException(sprintf('Unsupported content-encoding: "%s"', implode(', ', $headers['content-encoding'])));
+                }
             }
         }
         
