@@ -170,7 +170,7 @@ class Http1Driver implements HttpDriverInterface
             $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
-            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), $request->getMethod() == 'HEAD', $started);
+            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), isset($request) && $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
