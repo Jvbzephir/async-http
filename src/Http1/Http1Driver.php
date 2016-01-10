@@ -104,8 +104,8 @@ class Http1Driver implements HttpDriverInterface
             
             $line = yield from $reader->readLine();
             
-            if ($line === false) {
-                throw new StatusException(Http::CODE_BAD_REQUEST);
+            if (empty($line)) {
+                throw new SocketException('No HTTP request line available');
             }
             
             $m = NULL;
