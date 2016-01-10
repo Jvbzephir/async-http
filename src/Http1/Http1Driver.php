@@ -80,7 +80,9 @@ class Http1Driver implements HttpDriverInterface
         
         // Attempt to upgrade HTTP connection based on data sent by client
         if (NULL !== ($handler = yield from $endpoint->findDirectUpgradeHandler($socket))) {
+            $socket->rewind();
             $cached = false;
+            
             $response = yield from $handler->upgradeDirectConnection($endpoint, $socket, $action);
             
             if ($response instanceof HttpResponse) {
@@ -94,6 +96,7 @@ class Http1Driver implements HttpDriverInterface
             return;
         }
         
+        $socket->rewind();
         $cached = false;
         
         try {
