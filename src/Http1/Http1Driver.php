@@ -23,6 +23,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketException;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\captureError;
 use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
 
@@ -170,12 +171,16 @@ class Http1Driver implements HttpDriverInterface
             $response = new HttpResponse(Http::CODE_OK, yield tempStream());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
+            yield captureError($e);
+            
             yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), isset($request) && $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
             return;
         } catch (SocketException $e) {
+            yield captureError($e);
+            
             $socket->close();
             
             if ($this->logger) {
