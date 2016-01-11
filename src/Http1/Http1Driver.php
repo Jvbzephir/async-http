@@ -224,6 +224,15 @@ class Http1Driver implements HttpDriverInterface
                 $request = $request->withoutHeader($name);
             }
             
+            // Signal clients to send body immediately for now...
+            if (1.1 <= (float) $request->getProtocolVersion() && $request->hasHeader('Expect')) {
+                $expected = array_map('strtolower', array_map('trim', explode(',', $request->getHeaderLine('Expect'))));
+                
+                if (in_array('100-continue', $expected)) {
+                    yield from $reader->write(sprintf("HTTP/%s 100 Continue\r\n", $request->getProtocolVersion()));
+                }
+            }
+            
             $response = $action($request, $response);
             
             if ($response instanceof \Generator) {
