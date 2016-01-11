@@ -285,7 +285,7 @@ class ConnectionHandler
                             yield captureError($e);
                             yield from $this->endRequest($requestId);
                         } finally {
-                            
+                            unset($this->workers[$worker->id]);
                         }
                     });
                     
