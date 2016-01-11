@@ -25,6 +25,8 @@ abstract class HttpMessage
     protected $headers;
     
     protected $body;
+    
+    protected $attributes = [];
 
     public function __construct(InputStreamInterface $body, array $headers = [], string $protocolVersion = '1.1')
     {
@@ -180,6 +182,22 @@ abstract class HttpMessage
     {
         $message = clone $this;
         $message->body = $body;
+        
+        return $message;
+    }
+    
+    public function withAttribute(string $name, $value): HttpMessage
+    {
+        $message = clone $this;
+        $message->attributes[$name] = $value;
+        
+        return $message;
+    }
+
+    public function withoutAttribute(string $name): HttpMessage
+    {
+        $message = clone $this;
+        unset($message->attributes[$name]);
         
         return $message;
     }
