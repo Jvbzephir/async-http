@@ -201,7 +201,7 @@ abstract class HttpMessage
         
         return $message;
     }
-
+    
     protected function assertArrayOfStrings(array $strings): bool
     {
         foreach ($strings as $string) {

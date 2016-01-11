@@ -24,7 +24,7 @@ class HttpResponse extends HttpMessage
 
     protected $reason;
 
-    public function __construct(int $status = NULL, InputStreamInterface $body, array $headers = [])
+    public function __construct(int $status, InputStreamInterface $body, array $headers = [])
     {
         parent::__construct($body, $headers);
         

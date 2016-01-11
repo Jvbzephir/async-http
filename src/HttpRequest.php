@@ -131,7 +131,7 @@ class HttpRequest extends HttpMessage
         
         return $headers;
     }
-
+    
     protected function filterMethod(string $method): string
     {
         if (!preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
