@@ -13,6 +13,9 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\ExecutorInterface;
+use KoolKode\Async\Http\Header\AcceptHeader;
+use KoolKode\Async\Http\Header\ContentType;
+use KoolKode\Async\Http\Header\ContentTypeHeader;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
 use KoolKode\Async\Stream\InputStreamInterface;
@@ -70,6 +73,83 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             } finally {
                 $body->close();
             }
+        });
+        
+        $executor->run();
+    }
+    
+    public function testCTH()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runCallback(function () {
+            $message = new HttpResponse(200, yield tempStream());
+            $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
+            
+            $type = ContentTypeHeader::fromMessage($message);
+            $this->assertEquals('text/plain', (string) $type->getMediaType());
+            $this->assertEquals([
+                'charset' => 'utf-8',
+                'wrap' => true,
+                'max-age' => 20
+            ], $type->getAttributes());
+            
+            $this->assertTrue($type->hasAttribute('wrap'));
+            $this->assertTrue($type->getAttribute('wrap'));
+            
+            $this->assertFalse($type->hasAttribute('foo'));
+            $this->assertEquals('FOO', $type->getAttribute('foo', 'FOO'));
+        });
+        
+        $executor->run();
+    }
+    
+    public function testHeaderParsing()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runCallback(function () {
+            $message = new HttpResponse(200, yield tempStream());
+            $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
+            
+            $accept = AcceptHeader::fromMessage($message);
+            $this->assertCount(6, $accept);
+            
+            $it = $accept->getIterator();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $this->assertEquals(1, $type->getAttribute('level'));
+            $it->next();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('application/xml', (string) $type->getMediaType());
+            $it->next();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $this->assertEquals(2, $type->getAttribute('level'));
+            $it->next();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $it->next();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/*', (string) $type->getMediaType());
+            $it->next();
+            
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('*/*', (string) $type->getMediaType());
+            $it->next();
+            
+            $this->assertFalse($it->valid());
         });
         
         $executor->run();
