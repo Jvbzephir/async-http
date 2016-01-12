@@ -54,13 +54,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         }
     }
     
-    protected function runTest()
-    {
-        fwrite(STDERR, "\nTEST: {$this->getName()}\n");
-        
-        parent::runTest();
-    }
-
     public function testHttp1Client()
     {
         $executor = $this->createExecutor();
@@ -173,11 +166,11 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
      */
     public function testHttp1Server(bool $chunked)
     {
-//         if (DIRECTORY_SEPARATOR !== '\\') {
-//             return $this->markTestSkipped('Server Test skipped due to Travis CI');
-//         }
-
         $executor = $this->createExecutor();
+     
+        if ($executor instanceof \KoolKode\Async\LibEvExecutor) {
+            return $this->markTestSkipped('Server Test skipped due to problems with EV');
+        }
         
         $executor->runCallback(function () use($chunked) {
             $server = new HttpEndpoint(12345);
