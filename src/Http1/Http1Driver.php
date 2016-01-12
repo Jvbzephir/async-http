@@ -21,6 +21,7 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
@@ -75,6 +76,8 @@ class Http1Driver implements HttpDriverInterface
     {
         $started = microtime(true);
         $cached = true;
+        $raw = $socket;
+        
         $socket = new DirectUpgradeDuplexStream($socket, $cached);
         
         // Attempt to upgrade HTTP connection based on data sent by client
@@ -86,6 +89,10 @@ class Http1Driver implements HttpDriverInterface
             
             if ($response instanceof HttpResponse) {
                 try {
+                    if ($raw instanceof SocketStream) {
+                        $raw->setTimeout(5);
+                    }
+                    
                     return yield from $this->sendResponse($socket, $response, false, $started);
                 } finally {
                     $socket->close();
@@ -97,6 +104,10 @@ class Http1Driver implements HttpDriverInterface
         
         $socket->rewind();
         $cached = false;
+        
+        if ($raw instanceof SocketStream) {
+            $raw->setTimeout(5);
+        }
         
         try {
             $reader = new BufferedDuplexStream($socket);
@@ -202,6 +213,10 @@ class Http1Driver implements HttpDriverInterface
         
         // Attempt to upgrade HTTP connection if requested by the client:
         if (NULL !== ($handler = $this->findUpgradeHandler($request, $endpoint))) {
+            if ($raw instanceof SocketStream) {
+                $raw->setTimeout(0);
+            }
+            
             $response = yield from $handler->upgradeConnection($request, $response, $endpoint, $reader, $action);
             
             if ($response instanceof HttpResponse) {

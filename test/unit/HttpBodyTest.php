@@ -168,9 +168,9 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     {
         $executor = $this->createExecutor();
      
-        if ($executor instanceof \KoolKode\Async\LibEvExecutor) {
-            return $this->markTestSkipped('Server Test skipped due to problems with EV');
-        }
+//         if ($executor instanceof \KoolKode\Async\LibEvExecutor) {
+//             return $this->markTestSkipped('Server Test skipped due to problems with EV');
+//         }
         
         $executor->runCallback(function () use($chunked) {
             $server = new HttpEndpoint(12345);
