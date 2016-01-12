@@ -37,12 +37,12 @@ class AcceptHeader implements \Countable, \IteratorAggregate
     {
         return implode(', ', $this->types);
     }
-    
+
     public function count()
     {
         return count($this->types);
     }
-    
+
     public function getIterator()
     {
         return new \ArrayIterator($this->types);
@@ -64,41 +64,8 @@ class AcceptHeader implements \Countable, \IteratorAggregate
                 ], static::parseAttributes(substr($str, $index + 1))));
             }
             
-            $q = (float) min(1, max(0, (float) $type->getAttribute('q', 1)));
-            
-            for ($size = count($types), $i = 0; $i < $size; $i++) {
-                $tmp = (float) $types[$i]->getAttribute('q', 1.0);
-                
-                if ($q > $tmp) {
-                    array_splice($types, $i, 0, [
-                        $type
-                    ]);
-                    
-                    continue 2;
-                }
-                
-                if ($q == $tmp) {
-                    $s = $type->getMediaType()->getScore();
-                    $tmp = $types[$i]->getMediaType()->getScore();
-                    
-                    if ($s > $tmp) {
-                        array_splice($types, $i, 0, [
-                            $type
-                        ]);
-                        
-                        continue 2;
-                    }
-                    
-                    if ($s == $tmp) {
-                        if (count($type->getAttributes()) > count($types[$i]->getAttributes())) {
-                            array_splice($types, $i, 0, [
-                                $type
-                            ]);
-                            
-                            continue 2;
-                        }
-                    }
-                }
+            if (static::insertBasedOnQuality($type, $types)) {
+                continue;
             }
             
             $types[] = $type;
@@ -106,9 +73,65 @@ class AcceptHeader implements \Countable, \IteratorAggregate
         
         return new static($types);
     }
-    
+
     public function getContentTypes(): array
     {
         return $this->types;
+    }
+
+    protected static function insertBasedOnQuality(ContentType $type, array & $types): bool
+    {
+        $q = (float) min(1, max(0, (float) $type->getAttribute('q', 1)));
+        
+        for ($size = count($types), $i = 0; $i < $size; $i++) {
+            $tmp = (float) $types[$i]->getAttribute('q', 1.0);
+            
+            if ($q > $tmp) {
+                array_splice($types, $i, 0, [
+                    $type
+                ]);
+                
+                return true;
+            }
+            
+            if ($q == $tmp) {
+                return static::insertBasedOnScore($type, $types, $i);
+            }
+        }
+        
+        return false;
+    }
+
+    protected static function insertBasedOnScore(ContentType $type, array & $types, int $i): bool
+    {
+        $s = $type->getMediaType()->getScore();
+        $tmp = $types[$i]->getMediaType()->getScore();
+        
+        if ($s > $tmp) {
+            array_splice($types, $i, 0, [
+                $type
+            ]);
+            
+            return true;
+        }
+        
+        if ($s == $tmp) {
+            return static::insertBasedOnAttributeCount($type, $types, $i);
+        }
+        
+        return false;
+    }
+
+    protected static function insertBasedOnAttributeCount(ContentType $type, array & $types, int $i): bool
+    {
+        if (count($type->getAttributes()) > count($types[$i]->getAttributes())) {
+            array_splice($types, $i, 0, [
+                $type
+            ]);
+            
+            return true;
+        }
+        
+        return false;
     }
 }
