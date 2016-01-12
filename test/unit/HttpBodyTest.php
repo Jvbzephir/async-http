@@ -53,6 +53,11 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $in->close();
         }
     }
+    
+    protected function runTest()
+    {
+        fwrite(STDOUT, "\nTEST: {$this->getName()}\n");
+    }
 
     public function testHttp1Client()
     {
@@ -169,7 +174,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
 //         if (DIRECTORY_SEPARATOR !== '\\') {
 //             return $this->markTestSkipped('Server Test skipped due to Travis CI');
 //         }
-        
+
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use($chunked) {
