@@ -56,7 +56,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     protected function runTest()
     {
-        echo "\nTEST: {$this->getName()}\n";
+        fwrite(STDERR, "\nTEST: {$this->getName()}\n");
         
         parent::runTest();
     }
