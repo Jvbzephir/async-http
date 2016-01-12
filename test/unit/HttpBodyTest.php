@@ -54,29 +54,29 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         }
     }
 
-    public function testHttp1Client()
-    {
-        $executor = $this->createExecutor();
+//     public function testHttp1Client()
+//     {
+//         $executor = $this->createExecutor();
         
-        $executor->runCallback(function () {
-            $connector = new Http1Connector();
+//         $executor->runCallback(function () {
+//             $connector = new Http1Connector();
             
-            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield tempStream());
-            $response = yield from $connector->send($request);
+//             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield tempStream());
+//             $response = yield from $connector->send($request);
             
-            $body = $response->getBody();
+//             $body = $response->getBody();
             
-            try {
-                while (!$body->eof()) {
-                    yield from $body->read();
-                }
-            } finally {
-                $body->close();
-            }
-        });
+//             try {
+//                 while (!$body->eof()) {
+//                     yield from $body->read();
+//                 }
+//             } finally {
+//                 $body->close();
+//             }
+//         });
         
-        $executor->run();
-    }
+//         $executor->run();
+//     }
     
     public function testCTH()
     {
@@ -157,7 +157,9 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     public function testHttp1Server()
     {
-        return $this->markTestSkipped('Server Test skipped due to Travis CI');
+//         if (DIRECTORY_SEPARATOR !== '\\') {
+//             return $this->markTestSkipped('Server Test skipped due to Travis CI');
+//         }
         
         $executor = $this->createExecutor();
         
@@ -170,6 +172,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             
             try {
                 $connector = new Http1Connector();
+                $connector->setChunkedRequests(false);
                 
                 $message = 'Hi there!';
                 $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield tempStream($message), 'POST');
