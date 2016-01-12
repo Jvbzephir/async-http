@@ -19,7 +19,6 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
 
 /**
@@ -227,7 +226,7 @@ class Http1Connector
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $stream = new ChunkDecodedInputStream($stream, yield readBuffer($stream, 8192));
+                    $stream = new ChunkDecodedInputStream($stream, (yield from $stream->readLine()) . "\r\n");
                 } else {
                     throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
                 }

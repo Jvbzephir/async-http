@@ -20,31 +20,50 @@ use KoolKode\Async\Stream\InputStreamInterface;
  */
 class ChunkDecodedInputStream implements InputStreamInterface
 {
+    /**
+     * Wrapped input stream that provides chunk-encoded data.
+     * 
+     * @var InputStreamInterface
+     */
     protected $stream;
 
     /**
-     * Remaining bytes within the current chunk.
+     * Number of remaining bytes t be read from the current chunk.
      * 
      * @var int
      */
     protected $remainder = 0;
 
     /**
-     * End of data reached?
+     * End of chunk-encoded stream reached?
      * 
      * @var bool
      */
     protected $ended = false;
     
+    /**
+     * Cascade the close operation to the wrapped stream?
+     * 
+     * @var bool
+     */
     protected $cascadeClose;
 
     /**
-     * Current read buffer.
+     * Buffered bytes of the current chunk.
      * 
      * @var string
      */
     protected $buffer = '';
 
+    /**
+     * Create a stream that will decode HTTP chunk-encoded data.
+     * 
+     * @param InputStreamInterface $stream Stream that provides chunk-encoded data.
+     * @param string $buffer Buffer containing at least the header (first line) of the first chunk.
+     * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
+     * 
+     * @throws \InvalidArgumentException When
+     */
     public function __construct(InputStreamInterface $stream, string $buffer, bool $cascadeClose = true)
     {
         $this->stream = $stream;
@@ -53,17 +72,16 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         $m = NULL;
         
-        if (preg_match("'^([a-fA-F0-9]+).*\r\n'", $this->buffer, $m)) {
+        if (preg_match("'^([a-fA-F0-9]+)[^\r\n]*\r\n'", $this->buffer, $m)) {
             $this->remainder = hexdec($m[1]);
             $this->buffer = (string) substr($this->buffer, strlen($m[0]));
-        
+            
             if ($this->remainder === 0) {
-                $this->buffer = '';
                 $this->ended = true;
+                $this->buffer = '';
             }
         } else {
-            $this->buffer = '';
-            $this->ended = true;
+            throw new \InvalidArgumentException('Buffer does not contain a valid chunk header');
         }
     }
 
@@ -72,7 +90,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
      * 
      * @return array
      */
-    public function __debugInfo()
+    public function __debugInfo(): array
     {
         $info = get_object_vars($this);
         $info['buffer'] = sprintf('%u bytes buffered', strlen($info['buffer']));
@@ -80,11 +98,14 @@ class ChunkDecodedInputStream implements InputStreamInterface
         return $info;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close()
     {
-        $this->buffer = '';
         $this->ended = true;
         $this->remainder = 0;
+        $this->buffer = '';
         
         if ($this->stream !== NULL) {
             try {
@@ -106,7 +127,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
             return true;
         }
         
-        return $this->buffer === '';
+        return false;
     }
 
     /**
@@ -118,16 +139,12 @@ class ChunkDecodedInputStream implements InputStreamInterface
             throw new \RuntimeException('Cannot read from detached stream');
         }
         
-        if ($length == 0) {
+        if ($length == 0 || $this->ended) {
             return '';
         }
         
         while (strlen($this->buffer) < $this->remainder) {
             $this->buffer .= yield from $this->stream->read($this->remainder - strlen($this->buffer), $timeout);
-        }
-        
-        if ($this->ended) {
-            return '';
         }
         
         $chunk = (string) substr($this->buffer, 0, min($length, $this->remainder));
@@ -137,47 +154,40 @@ class ChunkDecodedInputStream implements InputStreamInterface
         $this->remainder -= $length;
         
         if ($this->remainder === 0) {
-            yield from $this->loadBuffer($timeout);
+            yield from $this->readChunkHeader($timeout);
         }
         
         return $chunk;
     }
 
     /**
-     * Load data of the next chunk into memory.
+     * Read header of next chunk into buffer.
+     * 
+     * This method will likely start to read and buffer contents of the next chunk.
+     * 
+     * @param float $timeout Read timeout in seconds (0 indicates no timeout).
      */
-    protected function loadBuffer(float $timeout = 0): \Generator
+    protected function readChunkHeader(float $timeout = 0): \Generator
     {
-        $this->remainder = 0;
+        $this->buffer = '';
         
-        if ($this->ended) {
-            return;
-        }
-        
-        while (strlen($this->buffer) < 8192 && !$this->stream->eof()) {
+        while ((strlen($this->buffer) < 3 || false === strpos($this->buffer, "\n", 2)) && !$this->stream->eof()) {
             $this->buffer .= yield from $this->stream->read(8192, $timeout);
         }
         
         $m = NULL;
         
-        if (preg_match("'^\r?\n?([a-fA-F0-9]+).*\r\n'", $this->buffer, $m)) {
-            $this->remainder = hexdec($m[1]);
-            $this->buffer = (string) substr($this->buffer, strlen($m[0]));
+        if (!preg_match("'^\r\n([a-fA-F0-9]+)[^\r\n]*\r\n'", $this->buffer, $m)) {
+            $this->ended = true;
+            $this->buffer = '';
             
-            if ($this->remainder === 0) {
-                $this->buffer = '';
-                $this->ended = true;
-            } else {
-                while (strlen($this->buffer) < $this->remainder && !$this->stream->eof()) {
-                    $this->buffer .= yield from $this->stream->read($this->remainder, $timeout);
-                }
-                
-                if (strlen($this->buffer) < $this->remainder) {
-                    $this->buffer = '';
-                    $this->ended = true;
-                }
-            }
-        } else {
+            return;
+        }
+        
+        $this->remainder = hexdec($m[1]);
+        $this->buffer = (string) substr($this->buffer, strlen($m[0]));
+        
+        if ($this->remainder === 0) {
             $this->buffer = '';
             $this->ended = true;
         }
