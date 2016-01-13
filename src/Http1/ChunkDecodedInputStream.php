@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\SocketException;
 
 /**
  * Stream that transparently applies HTTP chunk decoding.
@@ -61,30 +62,31 @@ class ChunkDecodedInputStream implements InputStreamInterface
      * @param InputStreamInterface $stream Stream that provides chunk-encoded data.
      * @param string $buffer Buffer containing at least the header (first line) of the first chunk.
      * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
-     * 
-     * @throws \InvalidArgumentException When
      */
     public function __construct(InputStreamInterface $stream, string $buffer, bool $cascadeClose = true)
     {
         $this->stream = $stream;
-        $this->buffer = $buffer;
         $this->cascadeClose = $cascadeClose;
         
         $m = NULL;
         
-        if (preg_match("'^([a-fA-F0-9]+)[^\r\n]*\r\n'", $this->buffer, $m)) {
-            $this->remainder = hexdec($m[1]);
-            $this->buffer = (string) substr($this->buffer, strlen($m[0]));
-            
-            if ($this->remainder === 0) {
-                $this->ended = true;
-                $this->buffer = '';
-            }
-        } else {
+        if (!preg_match("'^([a-fA-F0-9]+)[^\r\n]*\r\n'", $buffer, $m)) {
             $this->ended = true;
             $this->buffer = '';
             
-            throw new \InvalidArgumentException('Buffer does not contain a valid chunk header');
+            throw new \RuntimeException('Buffer does not contain a valid chunk header');
+        }
+        
+        if (strlen($m[1]) > 7) {
+            throw new \RuntimeException('HTTP chunk size must not exceed 0xFFFFFFF bytes');
+        }
+        
+        $this->remainder = hexdec($m[1]);
+        $this->buffer = substr($buffer, strlen($m[0]));
+        
+        if ($this->remainder === 0) {
+            $this->ended = true;
+            $this->buffer = '';
         }
     }
 
@@ -139,21 +141,21 @@ class ChunkDecodedInputStream implements InputStreamInterface
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL) {
-            throw new \RuntimeException('Cannot read from detached stream');
+            throw new SocketException('Cannot read from detached stream');
         }
         
-        if ($length == 0 || $this->ended) {
-            return '';
+        if ($this->ended) {
+            throw new SocketException('Cannot read from terminated HTTP chunk-encoded stream');
         }
         
-        while (strlen($this->buffer) < $this->remainder) {
-            $this->buffer .= yield from $this->stream->read($this->remainder - strlen($this->buffer), $timeout);
+        while ($this->buffer === '') {
+            $this->buffer = yield from $this->stream->read(min(8192, $this->remainder), $timeout);
         }
         
-        $chunk = (string) substr($this->buffer, 0, min($length, $this->remainder));
+        $chunk = substr($this->buffer, 0, min($length, $this->remainder));
         $length = strlen($chunk);
         
-        $this->buffer = (string) substr($this->buffer, $length);
+        $this->buffer = substr($this->buffer, $length);
         $this->remainder -= $length;
         
         if ($this->remainder === 0) {
@@ -188,8 +190,12 @@ class ChunkDecodedInputStream implements InputStreamInterface
             throw new \RuntimeException('Invalid HTTP chunk header received');
         }
         
+        if (strlen($m[1]) > 7) {
+            throw new \RuntimeException('HTTP chunk size must not exceed 0xFFFFFFF bytes');
+        }
+        
         $this->remainder = hexdec($m[1]);
-        $this->buffer = (string) substr($this->buffer, strlen($m[0]));
+        $this->buffer = substr($this->buffer, strlen($m[0]));
         
         if ($this->remainder === 0) {
             $this->buffer = '';
