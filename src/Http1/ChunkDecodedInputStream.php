@@ -148,7 +148,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
             throw new SocketException('Cannot read from terminated HTTP chunk-encoded stream');
         }
         
-        while ($this->buffer === '') {
+        if ($this->buffer === '') {
             $this->buffer = yield from $this->stream->read(min(8192, $this->remainder), $timeout);
         }
         
