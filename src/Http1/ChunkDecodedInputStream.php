@@ -12,7 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\SocketClosedException;
 
 /**
  * Stream that transparently applies HTTP chunk decoding.
@@ -141,11 +141,11 @@ class ChunkDecodedInputStream implements InputStreamInterface
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL) {
-            throw new SocketException('Cannot read from detached stream');
+            throw new SocketClosedException('Cannot read from detached stream');
         }
         
         if ($this->ended) {
-            throw new SocketException('Cannot read from terminated HTTP chunk-encoded stream');
+            throw new SocketClosedException('Cannot read from terminated HTTP chunk-encoded stream');
         }
         
         if ($this->buffer === '') {
