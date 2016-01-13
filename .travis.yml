@@ -12,32 +12,23 @@ matrix:
   include:
     - php: 7.0
     - php: 7.0
-      env: 'DEPS=--prefer-lowest'
+      env: DEPS=--prefer-lowest
     - php: 7.0
-      env: 'LOOP=ev'
+      env: LOOP=ev
   allow_failures:
-    - env: 'LOOP=ev'
+    - env: LOOP=ev
 
 before_install:
-  - 'composer selfupdate --no-interaction'
+  - composer selfupdate --no-interaction
 
 install:
-  - >
-    if [[ "$LOOP" == "ev" ]]; then
-    curl -LS https://pecl.php.net/get/ev | tar -xz;
-    pushd ev-*;
-    phpize;
-    ./configure;
-    make;
-    make install;
-    popd;
-    echo "extension=ev.so" >> "$(php -r 'echo php_ini_loaded_file();')";
-    fi
-  - 'travis_retry composer update --no-interaction --prefer-source $DEPS'
-  - 'composer info -i'
+  - if [[ "$LOOP" == "ev" ]]; then yes '' | pecl install ev-beta; fi
+  - yes '' | pecl install pthreads
+  - travis_retry composer update --no-interaction --prefer-source $DEPS
+  - composer info -i
 
 script:
-  - './vendor/bin/phpunit -c "./test/phpunit.xml"'
+  - ./vendor/bin/phpunit -c "./test/phpunit.xml"
 
 notifications:
   email: false
