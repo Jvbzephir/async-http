@@ -91,15 +91,10 @@ class InflateInputStream implements InputStreamInterface
      * @param int $encoding Expected compression encoding, use class constants of this class!
      * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
      * 
-     * @throws \RuntimeException When decompression is not supported by the installed PHP version.
      * @throws \InvalidArgumentException When an invalid compression encoding is specified.
      */
     public function __construct(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true)
     {
-        if (!function_exists('inflate_init')) {
-            throw new \RuntimeException('Stream decompression requires PHP 7');
-        }
-        
         switch ($encoding) {
             case self::RAW:
             case self::DEFLATE:
@@ -120,7 +115,7 @@ class InflateInputStream implements InputStreamInterface
      * 
      * @return array
      */
-    public function __debugInfo()
+    public function __debugInfo(): array
     {
         $info = get_object_vars($this);
         $info['buffer'] = sprintf('%u bytes buffered', strlen($info['buffer']));

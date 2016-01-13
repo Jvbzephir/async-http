@@ -11,48 +11,20 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\ExecutorFactory;
-use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Header\AcceptHeader;
 use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Header\ContentTypeHeader;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
-use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
 use function KoolKode\Async\tempStream;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
-    protected function createExecutor(): ExecutorInterface
-    {
-        $executor = (new ExecutorFactory())->createExecutor();
-        
-        $file = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'config.local.php';
-        
-        if (is_file($file)) {
-            call_user_func(require $file, $executor);
-        }
-        
-        return $executor;
-    }
-
-    protected function readContents(InputStreamInterface $in): \Generator
-    {
-        try {
-            $buffer = '';
-            
-            while (!$in->eof()) {
-                $buffer .= yield from $in->read();
-            }
-            
-            return $buffer;
-        } finally {
-            $in->close();
-        }
-    }
+    use AsyncTrait;
     
     public function testHttp1Client()
     {
