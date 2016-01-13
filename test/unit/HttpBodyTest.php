@@ -21,8 +21,8 @@ use KoolKode\Async\Http\Http2\Http2Connector;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 
-use function KoolKode\Async\tempStream;
 use function KoolKode\Async\runTask;
+use function KoolKode\Async\tempStream;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -167,10 +167,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     public function testHttp1Server(bool $chunked)
     {
         $executor = $this->createExecutor();
-     
-//         if ($executor instanceof \KoolKode\Async\LibEvExecutor) {
-//             return $this->markTestSkipped('Server Test skipped due to problems with EV');
-//         }
         
         $executor->runCallback(function () use($chunked) {
             $server = new HttpEndpoint(12345);
@@ -185,6 +181,11 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 
                 $message = 'Hi there!';
                 $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield tempStream($message), 'POST');
+                
+                if (!$chunked) {
+                    $request = $request->withProtocolVersion('1.0');
+                }
+                
                 $response = yield from $connector->send($request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
