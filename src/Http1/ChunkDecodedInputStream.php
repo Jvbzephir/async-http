@@ -81,6 +81,9 @@ class ChunkDecodedInputStream implements InputStreamInterface
                 $this->buffer = '';
             }
         } else {
+            $this->ended = true;
+            $this->buffer = '';
+            
             throw new \InvalidArgumentException('Buffer does not contain a valid chunk header');
         }
     }
@@ -179,9 +182,10 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         if (!preg_match("'^\r\n([a-fA-F0-9]+)[^\r\n]*\r\n'", $this->buffer, $m)) {
             $this->ended = true;
+            $this->remainder = 0;
             $this->buffer = '';
             
-            return;
+            throw new \RuntimeException('Invalid HTTP chunk header received');
         }
         
         $this->remainder = hexdec($m[1]);
