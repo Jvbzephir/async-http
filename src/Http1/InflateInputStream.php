@@ -12,22 +12,41 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\SocketClosedException;
 
 /**
- * Decompresses output as it is being read.
+ * Applies data decompression on top of another input stream.
  * 
  * @author Martin Schröder
  */
 class InflateInputStream implements InputStreamInterface
 {
+    /**
+     * ZLIB raw format, compatible with data produced by gzdeflate().
+     * 
+     * @var int
+     */
     const RAW = ZLIB_ENCODING_RAW;
 
+    /**
+     * Deflate format, compatible with data produced by gzcompress().
+     * 
+     * @var int
+     */
     const DEFLATE = ZLIB_ENCODING_DEFLATE;
 
+    /**
+     * GZIP format, compatible with data produced by gzencode().
+     * 
+     * @var int
+     */
     const GZIP = ZLIB_ENCODING_GZIP;
 
-    const MIN_BUFFER_SIZE = 65536;
-
+    /**
+     * Wrapped input stream that supplies compressed data.
+     * 
+     * @var InputStreamInterface
+     */
     protected $stream;
 
     /**
@@ -50,6 +69,13 @@ class InflateInputStream implements InputStreamInterface
      * @var bool
      */
     protected $finished = false;
+    
+    /**
+     * Cascade the close operation to the wrapped stream?
+     * 
+     * @var bool
+     */
+    protected $cascadeClose;
 
     /**
      * Error handler callback.
@@ -61,13 +87,14 @@ class InflateInputStream implements InputStreamInterface
     /**
      * Decompress data as it is being read from the given input stream.
      * 
-     * @param StreamInterface $stream
-     * @param int $encoding
+     * @param StreamInterface $stream stream that supplies compressed data.
+     * @param int $encoding Expected compression encoding, use class constants of this class!
+     * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
      * 
      * @throws \RuntimeException When decompression is not supported by the installed PHP version.
      * @throws \InvalidArgumentException When an invalid compression encoding is specified.
      */
-    public function __construct(InputStreamInterface $stream, $encoding = self::DEFLATE)
+    public function __construct(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true)
     {
         if (!function_exists('inflate_init')) {
             throw new \RuntimeException('Stream decompression requires PHP 7');
@@ -84,6 +111,7 @@ class InflateInputStream implements InputStreamInterface
         }
         
         $this->stream = $stream;
+        $this->cascadeClose = $cascadeClose;
         $this->context = $this->invokeWithErrorHandler('inflate_init', $encoding);
     }
 
@@ -100,6 +128,9 @@ class InflateInputStream implements InputStreamInterface
         return $info;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close()
     {
         $this->buffer = '';
@@ -108,7 +139,9 @@ class InflateInputStream implements InputStreamInterface
         
         if ($this->stream !== NULL) {
             try {
-                $this->stream->close();
+                if ($this->cascadeClose) {
+                    $this->stream->close();
+                }
             } finally {
                 $this->stream = NULL;
             }
@@ -133,56 +166,32 @@ class InflateInputStream implements InputStreamInterface
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL) {
-            throw new \RuntimeException(sprintf('Cannot read from detached stream'));
+            throw new SocketClosedException('Cannot read from detached stream');
         }
         
-        if ($this->finished || $length == 0) {
-            return '';
+        if ($this->finished && $this->buffer === '') {
+            throw new SocketClosedException('Cannot read from terminated stream');
         }
         
-        if ($this->buffer === '') {
+        while ($this->buffer === '') {
+            $chunk = yield from $this->stream->read(max($length, 8192), $timeout);
+            
             if ($this->stream->eof()) {
-                $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, '', ZLIB_FINISH);
                 $this->finished = true;
+                $this->buffer .= $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, ZLIB_FINISH);
             } else {
-                do {
-                    $chunk = yield from $this->stream->read(max($length, self::MIN_BUFFER_SIZE), $timeout);
-                    
-                    if ($chunk !== '') {
-                        $this->buffer .= $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk);
-                        
-                        if ($this->buffer !== '') {
-                            break;
-                        }
-                    }
-                } while (!$this->stream->eof());
+                $this->buffer .= $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk);
             }
         }
         
-        $chunk = (string) substr($this->buffer, 0, $length);
+        $chunk = substr($this->buffer, 0, $length);
         $len = strlen($chunk);
         
-        $this->buffer = (string) substr($this->buffer, $len);
+        $this->buffer = substr($this->buffer, $len);
         
         return $chunk;
     }
-
-    /**
-     * Initialize and return the error handler callback.
-     *
-     * @return callable
-     */
-    protected static function handleError()
-    {
-        if (self::$errorHandler === NULL) {
-            self::$errorHandler = function ($type, $message, $file, $line) {
-                throw new \RuntimeException($message);
-            };
-        }
-        
-        return self::$errorHandler;
-    }
-
+    
     /**
      * Invoke the given callback handling all errors / warnings using exceptions.
      *
@@ -190,11 +199,11 @@ class InflateInputStream implements InputStreamInterface
      * @param mixed ...$args Optional arguments to passed to the callback.
      * @return mixed Whatever is returned by the callback.
      */
-    protected static function invokeWithErrorHandler(callable $callback, ...$args)
+    protected function invokeWithErrorHandler(callable $callback, ...$args)
     {
         if (self::$errorHandler === NULL) {
             self::$errorHandler = function ($type, $message, $file, $line) {
-                throw new \RuntimeException($message);
+                throw new \ErrorException($message, 0, $type, $file, $line);
             };
         }
         
