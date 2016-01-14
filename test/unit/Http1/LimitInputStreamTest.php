@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\tempStream;
+use function KoolKode\Async\readBuffer;
 
 class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -32,6 +33,55 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
             $this->assertTrue($in->eof());
         });
         
+        $executor->run();
+    }
+    
+    /**
+     * @expectedException \InvalidArgumentException
+     */
+    public function testLimitMustBePositive()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runCallback(function () {
+            new LimitInputStream(yield tempStream(), -4);
+        });
+        
+        $executor->run();
+    }
+    
+    /**
+     * @expectedException \KoolKode\Async\Stream\SocketClosedException
+     */
+    public function testCannotReadBeyondLimit()
+    {
+        $executor = $this->createExecutor();
+    
+        $executor->runCallback(function () {
+            $in = new LimitInputStream(yield tempStream('ABCDEF'), 3);
+            yield readBuffer($in, 100);
+            
+            $this->assertTrue($in->eof());
+            yield from $in->read();
+        });
+    
+        $executor->run();
+    }
+    
+    /**
+     * @expectedException \KoolKode\Async\Stream\SocketClosedException
+     */
+    public function testCannotReadFromClosedStream()
+    {
+        $executor = $this->createExecutor();
+    
+        $executor->runCallback(function () {
+            $in = new LimitInputStream(yield tempStream('ABCDEF'), 3);
+            $in->close();
+            
+            yield from $in->read();
+        });
+    
         $executor->run();
     }
 }

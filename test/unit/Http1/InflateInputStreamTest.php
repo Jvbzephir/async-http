@@ -20,13 +20,34 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {
     use AsyncTrait;
     
-    public function testCanDecodeCompressedData()
+    public function provideCompressionData()
+    {
+        yield ['', InflateInputStream::RAW, 'gzdeflate'];
+        yield ['', InflateInputStream::DEFLATE, 'gzcompress'];
+        yield ['', InflateInputStream::GZIP, 'gzencode'];
+        
+        yield ['Hello World', InflateInputStream::RAW, 'gzdeflate'];
+        yield ['Hello World', InflateInputStream::DEFLATE, 'gzcompress'];
+        yield ['Hello World', InflateInputStream::GZIP, 'gzencode'];
+        
+        yield [file_get_contents(__FILE__), InflateInputStream::RAW, 'gzdeflate'];
+        yield [file_get_contents(__FILE__), InflateInputStream::DEFLATE, 'gzcompress'];
+        yield [file_get_contents(__FILE__), InflateInputStream::GZIP, 'gzencode'];
+        
+        yield [random_bytes(8192 * 32), InflateInputStream::RAW, 'gzdeflate'];
+        yield [random_bytes(8192 * 32), InflateInputStream::DEFLATE, 'gzcompress'];
+        yield [random_bytes(8192 * 32), InflateInputStream::GZIP, 'gzencode'];
+    }
+
+    /**
+     * @dataProvider provideCompressionData
+     */
+    public function testCanDecodeCompressedData(string $data, int $format, callable $encoder)
     {
         $executor = $this->createExecutor();
         
-        $executor->runCallback(function () {
-            $data = file_get_contents(__FILE__);
-            $in = new InflateInputStream(yield tempStream(gzencode($data)), InflateInputStream::GZIP);
+        $executor->runCallback(function () use ($data, $format, $encoder) {
+            $in = yield from InflateInputStream::open(yield tempStream($encoder($data)), $format);
             $decoded = yield from $this->readContents($in);
             
             $this->assertTrue($in->eof());
@@ -36,7 +57,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         
         $executor->run();
     }
-    
+
     /**
      * @expectedException \InvalidArgumentException
      */
@@ -45,22 +66,22 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            new InflateInputStream(yield tempStream('Hello World'), 'FOO');
+            new InflateInputStream(yield tempStream('Hello World'), '', 'FOO');
         });
         
         $executor->run();
     }
-    
+
     /**
      * @expectedException \KoolKode\Async\Stream\SocketClosedException
      */
     public function testCannotReadFromClosedStream()
     {
         $executor = $this->createExecutor();
-    
+        
         $executor->runCallback(function () {
-            $in = new InflateInputStream(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
-    
+            $in = yield from InflateInputStream::open(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
+            
             $this->assertFalse($in->eof());
             $this->assertEquals('Hello W', yield readBuffer($in, 7));
             $this->assertFalse($in->eof());
@@ -70,7 +91,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             
             yield from $in->read();
         });
-    
+        
         $executor->run();
     }
 
@@ -82,7 +103,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = new InflateInputStream(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
+            $in = yield from InflateInputStream::open(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
             $this->assertEquals('Hello World', yield readBuffer($in, 100));

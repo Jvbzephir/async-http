@@ -14,6 +14,8 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\SocketClosedException;
 
+use function KoolKode\Async\readBuffer;
+
 /**
  * Applies data decompression on top of another input stream.
  * 
@@ -87,13 +89,14 @@ class InflateInputStream implements InputStreamInterface
     /**
      * Decompress data as it is being read from the given input stream.
      * 
-     * @param StreamInterface $stream stream that supplies compressed data.
+     * @param StreamInterface $stream Stream that supplies compressed data.
+     * @param string $chunk First chunk of data.
      * @param int $encoding Expected compression encoding, use class constants of this class!
      * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
      * 
      * @throws \InvalidArgumentException When an invalid compression encoding is specified.
      */
-    public function __construct(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true)
+    public function __construct(InputStreamInterface $stream, string $chunk, $encoding = self::DEFLATE, bool $cascadeClose = true)
     {
         switch ($encoding) {
             case self::RAW:
@@ -108,8 +111,11 @@ class InflateInputStream implements InputStreamInterface
         $this->stream = $stream;
         $this->cascadeClose = $cascadeClose;
         $this->context = $this->invokeWithErrorHandler('inflate_init', $encoding);
+        
+        $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, $this->stream->eof() ? ZLIB_FINISH : ZLIB_SYNC_FLUSH);
+        $this->finished = $this->stream->eof();
     }
-
+    
     /**
      * Assemble debug data.
      * 
@@ -123,6 +129,19 @@ class InflateInputStream implements InputStreamInterface
         return $info;
     }
 
+    /**
+     * Coroutine that creates an inflate input stream from the given stream.
+     * 
+     * @param InputStreamInterface $stream Stream that supplies compressed data.
+     * @param int $encoding Expected compression encoding, use class constants of this class!
+     * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
+     * @return InflateInputStream
+     */
+    public static function open(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true): \Generator
+    {
+        return new static($stream, yield readBuffer($stream, 8192), $encoding, $cascadeClose);
+    }
+    
     /**
      * {@inheritdoc}
      */
@@ -174,6 +193,7 @@ class InflateInputStream implements InputStreamInterface
             if ($this->stream->eof()) {
                 $this->finished = true;
                 $this->buffer .= $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, ZLIB_FINISH);
+                $this->context = NULL;
             } else {
                 $this->buffer .= $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk);
             }

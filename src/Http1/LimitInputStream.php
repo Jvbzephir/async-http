@@ -58,6 +58,10 @@ class LimitInputStream implements InputStreamInterface
      */
     public function __construct(InputStreamInterface $stream, int $limit, bool $cascadeClose = true)
     {
+        if ($limit < 0) {
+            throw new \InvalidArgumentException('Limit must not be negative');
+        }
+        
         $this->stream = $stream;
         $this->limit = $limit;
         $this->cascadeClose = $cascadeClose;
@@ -68,12 +72,14 @@ class LimitInputStream implements InputStreamInterface
      */
     public function close()
     {
-        try {
-            if ($this->cascadeClose) {
-                $this->stream->close();
+        if ($this->stream !== NULL) {
+            try {
+                if ($this->cascadeClose) {
+                    $this->stream->close();
+                }
+            } finally {
+                $this->stream = NULL;
             }
-        } finally {
-            $this->stream = NULL;
         }
     }
 
@@ -94,11 +100,11 @@ class LimitInputStream implements InputStreamInterface
      */
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
-        if ($this->stream === NULL) {
+        if ($this->stream === NULL || $this->stream->eof()) {
             throw new SocketClosedException('Cannot read from closed stream');
         }
         
-        if ($this->offset >= $this->limit || $this->stream->eof()) {
+        if ($this->offset >= $this->limit) {
             throw new SocketClosedException(sprintf('Cannot read beyond %u bytes', $this->limit));
         }
         

@@ -226,7 +226,7 @@ class Http1Connector
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $stream = new ChunkDecodedInputStream($stream, (yield from $stream->readLine()) . "\r\n");
+                    $stream = yield from ChunkDecodedInputStream::open($stream);
                 } else {
                     throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
                 }
@@ -241,10 +241,10 @@ class Http1Connector
             if (isset($headers['content-encoding'])) {
                 switch (implode(', ', $headers['content-encoding'])) {
                     case 'gzip':
-                        $stream = new InflateInputStream($stream, InflateInputStream::GZIP);
+                        $stream = yield from InflateInputStream::open($stream, InflateInputStream::GZIP);
                         break;
                     case 'deflate':
-                        $stream = new InflateInputStream($stream, InflateInputStream::DEFLATE);
+                        $stream = yield from InflateInputStream::open($stream, InflateInputStream::DEFLATE);
                         break;
                     default:
                         throw new \RuntimeException(sprintf('Unsupported content-encoding: "%s"', implode(', ', $headers['content-encoding'])));

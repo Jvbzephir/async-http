@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\SocketClosedException;
 
@@ -70,7 +71,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         $m = NULL;
         
-        if (!preg_match("'^([a-fA-F0-9]+)[^\r\n]*\r\n'", $buffer, $m)) {
+        if (!preg_match("'^([a-fA-F0-9]+)(?:;[^\r\n]*)*\r\n'", $buffer, $m)) {
             $this->ended = true;
             $this->buffer = '';
             
@@ -90,6 +91,22 @@ class ChunkDecodedInputStream implements InputStreamInterface
         }
     }
 
+    /**
+     * Coroutine that creates a chunk-decoded input stream from the given stream.
+     * 
+     * @param InputStreamInterface $stream Stream that provides chunk-encoded data.
+     * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
+     * @return ChunkDecodedInputStream
+     */
+    public static function open(InputStreamInterface $stream, bool $cascadeClose = true): \Generator
+    {
+        if (!$stream instanceof BufferedDuplexStream) {
+            $stream = new BufferedDuplexStream($stream);
+        }
+        
+        return new static($stream, (yield from $stream->readLine()) . "\r\n", $cascadeClose);
+    }
+    
     /**
      * Assemble debug data.
      * 
@@ -140,12 +157,8 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
-        if ($this->stream === NULL) {
-            throw new SocketClosedException('Cannot read from detached stream');
-        }
-        
-        if ($this->ended) {
-            throw new SocketClosedException('Cannot read from terminated HTTP chunk-encoded stream');
+        if ($this->stream === NULL || $this->ended) {
+            throw new SocketClosedException('Cannot read from closed stream');
         }
         
         if ($this->buffer === '') {
@@ -158,7 +171,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         $this->buffer = substr($this->buffer, $length);
         $this->remainder -= $length;
         
-        if ($this->remainder === 0) {
+        if ($this->remainder === 0 && !$this->ended) {
             yield from $this->readChunkHeader($timeout);
         }
         
@@ -174,15 +187,13 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     protected function readChunkHeader(float $timeout = 0): \Generator
     {
-        $this->buffer = '';
-        
         while ((strlen($this->buffer) < 3 || false === strpos($this->buffer, "\n", 2)) && !$this->stream->eof()) {
             $this->buffer .= yield from $this->stream->read(8192, $timeout);
         }
         
         $m = NULL;
         
-        if (!preg_match("'^\r\n([a-fA-F0-9]+)[^\r\n]*\r\n'", $this->buffer, $m)) {
+        if (!preg_match("'^\r\n([a-fA-F0-9]+)(?:;[^\r\n]*)*\r\n'", $this->buffer, $m)) {
             $this->ended = true;
             $this->remainder = 0;
             $this->buffer = '';

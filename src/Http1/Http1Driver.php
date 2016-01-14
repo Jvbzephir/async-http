@@ -153,7 +153,7 @@ class Http1Driver implements HttpDriverInterface
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $body = new ChunkDecodedInputStream($reader, (yield from $reader->readLine()) . "\r\n", false);
+                    $body = yield from ChunkDecodedInputStream::open($reader, false);
                 } else {
                     throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
                 }
