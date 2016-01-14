@@ -71,7 +71,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         $m = NULL;
         
-        if (!preg_match("'^([a-fA-F0-9]+)(?:;[^\r\n]*)*\r\n'", $buffer, $m)) {
+        if (!preg_match("'^([a-fA-F0-9]+)(?:;[^\r\n]*)?\r\n'", $buffer, $m)) {
             $this->ended = true;
             $this->buffer = '';
             
@@ -193,7 +193,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         
         $m = NULL;
         
-        if (!preg_match("'^\r\n([a-fA-F0-9]+)(?:;[^\r\n]*)*\r\n'", $this->buffer, $m)) {
+        if (!preg_match("'^\r\n([a-fA-F0-9]+)(?:;[^\r\n]*)?\r\n'", $this->buffer, $m)) {
             $this->ended = true;
             $this->remainder = 0;
             $this->buffer = '';
