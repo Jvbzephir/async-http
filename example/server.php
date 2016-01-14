@@ -10,6 +10,7 @@
  */
 
 use KoolKode\Async\ExecutorFactory;
+use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http2\Http2Driver;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
@@ -86,7 +87,7 @@ $executor->runNewTask(call_user_func(function () {
         return $response->withBody(yield tempStream('KoolKode Async HTTP :)'));
     };
     
-    $fcgi = new \KoolKode\Async\Http\Fcgi\FcgiEndpoint(4000, '0.0.0.0', $logger);
+    $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
     
     yield runTask($http->run($action), $http->getTitle());
     yield runTask($fcgi->run($action), $fcgi->getTitle());
