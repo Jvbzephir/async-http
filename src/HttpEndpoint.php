@@ -71,7 +71,7 @@ class HttpEndpoint
         'SNI_enabled' => true,
         'single_ecdh_use' => false,
         'ecdh_curve' => 'prime256v1',
-        'ciphers' => 'HIGH',
+        'ciphers' => 'HIGH:!SSLv2:!SSLv3',
         'reneg_limit' => 0
     ];
     
@@ -260,7 +260,7 @@ class HttpEndpoint
         try {
             if (isset($this->sslOptions['local_cert'])) {
                 try {
-                    yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_SERVER);
+                    yield from $stream->encrypt(true);
                 } catch (SocketException $e) {
                     if ($this->logger) {
                         $this->logger->debug('Dropped client {peer} due to TLS handshake failure: {error}', [

@@ -66,7 +66,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 'max-age' => 20
             ], $type->getAttributes());
             
-            $this->assertTrue($type->hasAttribute('wrap'));
             $this->assertTrue($type->getAttribute('wrap'));
             
             $this->assertFalse($type->hasAttribute('foo'));

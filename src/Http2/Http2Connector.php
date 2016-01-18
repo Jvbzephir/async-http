@@ -55,7 +55,7 @@ class Http2Connector
         $socket = yield from SocketStream::connect($host, $port, 'tcp', $timeout, $context);
         
         if ($secure) {
-            yield from $socket->encrypt(STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);
+            yield from $socket->encrypt();
         }
         
         $conn = yield from Connection::connectClient($socket, $this->logger);

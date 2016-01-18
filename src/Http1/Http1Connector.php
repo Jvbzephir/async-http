@@ -68,7 +68,7 @@ class Http1Connector
         
         try {
             if ($secure) {
-                yield from $stream->encrypt(STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                yield from $stream->encrypt();
             }
             
             $request = $this->prepareRequest($request);
