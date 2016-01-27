@@ -54,9 +54,10 @@ class Http1Connector
      * 
      * @param HttpRequest $request
      * @param float $timeout Connect timeout in seconds.
+     * @param array $options Stream context options.
      * @return Generator
      */
-    public function send(HttpRequest $request, float $timeout = 5): \Generator
+    public function send(HttpRequest $request, float $timeout = 5, array $options = []): \Generator
     {
         $uri = $request->getUri();
         $secure = $uri->getScheme() === 'https';
@@ -64,7 +65,7 @@ class Http1Connector
         $host = $uri->getHost();
         $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
         
-        $stream = yield from SocketStream::connect($host, $port, 'tcp', $timeout);
+        $stream = yield from SocketStream::connect($host, $port, 'tcp', $timeout, $options);
         
         try {
             if ($secure) {
