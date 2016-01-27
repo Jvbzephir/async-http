@@ -139,6 +139,14 @@ class HttpEndpoint
         $this->sslOptions['local_cert'] = $file;
         $this->sslOptions['allow_self_signed'] = $allowSelfSigned;
     }
+    
+    /**
+     * Set allowed OpenSSL ciphers.
+     */
+    public function setCiphers(string $ciphers)
+    {
+        $this->sslOptions['ciphers'] = $ciphers;
+    }
 
     public function setPassphrase(string $password = NULL)
     {

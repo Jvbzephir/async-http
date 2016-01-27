@@ -141,6 +141,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         
         $executor->runCallback(function () use($chunked) {
             $server = new HttpEndpoint(12345);
+            $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
                 return $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))));
