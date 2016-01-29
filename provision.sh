@@ -1,16 +1,42 @@
 #!/bin/bash
 
-sudo apt-get install -y language-pack-en-base;
+sudo apt-get update
+yes 'Y' | sudo apt-get install git pkg-config autoconf bison libxml2-dev libssl-dev
 
-yes 'Y' | sudo LC_ALL=en_US.UTF-8 apt-add-repository ppa:ondrej/php;
-yes 'Y' | sudo apt-get update;
-yes 'Y' | sudo apt-get install php7.0-cli php7.0-dev php-pear;
+sudo mkdir /etc/php7
+cd /etc/php7
 
-sudo pear config-set php_ini /etc/php/7.0/cli/php.ini;
-sudo pecl config-set php_ini /etc/php/7.0/cli/php.ini;
+sudo git clone -b master https://git.php.net/repository/php-src.git
 
-sudo pecl channel-update pecl.php.net;
+cd php-src
 
-sudo pecl uninstall ev;
+sudo ./buildconf
+sudo ./configure \
+	--prefix=/etc/php7/usr \
+	--with-config-file-path=/etc/php7/usr/etc \
+	--enable-maintainer-zts \
+	--enable-pcntl \
+	--with-iconv \
+	--with-openssl \
+	--with-zlib=/usr
+	
+sudo make
+sudo make install
 
-yes 'Y' | sudo pecl install ev-beta;
+sudo ln -s /etc/php7/usr/bin/php /usr/local/bin/php
+sudo ln -s /etc/php7/usr/bin/pecl /usr/local/bin/pecl
+sudo ln -s /etc/php7/usr/bin/pear /usr/local/bin/pear
+
+sudo touch /etc/php7/usr/etc/php.ini
+sudo chmod 777 /etc/php7/usr/etc/php.ini
+
+sudo pear config-set php_ini /etc/php7/usr/etc/php.ini
+sudo pecl config-set php_ini /etc/php7/usr/etc/php.ini
+
+sudo pecl channel-update pecl.php.net
+
+sudo pecl uninstall ev
+yes '' | sudo pecl install ev-beta
+
+sudo pecl uninstall pthreads
+yes '' | sudo pecl install pthreads
