@@ -21,7 +21,6 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
-use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
 /**
@@ -304,7 +303,8 @@ class HttpEndpoint
     
     protected function handleConnection(HttpDriverInterface $driver, SocketStream $stream, callable $action)
     {
-        yield noop();
+        // Ensure all driver code runs in a separate aync task.
+        yield;
         
         return yield from $driver->handleConnection($this, $stream, $action);
     }

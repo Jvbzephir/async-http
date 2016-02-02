@@ -14,7 +14,6 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\InputStreamInterface;
 
-use function KoolKode\Async\noop;
 use function KoolKode\Async\runTask;
 
 /**
