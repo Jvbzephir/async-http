@@ -15,6 +15,7 @@ use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
+use KoolKode\Async\Stream\SocketClosedException;
 
 class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -58,23 +59,19 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->run();
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     */
     public function testRequiresValidCompressionType()
     {
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
+            $this->expectException(\InvalidArgumentException::class);
+            
             new InflateInputStream(yield tempStream('Hello World'), '', 'FOO');
         });
         
         $executor->run();
     }
-
-    /**
-     * @expectedException \KoolKode\Async\Stream\SocketClosedException
-     */
+    
     public function testCannotReadFromClosedStream()
     {
         $executor = $this->createExecutor();
@@ -89,15 +86,14 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             $in->close();
             $this->assertTrue($in->eof());
             
+            $this->expectException(SocketClosedException::class);
+            
             yield from $in->read();
         });
         
         $executor->run();
     }
-
-    /**
-     * @expectedException \KoolKode\Async\Stream\SocketClosedException
-     */
+    
     public function testRemainingBufferCanBeReadWhenFinished()
     {
         $executor = $this->createExecutor();
@@ -108,6 +104,8 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             $this->assertFalse($in->eof());
             $this->assertEquals('Hello World', yield readBuffer($in, 100));
             $this->assertTrue($in->eof());
+            
+            $this->expectException(SocketClosedException::class);
             
             yield from $in->read();
         });

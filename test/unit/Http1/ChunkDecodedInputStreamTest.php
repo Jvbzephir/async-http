@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\tempStream;
+use KoolKode\Async\Stream\SocketClosedException;
 
 class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -66,38 +67,33 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         
         $executor->run();
     }
-
-    /**
-     * @expectedException \RuntimeException
-     */
+    
     public function testDetectsInvalidFirstChunk()
     {
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
+            $this->expectException(\RuntimeException::class);
+            
             yield from ChunkDecodedInputStream::open(yield tempStream("FOOBAR\r\nBAZ!\r\n"));
         });
         
         $executor->run();
     }
     
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testDetectsFirstChunkTooBig()
     {
         $executor = $this->createExecutor();
     
         $executor->runCallback(function () {
+            $this->expectException(\RuntimeException::class);
+            
             yield from ChunkDecodedInputStream::open(yield tempStream("FFFFFFFF\r\n"));
         });
     
         $executor->run();
     }
     
-    /**
-     * @expectedException \KoolKode\Async\Stream\SocketClosedException
-     */
     public function testDetectsReadFromClosedStream()
     {
         $executor = $this->createExecutor();
@@ -109,15 +105,14 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
             $in->close();
             $this->assertTrue($in->eof());
             
+            $this->expectException(SocketClosedException::class);
+            
             yield from $in->read();
         });
         
         $executor->run();
     }
     
-    /**
-     * @expectedException \KoolKode\Async\Stream\SocketClosedException
-     */
     public function testDetectsReadFromStreamAfterEof()
     {
         $executor = $this->createExecutor();
@@ -129,15 +124,14 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
             $this->assertEquals('H', yield from $in->read());
             $this->assertTrue($in->eof());
             
+            $this->expectException(SocketClosedException::class);
+            
             yield from $in->read();
         });
         
         $executor->run();
     }
     
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testDetectsMalformedChunkHeaderWithinStream()
     {
         $executor = $this->createExecutor();
@@ -146,23 +140,24 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
             $in = yield from ChunkDecodedInputStream::open(yield tempStream("3;foo\r\nFOO\r\nBAR\r\n"));
             $this->assertFalse($in->eof());
             
+            $this->expectException(\RuntimeException::class);
+            
             yield from $this->readContents($in);
         });
         
         $executor->run();
     }
     
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testDetectsChunkWithinStreamTooBig()
     {
         $executor = $this->createExecutor();
-    
+        
         $executor->runCallback(function () {
             $in = yield from ChunkDecodedInputStream::open(yield tempStream("3;foo=\"bar\"\r\nFOO\r\nFFFFFFFF\r\n"));
             $this->assertFalse($in->eof());
-    
+            
+            $this->expectException(\RuntimeException::class);
+            
             yield from $this->readContents($in);
         });
     
