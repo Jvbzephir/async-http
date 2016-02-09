@@ -11,11 +11,11 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\SocketClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\tempStream;
 use function KoolKode\Async\readBuffer;
-use KoolKode\Async\Stream\SocketClosedException;
 
 class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
 {

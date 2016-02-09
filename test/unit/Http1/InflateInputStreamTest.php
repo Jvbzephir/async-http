@@ -11,11 +11,11 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\SocketClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\readBuffer;
 use function KoolKode\Async\tempStream;
-use KoolKode\Async\Stream\SocketClosedException;
 
 class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {

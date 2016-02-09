@@ -11,10 +11,10 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\SocketClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\tempStream;
-use KoolKode\Async\Stream\SocketClosedException;
 
 class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
 {
