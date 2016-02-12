@@ -18,7 +18,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Log\Logger;
 use Psr\Log\LogLevel;
 
-use function KoolKode\Async\eventEmitter;
+use function KoolKode\Async\currentExecutor;
 use function KoolKode\Async\runTask;
 use function KoolKode\Async\tempStream;
 
@@ -40,7 +40,7 @@ $executor->setErrorHanndler(function (\Throwable $e) {
 
 $executor->runNewTask(call_user_func(function () {
     
-    $logger = new Logger(yield eventEmitter(), $_SERVER['argv'][1] ?? LogLevel::INFO);
+    $logger = new Logger(yield currentExecutor(), 'php://stderr', $_SERVER['argv'][1] ?? LogLevel::INFO);
     
 //     $app = new App((new K1())->build());
     
