@@ -23,7 +23,6 @@ before_install:
 
 install:
   - if [[ "$LOOP" == "ev" ]]; then yes '' | pecl install ev-beta; fi
-  - yes '' | pecl install pthreads
   - travis_retry composer update --no-interaction --prefer-source $DEPS
   - composer info -i
 
