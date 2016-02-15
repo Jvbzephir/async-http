@@ -18,7 +18,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
-use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Task;
 use KoolKode\Async\TaskInterruptedException;
 use Psr\Log\LoggerInterface;
@@ -326,7 +325,7 @@ class ConnectionHandler
             'started' => microtime(true),
             'keep-alive' => ($content['flags'] & self::FCGI_KEEP_CONNECTION) ? true : false,
             'params' => [],
-            'stdin' => yield from TempStream::buffer()
+            'stdin' => yield from Stream::temp()
         ];
         
         if ($content['role'] != self::FCGI_RESPONDER) {
@@ -359,7 +358,7 @@ class ConnectionHandler
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
+        $response = new HttpResponse(Http::CODE_OK, yield from Stream::temp());
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         
         $response = $action($request, $response);

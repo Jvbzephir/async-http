@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
-use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
@@ -47,7 +46,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($data, $format, $encoder) {
-            $in = yield from InflateInputStream::open(yield from TempStream::buffer($encoder($data)), $format);
+            $in = yield from InflateInputStream::open(yield from Stream::temp($encoder($data)), $format);
             $decoded = yield from Stream::readContents($in);
             
             $this->assertTrue($in->eof());
@@ -65,7 +64,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\InvalidArgumentException::class);
             
-            new InflateInputStream(yield from TempStream::buffer('Hello World'), '', 'FOO');
+            new InflateInputStream(yield from Stream::temp('Hello World'), '', 'FOO');
         });
         
         $executor->run();
@@ -76,7 +75,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from InflateInputStream::open(yield from TempStream::buffer(gzencode('Hello World')), InflateInputStream::GZIP);
+            $in = yield from InflateInputStream::open(yield from Stream::temp(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
             $this->assertEquals('Hello W', yield from Stream::readBuffer($in, 7));
@@ -98,7 +97,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from InflateInputStream::open(yield from TempStream::buffer(gzencode('Hello World')), InflateInputStream::GZIP);
+            $in = yield from InflateInputStream::open(yield from Stream::temp(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
             $this->assertEquals('Hello World', yield from Stream::readBuffer($in, 100));

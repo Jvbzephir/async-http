@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
-use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
@@ -26,7 +25,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         
         $executor->runCallback(function () {
             $data = 'FOO & BAR';
-            $in = new LimitInputStream(yield from TempStream::buffer($data), 5);
+            $in = new LimitInputStream(yield from Stream::temp($data), 5);
             
             $this->assertFalse($in->eof());
             $this->assertEquals('FOO &', yield from Stream::readContents($in));
@@ -43,7 +42,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\InvalidArgumentException::class);
             
-            new LimitInputStream(yield from TempStream::buffer(), -4);
+            new LimitInputStream(yield from Stream::temp(), -4);
         });
         
         $executor->run();
@@ -54,7 +53,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
     
         $executor->runCallback(function () {
-            $in = new LimitInputStream(yield from TempStream::buffer('ABCDEF'), 3);
+            $in = new LimitInputStream(yield from Stream::temp('ABCDEF'), 3);
             
             yield from Stream::readBuffer($in, 100);
             
@@ -73,7 +72,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
     
         $executor->runCallback(function () {
-            $in = new LimitInputStream(yield from TempStream::buffer('ABCDEF'), 3);
+            $in = new LimitInputStream(yield from Stream::temp('ABCDEF'), 3);
             $in->close();
             
             $this->expectException(StreamClosedException::class);

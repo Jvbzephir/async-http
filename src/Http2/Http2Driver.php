@@ -22,7 +22,6 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
-use KoolKode\Async\Stream\TempStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
@@ -243,7 +242,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
+        $response = new HttpResponse(Http::CODE_OK, yield from IO::temp());
         $response = $response->withProtocolVersion('2.0');
         
         $response = $action($request, $response);

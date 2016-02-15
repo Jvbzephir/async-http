@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
-use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
@@ -53,7 +52,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($data, $len) {
-            $in = yield from ChunkDecodedInputStream::open(yield from TempStream::buffer($this->chunkEncode($data, $len)));
+            $in = yield from ChunkDecodedInputStream::open(yield from Stream::temp($this->chunkEncode($data, $len)));
             
             if ($data !== '') {
                 $this->assertFalse($in->eof());
@@ -75,7 +74,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\RuntimeException::class);
             
-            yield from ChunkDecodedInputStream::open(yield from TempStream::buffer("FOOBAR\r\nBAZ!\r\n"));
+            yield from ChunkDecodedInputStream::open(yield from Stream::temp("FOOBAR\r\nBAZ!\r\n"));
         });
         
         $executor->run();
@@ -88,7 +87,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\RuntimeException::class);
             
-            yield from ChunkDecodedInputStream::open(yield from TempStream::buffer("FFFFFFFF\r\n"));
+            yield from ChunkDecodedInputStream::open(yield from Stream::temp("FFFFFFFF\r\n"));
         });
     
         $executor->run();
@@ -99,7 +98,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from ChunkDecodedInputStream::open(yield from TempStream::buffer($this->chunkEncode('Hello World this is some data...', 10)));
+            $in = yield from ChunkDecodedInputStream::open(yield from Stream::temp($this->chunkEncode('Hello World this is some data...', 10)));
             $this->assertFalse($in->eof());
             
             $in->close();
@@ -118,7 +117,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from ChunkDecodedInputStream::open(yield from TempStream::buffer($this->chunkEncode('H', 10)));
+            $in = yield from ChunkDecodedInputStream::open(yield from Stream::temp($this->chunkEncode('H', 10)));
             $this->assertFalse($in->eof());
             
             $this->assertEquals('H', yield from $in->read());
@@ -137,7 +136,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from ChunkDecodedInputStream::open(yield from TempStream::buffer("3;foo\r\nFOO\r\nBAR\r\n"));
+            $in = yield from ChunkDecodedInputStream::open(yield from Stream::temp("3;foo\r\nFOO\r\nBAR\r\n"));
             $this->assertFalse($in->eof());
             
             $this->expectException(\RuntimeException::class);
@@ -153,7 +152,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from ChunkDecodedInputStream::open(yield from TempStream::buffer("3;foo=\"bar\"\r\nFOO\r\nFFFFFFFF\r\n"));
+            $in = yield from ChunkDecodedInputStream::open(yield from Stream::temp("3;foo=\"bar\"\r\nFOO\r\nFFFFFFFF\r\n"));
             $this->assertFalse($in->eof());
             
             $this->expectException(\RuntimeException::class);

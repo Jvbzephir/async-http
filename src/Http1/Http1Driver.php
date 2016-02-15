@@ -22,7 +22,7 @@ use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
-use KoolKode\Async\Stream\TempStream;
+use KoolKode\Async\Stream\Stream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
@@ -173,10 +173,10 @@ class Http1Driver implements HttpDriverInterface
                     throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
-                $body = ($len === 0) ? yield from TempStream::buffer(): new LimitInputStream($reader, $len, false);
+                $body = ($len === 0) ? yield from Stream::temp(): new LimitInputStream($reader, $len, false);
             } else {
                 // Dropping request body if neighter content-length nor chunked encoding are specified.
-                $body = yield from TempStream::buffer();
+                $body = yield from Stream::temp();
             }
             
             $request = new HttpRequest($uri, $body, $m[1], $headers);
@@ -190,12 +190,12 @@ class Http1Driver implements HttpDriverInterface
                 ]);
             }
             
-            $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
+            $response = new HttpResponse(Http::CODE_OK, yield from Stream::temp());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
             yield captureError($e);
             
-            $response = new HttpResponse($e->getCode(), yield from TempStream::buffer());
+            $response = new HttpResponse($e->getCode(), yield from Stream::temp());
             
             yield from $this->sendResponse($socket, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
             
@@ -358,7 +358,7 @@ class Http1Driver implements HttpDriverInterface
             }
         } else {
             $in = $response->getBody();
-            $body = yield from TempStream::buffer();
+            $body = yield from Stream::temp();
             $length = 0;
             
             try {
