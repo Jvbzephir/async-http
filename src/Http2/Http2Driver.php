@@ -20,12 +20,12 @@ use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\StreamException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
-use function KoolKode\Async\readBuffer;
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\readBuffer;
+use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/2 driver.
@@ -107,7 +107,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
                     break;
                 }
             }
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
                     'error' => $e->getMessage(),
@@ -260,7 +260,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     
         try {
             yield from $event->stream->sendResponse($response, $event->started);
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client connection due to socket error: {error} in {file} at line {line}', [
                     'error' => $e->getMessage(),

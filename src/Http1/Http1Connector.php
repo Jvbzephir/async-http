@@ -19,7 +19,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/1 client endpoint.

@@ -20,7 +20,7 @@ use KoolKode\Async\Stream\SocketStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\tempStream;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {

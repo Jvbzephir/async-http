@@ -12,7 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\StreamException;
 
 /**
  * Stream that allows peeking reads while in cache mode.
@@ -79,7 +79,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
     public function rewind()
     {
         if (!$this->cache) {
-            throw new SocketException('Cannot rewind stream when caching is disabled');
+            throw new StreamException('Cannot rewind stream when caching is disabled');
         }
         
         $this->offset = 0;
@@ -91,7 +91,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
     public function close()
     {
         if ($this->cache) {
-            throw new SocketException('Cannot close stream while cache is enabled');
+            throw new StreamException('Cannot close stream while cache is enabled');
         }
         
         return $this->stream->close();
@@ -147,7 +147,7 @@ class DirectUpgradeDuplexStream implements DuplexStreamInterface
     public function write(string $data, int $priority = 0): \Generator
     {
         if ($this->cache) {
-            throw new SocketException('Cannot write data to stream while cache is enabled');
+            throw new StreamException('Cannot write data to stream while cache is enabled');
         }
         
         return yield from $this->stream->write($data, $priority);

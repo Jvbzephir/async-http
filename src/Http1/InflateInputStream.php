@@ -12,9 +12,9 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\Stream\SocketClosedException;
+use KoolKode\Async\Stream\StreamClosedException;
 
-use function KoolKode\Async\readBuffer;
+use function KoolKode\Async\Stream\readBuffer;
 
 /**
  * Applies data decompression on top of another input stream.
@@ -180,11 +180,11 @@ class InflateInputStream implements InputStreamInterface
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL) {
-            throw new SocketClosedException('Cannot read from detached stream');
+            throw new StreamClosedException('Cannot read from detached stream');
         }
         
         if ($this->finished && $this->buffer === '') {
-            throw new SocketClosedException('Cannot read from terminated stream');
+            throw new StreamClosedException('Cannot read from terminated stream');
         }
         
         while ($this->buffer === '') {

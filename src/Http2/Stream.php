@@ -237,7 +237,7 @@ class Stream
         }
         
         if (!in_array($state, $allowed, true)) {
-            throw new StreamException($this->id, sprintf('Invalid state transition from %u to %u', $this->state, $state), Frame::PROTOCOL_ERROR);
+            throw new Http2StreamException($this->id, sprintf('Invalid state transition from %u to %u', $this->state, $state), Frame::PROTOCOL_ERROR);
         }
         
         $this->state = $state;
@@ -246,7 +246,7 @@ class Stream
     protected function assertState(int ...$allowed)
     {
         if (!in_array($this->state, $allowed, true)) {
-            throw new StreamException('Operation permitted by current stream state', Frame::PROTOCOL_ERROR);
+            throw new Http2StreamException('Operation permitted by current stream state', Frame::PROTOCOL_ERROR);
         }
     }
     
@@ -302,7 +302,7 @@ class Stream
         try {
             if ($this->lastFrame !== NULL && $this->lastFrame->type === Frame::CONTINUATION) {
                if (!($this->lastFrame->flags & Frame::END_HEADERS) && $frame->type !== Frame::CONTINUATION) {
-                   throw new StreamException('CONTINUATION frame expected', Frame::PROTOCOL_ERROR);
+                   throw new Http2StreamException('CONTINUATION frame expected', Frame::PROTOCOL_ERROR);
                }
             }
             
@@ -315,11 +315,11 @@ class Stream
                             case Frame::HEADERS:
                             case Frame::CONTINUATION:
                                 if ($this->lastFrame->flags & Frame::END_HEADERS) {
-                                    throw new StreamException('Detected CONTINUATION frame after END_HEADERS', Frame::PROTOCOL_ERROR);
+                                    throw new Http2StreamException('Detected CONTINUATION frame after END_HEADERS', Frame::PROTOCOL_ERROR);
                                 }
                                 break;
                             default:
-                                throw new StreamException('CONTINUATION frame must be preceeded by HEADERS or CONTINUATION', Frame::PROTOCOL_ERROR);
+                                throw new Http2StreamException('CONTINUATION frame must be preceeded by HEADERS or CONTINUATION', Frame::PROTOCOL_ERROR);
                         }
                     }
                     
@@ -392,7 +392,7 @@ class Stream
                     throw new ConnectionException('PING frame must not be sent to a stream', Frame::PROTOCOL_ERROR);
                 case Frame::PRIORITY:
                     if (strlen($frame->data) !== 5) {
-                        throw new StreamException('PRIORITY frame does not consist of 5 bytes', Frame::FRAME_SIZE_ERROR);
+                        throw new Http2StreamException('PRIORITY frame does not consist of 5 bytes', Frame::FRAME_SIZE_ERROR);
                     }
                     
                     $this->setPriority(ord(substr($frame->data, 4, 1)) + 1);
@@ -422,7 +422,7 @@ class Stream
                     
                     $increment = unpack('N', "\0" . $frame->data)[1];
                     if ($increment < 1) {
-                        throw new StreamException('WINDOW_UPDATE increment must be positive and not 0', Frame::PROTOCOL_ERROR);
+                        throw new Http2StreamException('WINDOW_UPDATE increment must be positive and not 0', Frame::PROTOCOL_ERROR);
                     }
                     
                     $this->window += $increment;
@@ -469,7 +469,7 @@ class Stream
         $headers = (array) $this->hpack->decode($buffer);
         
         if (empty($headers)) {
-            throw new StreamException('Invalid HTTP headers received', Frame::COMPRESSION_ERROR);
+            throw new Http2StreamException('Invalid HTTP headers received', Frame::COMPRESSION_ERROR);
         }
         
         $event = new MessageReceivedEvent($this, $headers, $this->body, $this->started);

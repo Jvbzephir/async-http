@@ -11,11 +11,11 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Stream\SocketClosedException;
+use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
-use function KoolKode\Async\readBuffer;
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\readBuffer;
+use function KoolKode\Async\Stream\tempStream;
 
 class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -86,7 +86,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             $in->close();
             $this->assertTrue($in->eof());
             
-            $this->expectException(SocketClosedException::class);
+            $this->expectException(StreamClosedException::class);
             
             yield from $in->read();
         });
@@ -105,7 +105,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             $this->assertEquals('Hello World', yield readBuffer($in, 100));
             $this->assertTrue($in->eof());
             
-            $this->expectException(SocketClosedException::class);
+            $this->expectException(StreamClosedException::class);
             
             yield from $in->read();
         });

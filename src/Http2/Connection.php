@@ -13,12 +13,12 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\StreamException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\eventEmitter;
-use function KoolKode\Async\readBuffer;
+use function KoolKode\Async\Stream\readBuffer;
 
 /**
  * A transport-layer connection between two endpoints.
@@ -188,21 +188,21 @@ class Connection
      * @param LoggerInterface $logger
      * @return Connection
      * 
-     * @throws SocketException When the client did not send an HTTP/2 connection preface.
+     * @throws StreamException When the client did not send an HTTP/2 connection preface.
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield readBuffer($socket, strlen(self::PREFACE));
     
         if ($preface !== self::PREFACE) {
-            throw new SocketException('Client did not send valid HTTP/2 connection preface');
+            throw new StreamException('Client did not send valid HTTP/2 connection preface');
         }
     
         $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
     
         list ($id, $frame) = yield from $conn->readNextFrame();
         if ($id !== 0 || $frame->type !== Frame::SETTINGS) {
-            throw new SocketException('Missing initial settings frame');
+            throw new StreamException('Missing initial settings frame');
         }
     
         yield from $conn->handleFrame($frame);
@@ -255,7 +255,7 @@ class Connection
         $header = yield readBuffer($this->socket, 9);
         
         if (strlen($header) !== 9) {
-            throw new SocketException('Connection terminated');
+            throw new StreamException('Connection terminated');
         }
         
         $m = NULL;
@@ -290,7 +290,7 @@ class Connection
                     throw new ConnectionException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR);
                 }
                 
-                throw (new StreamException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR))->setStreamId($stream);
+                throw (new Http2StreamException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR))->setStreamId($stream);
             }
             
             $data = yield readBuffer($this->socket, $length);
@@ -320,7 +320,7 @@ class Connection
     {
         try {
             list ($id, $frame) = yield from $this->readNextFrame();
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
                     'error' => $e->getMessage(),
@@ -343,7 +343,7 @@ class Connection
             yield from $this->writeFrame(new Frame(Frame::GOAWAY, $e->getCode()), 1000);
             
             return false;
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client due to socket error: {error} in {file} at line {line}', [
                     'error' => $e->getMessage(),
@@ -459,7 +459,7 @@ class Connection
     }
     
     /**
-     * Coroutine that opens a new stream multiplexed ogver the connection.
+     * Coroutine that opens a new stream multiplexed over the connection.
      * 
      * @return Stream
      */
@@ -473,7 +473,7 @@ class Connection
             return $this->streams[$i] = new Stream($i, $this, yield eventEmitter(), $this->logger);
         }
         
-        throw new SocketException('Maximum number of concurrent streams exceeded');
+        throw new StreamException('Maximum number of concurrent streams exceeded');
     }
     
     /**

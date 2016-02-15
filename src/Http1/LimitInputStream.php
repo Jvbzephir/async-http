@@ -12,7 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\Stream\SocketClosedException;
+use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * Input stream with pre-defined maximum number of bytes that can be read.
@@ -101,11 +101,11 @@ class LimitInputStream implements InputStreamInterface
     public function read(int $length = 8192, float $timeout = 0): \Generator
     {
         if ($this->stream === NULL || $this->stream->eof()) {
-            throw new SocketClosedException('Cannot read from closed stream');
+            throw new StreamClosedException('Cannot read from closed stream');
         }
         
         if ($this->offset >= $this->limit) {
-            throw new SocketClosedException(sprintf('Cannot read beyond %u bytes', $this->limit));
+            throw new StreamClosedException(sprintf('Cannot read beyond %u bytes', $this->limit));
         }
         
         $chunk = yield from $this->stream->read(min($length, $this->limit - $this->offset), $timeout);

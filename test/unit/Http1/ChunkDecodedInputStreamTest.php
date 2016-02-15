@@ -11,10 +11,10 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Stream\SocketClosedException;
+use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\tempStream;
 
 class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -105,7 +105,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
             $in->close();
             $this->assertTrue($in->eof());
             
-            $this->expectException(SocketClosedException::class);
+            $this->expectException(StreamClosedException::class);
             
             yield from $in->read();
         });
@@ -124,7 +124,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
             $this->assertEquals('H', yield from $in->read());
             $this->assertTrue($in->eof());
             
-            $this->expectException(SocketClosedException::class);
+            $this->expectException(StreamClosedException::class);
             
             yield from $in->read();
         });

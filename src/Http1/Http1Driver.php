@@ -20,12 +20,12 @@ use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
-use function KoolKode\Async\tempStream;
+use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/1 server endpoint.
@@ -115,7 +115,7 @@ class Http1Driver implements HttpDriverInterface
             $line = yield from $reader->readLine();
             
             if (empty($line)) {
-                throw new SocketException('No HTTP request line available');
+                throw new StreamException('No HTTP request line available');
             }
             
             $m = NULL;
@@ -200,7 +200,7 @@ class Http1Driver implements HttpDriverInterface
             $socket->close();
             
             return;
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             yield captureError($e);
             
             $socket->close();
@@ -411,7 +411,7 @@ class Http1Driver implements HttpDriverInterface
                     'duration' => round((microtime(true) - $started) * 1000)
                 ]);
             }
-        } catch (SocketException $e) {
+        } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client connection due to socket error: {error} in {file} at line {line}', [
                     'error' => $e->getMessage(),

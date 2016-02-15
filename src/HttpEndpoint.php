@@ -15,7 +15,7 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\DirectUpgradeDuplexStream;
 use KoolKode\Async\Http\Http1\Http1Driver;
-use KoolKode\Async\Stream\SocketException;
+use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
@@ -268,7 +268,7 @@ class HttpEndpoint
             if (isset($this->sslOptions['local_cert'])) {
                 try {
                     yield from $stream->encrypt(true);
-                } catch (SocketException $e) {
+                } catch (StreamException $e) {
                     if ($this->logger) {
                         $this->logger->debug('Dropped client {peer} due to TLS handshake failure: {error}', [
                             'peer' => $stream->getPeer(),

@@ -25,9 +25,9 @@ use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentTask;
-use function KoolKode\Async\readBuffer;
+use function KoolKode\Async\Stream\readBuffer;
+use function KoolKode\Async\Stream\tempStream;
 use function KoolKode\Async\runTask;
-use function KoolKode\Async\tempStream;
 
 /**
  * Handles FCGI request multiplexing via socket connection.
