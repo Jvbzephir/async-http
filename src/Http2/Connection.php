@@ -13,12 +13,12 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\DuplexStreamInterface;
+use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\eventEmitter;
-use function KoolKode\Async\Stream\readBuffer;
 
 /**
  * A transport-layer connection between two endpoints.
@@ -192,7 +192,7 @@ class Connection
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
-        $preface = yield readBuffer($socket, strlen(self::PREFACE));
+        $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE));
     
         if ($preface !== self::PREFACE) {
             throw new StreamException('Client did not send valid HTTP/2 connection preface');
@@ -252,7 +252,7 @@ class Connection
      */
     public function readNextFrame(): \Generator
     {
-        $header = yield readBuffer($this->socket, 9);
+        $header = yield from IO::readBuffer($this->socket, 9);
         
         if (strlen($header) !== 9) {
             throw new StreamException('Connection terminated');
@@ -293,7 +293,7 @@ class Connection
                 throw (new Http2StreamException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR))->setStreamId($stream);
             }
             
-            $data = yield readBuffer($this->socket, $length);
+            $data = yield from IO::readBuffer($this->socket, $length);
         } else {
             $data = '';
         }

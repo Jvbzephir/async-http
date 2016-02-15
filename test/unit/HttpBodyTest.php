@@ -16,11 +16,12 @@ use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Header\ContentTypeHeader;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
-use function KoolKode\Async\Stream\tempStream;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -33,7 +34,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $connector = new Http1Connector();
             
-            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield tempStream());
+            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from TempStream::buffer());
             $response = yield from $connector->send($request, 5, [
                 'ssl' => [
                     'ciphers' => 'DEFAULT'
@@ -59,7 +60,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $message = new HttpResponse(200, yield tempStream());
+            $message = new HttpResponse(200, yield from TempStream::buffer());
             $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
             
             $type = ContentTypeHeader::fromMessage($message);
@@ -84,7 +85,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $message = new HttpResponse(200, yield tempStream());
+            $message = new HttpResponse(200, yield from TempStream::buffer());
             $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
             
             $accept = AcceptHeader::fromMessage($message);
@@ -148,7 +149,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
-                return $response->withBody(yield tempStream('RECEIVED: ' . (yield from $this->readContents($request->getBody()))));
+                return $response->withBody(yield from TempStream::buffer('RECEIVED: ' . (yield from Stream::readContents($request->getBody()))));
             }), 'Test Server', true);
             
             try {
@@ -156,7 +157,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $connector->setChunkedRequests($chunked);
                 
                 $message = 'Hi there!';
-                $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield tempStream($message), 'POST');
+                $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield from TempStream::buffer($message), 'POST');
                 
                 if (!$chunked) {
                     $request = $request->withProtocolVersion('1.0');
@@ -166,7 +167,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
-                $this->assertEquals('RECEIVED: ' . $message, yield from $this->readContents($response->getBody()));
+                $this->assertEquals('RECEIVED: ' . $message, yield from Stream::readContents($response->getBody()));
             } finally {
                 $worker->cancel();
             }
@@ -186,7 +187,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () use ($executor) {
             $connector = new Http2Connector();
             
-            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield tempStream());
+            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield from TempStream::buffer());
             $response = yield from $connector->send($request);
             
             try {

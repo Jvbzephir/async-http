@@ -17,6 +17,8 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
+use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Task;
 use KoolKode\Async\TaskInterruptedException;
 use Psr\Log\LoggerInterface;
@@ -25,8 +27,6 @@ use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentTask;
-use function KoolKode\Async\Stream\readBuffer;
-use function KoolKode\Async\Stream\tempStream;
 use function KoolKode\Async\runTask;
 
 /**
@@ -212,16 +212,16 @@ class ConnectionHandler
         
         try {
             while (true) {
-                list ($version, $type, $requestId, $len, $pad) = array_values(unpack($hf, yield readBuffer($this->stream, 8)));
+                list ($version, $type, $requestId, $len, $pad) = array_values(unpack($hf, yield from Stream::readBuffer($this->stream, 8)));
                 
                 if ($len > 0) {
-                    $data = yield readBuffer($this->stream, $len);
+                    $data = yield from Stream::readBuffer($this->stream, $len);
                 } else {
                     $data = '';
                 }
                 
                 if ($pad > 0) {
-                    yield readBuffer($this->stream, $pad);
+                    yield from Stream::readBuffer($this->stream, $pad);
                 }
                 
                 if (false === yield from $this->handleRecord(new Record($version, $type, $requestId, $data), $action)) {
@@ -326,7 +326,7 @@ class ConnectionHandler
             'started' => microtime(true),
             'keep-alive' => ($content['flags'] & self::FCGI_KEEP_CONNECTION) ? true : false,
             'params' => [],
-            'stdin' => yield tempStream()
+            'stdin' => yield from TempStream::buffer()
         ];
         
         if ($content['role'] != self::FCGI_RESPONDER) {
@@ -359,7 +359,7 @@ class ConnectionHandler
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield tempStream());
+        $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         
         $response = $action($request, $response);

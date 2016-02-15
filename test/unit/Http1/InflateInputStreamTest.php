@@ -11,11 +11,10 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
+use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
-
-use function KoolKode\Async\Stream\readBuffer;
-use function KoolKode\Async\Stream\tempStream;
 
 class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -48,8 +47,8 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($data, $format, $encoder) {
-            $in = yield from InflateInputStream::open(yield tempStream($encoder($data)), $format);
-            $decoded = yield from $this->readContents($in);
+            $in = yield from InflateInputStream::open(yield from TempStream::buffer($encoder($data)), $format);
+            $decoded = yield from Stream::readContents($in);
             
             $this->assertTrue($in->eof());
             $this->assertEquals('0 bytes buffered', $in->__debugInfo()['buffer']);
@@ -66,7 +65,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\InvalidArgumentException::class);
             
-            new InflateInputStream(yield tempStream('Hello World'), '', 'FOO');
+            new InflateInputStream(yield from TempStream::buffer('Hello World'), '', 'FOO');
         });
         
         $executor->run();
@@ -77,10 +76,10 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from InflateInputStream::open(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
+            $in = yield from InflateInputStream::open(yield from TempStream::buffer(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
-            $this->assertEquals('Hello W', yield readBuffer($in, 7));
+            $this->assertEquals('Hello W', yield from Stream::readBuffer($in, 7));
             $this->assertFalse($in->eof());
             
             $in->close();
@@ -99,10 +98,10 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () {
-            $in = yield from InflateInputStream::open(yield tempStream(gzencode('Hello World')), InflateInputStream::GZIP);
+            $in = yield from InflateInputStream::open(yield from TempStream::buffer(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
-            $this->assertEquals('Hello World', yield readBuffer($in, 100));
+            $this->assertEquals('Hello World', yield from Stream::readBuffer($in, 100));
             $this->assertTrue($in->eof());
             
             $this->expectException(StreamClosedException::class);

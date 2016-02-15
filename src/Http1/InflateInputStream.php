@@ -12,9 +12,8 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
-
-use function KoolKode\Async\Stream\readBuffer;
 
 /**
  * Applies data decompression on top of another input stream.
@@ -139,7 +138,7 @@ class InflateInputStream implements InputStreamInterface
      */
     public static function open(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true): \Generator
     {
-        return new static($stream, yield readBuffer($stream, 8192), $encoding, $cascadeClose);
+        return new static($stream, yield from Stream::readBuffer($stream, 8192), $encoding, $cascadeClose);
     }
     
     /**

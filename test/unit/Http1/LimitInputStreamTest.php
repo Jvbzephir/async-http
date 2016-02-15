@@ -11,11 +11,10 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
+use KoolKode\Async\Stream\TempStream;
 use KoolKode\Async\Test\AsyncTrait;
-
-use function KoolKode\Async\Stream\tempStream;
-use function KoolKode\Async\Stream\readBuffer;
 
 class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
 {
@@ -27,10 +26,10 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         
         $executor->runCallback(function () {
             $data = 'FOO & BAR';
-            $in = new LimitInputStream(yield tempStream($data), 5);
+            $in = new LimitInputStream(yield from TempStream::buffer($data), 5);
             
             $this->assertFalse($in->eof());
-            $this->assertEquals('FOO &', yield from $this->readContents($in));
+            $this->assertEquals('FOO &', yield from Stream::readContents($in));
             $this->assertTrue($in->eof());
         });
         
@@ -44,7 +43,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $this->expectException(\InvalidArgumentException::class);
             
-            new LimitInputStream(yield tempStream(), -4);
+            new LimitInputStream(yield from TempStream::buffer(), -4);
         });
         
         $executor->run();
@@ -55,8 +54,9 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
     
         $executor->runCallback(function () {
-            $in = new LimitInputStream(yield tempStream('ABCDEF'), 3);
-            yield readBuffer($in, 100);
+            $in = new LimitInputStream(yield from TempStream::buffer('ABCDEF'), 3);
+            
+            yield from Stream::readBuffer($in, 100);
             
             $this->assertTrue($in->eof());
             
@@ -73,7 +73,7 @@ class LimitInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
     
         $executor->runCallback(function () {
-            $in = new LimitInputStream(yield tempStream('ABCDEF'), 3);
+            $in = new LimitInputStream(yield from TempStream::buffer('ABCDEF'), 3);
             $in->close();
             
             $this->expectException(StreamClosedException::class);

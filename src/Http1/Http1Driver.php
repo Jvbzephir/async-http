@@ -22,10 +22,10 @@ use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Stream\TempStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
-use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/1 server endpoint.
@@ -173,10 +173,10 @@ class Http1Driver implements HttpDriverInterface
                     throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
-                $body = ($len === 0) ? yield tempStream() : new LimitInputStream($reader, $len, false);
+                $body = ($len === 0) ? yield from TempStream::buffer(): new LimitInputStream($reader, $len, false);
             } else {
                 // Dropping request body if neighter content-length nor chunked encoding are specified.
-                $body = yield tempStream();
+                $body = yield from TempStream::buffer();
             }
             
             $request = new HttpRequest($uri, $body, $m[1], $headers);
@@ -190,12 +190,14 @@ class Http1Driver implements HttpDriverInterface
                 ]);
             }
             
-            $response = new HttpResponse(Http::CODE_OK, yield tempStream());
+            $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
             yield captureError($e);
             
-            yield from $this->sendResponse($socket, new HttpResponse($e->getCode(), yield tempStream()), isset($request) && $request->getMethod() == 'HEAD', $started);
+            $response = new HttpResponse($e->getCode(), yield from TempStream::buffer());
+            
+            yield from $this->sendResponse($socket, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
@@ -356,7 +358,7 @@ class Http1Driver implements HttpDriverInterface
             }
         } else {
             $in = $response->getBody();
-            $body = yield tempStream();
+            $body = yield from TempStream::buffer();
             $length = 0;
             
             try {

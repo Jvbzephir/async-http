@@ -20,12 +20,12 @@ use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
+use KoolKode\Async\Stream\TempStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
-use function KoolKode\Async\Stream\readBuffer;
-use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/2 driver.
@@ -133,7 +133,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             return false;
         }
         
-        return Connection::PREFACE === yield readBuffer($stream, strlen(Connection::PREFACE));
+        return Connection::PREFACE === yield from IO::readBuffer($stream, strlen(Connection::PREFACE));
     }
     
     /**
@@ -189,7 +189,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             
             $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
             
-            $preface = yield readBuffer($socket, strlen(Connection::PREFACE));
+            $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE));
             
             if ($preface !== self::PREFACE) {
                 if ($this->logger) {
@@ -243,7 +243,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield tempStream());
+        $response = new HttpResponse(Http::CODE_OK, yield from TempStream::buffer());
         $response = $response->withProtocolVersion('2.0');
         
         $response = $action($request, $response);

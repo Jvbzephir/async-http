@@ -17,9 +17,8 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Stream\TempStream;
 use Psr\Log\LoggerInterface;
-
-use function KoolKode\Async\Stream\tempStream;
 
 /**
  * HTTP/1 client endpoint.
@@ -126,10 +125,10 @@ class Http1Connector
             $chunked = false;
             
             if ($chunk === '') {
-                $tmp = yield tempStream();
+                $tmp = yield from TempStream::buffer();
                 $request = $request->withHeader('Content-Length', '0');
             } elseif (!$this->chunkedRequests || $request->getProtocolVersion() === '1.0') {
-                $tmp = yield tempStream();
+                $tmp = yield from TempStream::buffer();
                 $size = yield from $tmp->write($chunk);
                 
                 while (!$body->eof()) {
@@ -220,7 +219,7 @@ class Http1Connector
         }
         
         if ($request->getMethod() == 'HEAD') {
-            $stream = yield tempStream();
+            $stream = yield from TempStream::buffer();
         } else {
             if (isset($headers['transfer-encoding'])) {
                 $encodings = strtolower(implode(',', $headers['transfer-encoding']));
@@ -234,7 +233,7 @@ class Http1Connector
             } elseif (isset($headers['content-length'])) {
                 $len = Http::parseContentLength(implode(', ', $headers['content-length']));
                 
-                $stream = ($len === 0) ? yield tempStream() : new LimitInputStream($stream, $len);
+                $stream = ($len === 0) ? yield from TempStream::buffer() : new LimitInputStream($stream, $len);
             } else {
                 throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
             }
