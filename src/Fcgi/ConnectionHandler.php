@@ -169,9 +169,9 @@ class ConnectionHandler
     /**
      * Worker tasks still processing requests.
      * 
-     * @var array
+     * @var \SplObjectStorage
      */
-    protected $workers = [];
+    protected $workers;
     
     /**
      * Create a new FastCGI connection handler using the given stream as transport.
@@ -183,6 +183,7 @@ class ConnectionHandler
     {
         $this->stream = $stream;
         $this->logger = $logger;
+        $this->workers = new \SplObjectStorage();
     }
     
     /**
@@ -230,8 +231,8 @@ class ConnectionHandler
         } catch (TaskInterruptedException $e) {
             // Bail out due to max requests reached.
         } finally {
-            if (!empty($this->workers)) {
-                yield awaitAll($this->workers);
+            if ($this->workers->count()) {
+                yield awaitAll(iterator_to_array($this->workers));
             }
             
             $this->stream->close();
@@ -273,10 +274,11 @@ class ConnectionHandler
             case Record::FCGI_STDIN:
                 if ($record->data === '') {
                     $worker = yield runTask($this->dispatch($requestId, $action), 'FCGI Worker');
-                    $this->workers[$worker->id] = $worker;
+                    
+                    $this->workers->attach($worker);
                     
                     $worker->onComplete(function (ExecutorInterface $executor, Task $worker) {
-                        unset($this->workers[$worker->id]);
+                        $this->workers->detach($worker);
                     });
                     
                     $worker->onError(function (ExecutorInterface $executor, Task $worker, \Throwable $e) use($requestId) {
@@ -284,7 +286,7 @@ class ConnectionHandler
                             yield captureError($e);
                             yield from $this->endRequest($requestId);
                         } finally {
-                            unset($this->workers[$worker->id]);
+                            $this->workers->detach($worker);
                         }
                     });
                     
@@ -292,7 +294,7 @@ class ConnectionHandler
                         try {
                             yield from $this->endRequest($requestId);
                         } finally {
-                            unset($this->workers[$worker->id]);
+                            $this->workers->detach($worker);
                         }
                     });
                 } else {
@@ -561,8 +563,7 @@ class ConnectionHandler
                 if ($this->task !== NULL) {
                     $task = $this->task;
                     $this->task = NULL;
-                    
-                    unset($this->workers[(yield currentTask())->id]);
+                    $this->workers->detach(yield currentTask());
                     
                     $task->notify();
                 }

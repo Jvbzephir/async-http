@@ -148,7 +148,7 @@ class Stream
      */
     protected $hpack;
     
-    protected $tasks = [];
+    protected $tasks;
     
     protected $started;
     
@@ -159,7 +159,7 @@ class Stream
         $this->events = $events;
         $this->logger = $logger;
         $this->started = microtime(true);
-        
+        $this->tasks = new \SplObjectStorage();
         $this->socket = $conn->getSocket();
         $this->hpack = $conn->getHPack();
     }
@@ -179,7 +179,7 @@ class Stream
                 $task->cancel();
             }
         } finally {
-            $this->tasks = [];
+            $this->tasks = new \SplObjectStorage();
         }
     }
     
@@ -405,7 +405,7 @@ class Stream
                             $task->cancel();
                         }
                     } finally {
-                        $this->tasks = [];
+                        $this->tasks = new \SplObjectStorage();
                     }
                     
                     if ($this->state === self::IDLE) {
@@ -489,17 +489,13 @@ class Stream
     public function incrementRemoteWindow(int $increment): \Generator
     {
         $task = yield currentTask();
-        $this->tasks[$task->id] = $task;
+        $this->tasks->attach($task);
         
         try {
             yield from $this->conn->incrementRemoteWindow($increment);
             yield from $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)));
-//             yield awaitAll([
-//                 $this->conn->incrementRemoteWindow($increment),
-//                 $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', $increment)))
-//             ]);
         } finally {
-            unset($this->tasks[$task->id]);
+            $this->tasks->detach($task);
         }
     }
     
