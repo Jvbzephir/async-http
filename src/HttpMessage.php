@@ -186,6 +186,11 @@ abstract class HttpMessage
         return $message;
     }
     
+    public function getAttribute(string $name, mixed $default)
+    {
+        return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
+    }
+    
     public function withAttribute(string $name, $value): HttpMessage
     {
         $message = clone $this;
