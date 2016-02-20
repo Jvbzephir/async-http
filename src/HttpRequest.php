@@ -132,6 +132,25 @@ class HttpRequest extends HttpMessage
         return $headers;
     }
     
+    public function hasQueryParam(string $name): bool
+    {
+        return $this->uri->hasQueryParam($name);
+    }
+
+    public function getQueryParam(string $name)
+    {
+        if (func_num_args() > 1) {
+            return $this->uri->getQueryParams(...func_get_args());
+        }
+        
+        return $this->uri->getQueryParam($name);
+    }
+
+    public function getQueryParams(): array
+    {
+        return $this->uri->getQueryParams();
+    }
+    
     protected function filterMethod(string $method): string
     {
         if (!preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
