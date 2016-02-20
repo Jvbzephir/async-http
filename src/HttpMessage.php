@@ -206,6 +206,19 @@ abstract class HttpMessage
         
         return $message;
     }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function withAttributes(array $attributes): HttpMessage
+    {
+        $message = clone $this;
+        $message->attributes = $attributes;
+        
+        return $message;
+    }
     
     protected function assertArrayOfStrings(array $strings): bool
     {
