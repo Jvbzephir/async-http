@@ -33,7 +33,29 @@ class HttpRequest extends HttpMessage
         $this->method = $this->filterMethod(($method === NULL) ? 'GET' : $method);
         $this->uri = $uri ?: new Uri();
     }
-
+    
+    public function __debugInfo(): array
+    {
+        $headers = [];
+        foreach ($this->getHeaders() as $k => $header) {
+            foreach ($header as $v) {
+                $headers[] = sprintf('%s: %s', $k, $v);
+            }
+        }
+        
+        sort($headers, SORT_NATURAL);
+        
+        return [
+            'protocol' => sprintf('HTTP/%s', $this->protocolVersion),
+            'method' => $this->method,
+            'uri' => (string) $this->uri,
+            'target' => $this->getRequestTarget(),
+            'headers' => $headers,
+            'body' => $this->body,
+            'attributes' => array_keys($this->attributes)
+        ];
+    }
+    
     public function getRequestTarget(): string
     {
         if (NULL !== $this->target) {

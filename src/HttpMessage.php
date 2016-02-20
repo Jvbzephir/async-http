@@ -55,7 +55,7 @@ abstract class HttpMessage
             }
         }
     }
-
+        
     public function getProtocolVersion(): string
     {
         return $this->protocolVersion;
