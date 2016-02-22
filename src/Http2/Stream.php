@@ -83,7 +83,10 @@ class Stream
     
     const MAX_HEADER_SIZE = 16384;
     
-    const INITIAL_WINDOW_SIZE = 65535;
+//     const INITIAL_WINDOW_SIZE = 65535;
+    const INITIAL_WINDOW_SIZE = 2 ** 30;
+    
+    // FIXME: Need to separate local and remote windows size into distinct properties!!!
     
     /**
      * Identifier of the stream instance.

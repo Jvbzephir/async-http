@@ -50,7 +50,10 @@ class Connection
     
     const SETTING_MAX_HEADER_LIST_SIZE = 0x06;
     
-    const INITIAL_WINDOW_SIZE = 65535;
+//     const INITIAL_WINDOW_SIZE = 65535;
+    const INITIAL_WINDOW_SIZE = 2 ** 30;
+    
+    // FIXME: Need to separate local and remote windows size into distinct properties!!!
     
     /**
      * PING frame payload.
