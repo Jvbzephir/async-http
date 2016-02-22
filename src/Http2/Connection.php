@@ -191,14 +191,14 @@ class Connection
      * @param LoggerInterface $logger
      * @return Connection
      * 
-     * @throws StreamException When the client did not send an HTTP/2 connection preface.
+     * @throws ConnectionException When the client did not send an HTTP/2 connection preface.
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE));
     
         if ($preface !== self::PREFACE) {
-            throw new StreamException('Client did not send valid HTTP/2 connection preface');
+            throw new ConnectionException('Client did not send valid HTTP/2 connection preface');
         }
     
         $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);

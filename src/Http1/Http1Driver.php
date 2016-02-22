@@ -112,10 +112,15 @@ class Http1Driver implements HttpDriverInterface
         try {
             $reader = new BufferedDuplexStream($socket);
             
-            $line = yield from $reader->readLine();
+            // Bail out when no HTTP request line is received.
+            try {
+                $line = yield from $reader->readLine();
+            } catch (StreamException $e) {
+                return;
+            }
             
             if (empty($line)) {
-                throw new StreamException('No HTTP request line available');
+                return;
             }
             
             $m = NULL;

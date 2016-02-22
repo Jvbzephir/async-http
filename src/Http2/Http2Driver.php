@@ -95,7 +95,12 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     public function handleConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
     {
         try {
-            $this->conns[] = $conn = yield from Connection::connectServer($socket, $this->logger);
+            // Bail out if no connection preface is received.
+            try {
+                $this->conns[] = $conn = yield from Connection::connectServer($socket, $this->logger);
+            } catch (ConnectionException $e) {
+                return;
+            }
             
             $conn->getEvents()->observe(MessageReceivedEvent::class, function (MessageReceivedEvent $event) use($endpoint, $action) {
                 yield from $this->handleMessage($event, $endpoint, $action);
