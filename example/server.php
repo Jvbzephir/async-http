@@ -19,9 +19,6 @@ use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Stream\Stream;
 use Psr\Log\LogLevel;
 
-use function KoolKode\Async\currentExecutor;
-use function KoolKode\Async\runTask;
-
 error_reporting(-1);
 ini_set('display_errors', false);
 
@@ -38,42 +35,9 @@ $executor->setErrorHanndler(function (\Throwable $e) {
     fwrite(STDERR, $e . "\n\n");
 });
 
-$executor->runNewTask(call_user_func(function () {
+$executor->runCallback(function () use ($executor) {
     
-    $logger = new Logger(yield currentExecutor(), 'php://stderr', $_SERVER['argv'][1] ?? LogLevel::INFO);
-    
-//     $app = new App((new K1())->build());
-    
-//     $app->route('index', '/', function (ServerRequestInterface $request) {
-//         return sprintf('You are connected using HTTP/%s', $request->getProtocolVersion());
-//     });
-    
-//     $app->route('favicon', 'GET /favicon.ico', function (ResponseInterface $response) {
-//         $response = $response->withHeader('Content-Type', 'image/vnd.microsoft.icon');
-//         $response = $response->withHeader('Cache-Control', 'public,max-age=3600');
-//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/favicon.ico'));
-        
-//         return $response;
-//     });
-    
-//     $app->route('html', 'GET /test.html', function (ResponseInterface $response) use($app) {
-//         $response = $response->withHeader('Content-Type', 'text/html');
-//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/test.html'));
-        
-//         return $response->withAddedHeader('K1-Push-Promise', 'bigbang');
-//     });
-    
-//     $app->route('greeting', '/greet/{name}', function ($name) {
-//         return sprintf('Hello %s', $name);
-//     });
-    
-//     $app->route('bigbang', 'GET /img/bigbang.jpg', function (ResponseInterface $response) {
-//         $response = $response->withHeader('Content-Type', 'image/jpeg');
-//         $response = $response->withHeader('Cache-Control', 'public,max-age=30');
-//         $response = $response->withBody(ResourceInputStream::fromUrl(__DIR__ . '/content/big-bang-theory.jpg'));
-        
-//         return $response;
-//     });
+    $logger = new Logger($executor, 'php://stderr', $_SERVER['argv'][1] ?? LogLevel::INFO);
     
     $http = new HttpEndpoint(8000, '0.0.0.0', 'test.k1');
     $http->setCertificate(__DIR__ . '/cert.pem', true);
@@ -89,8 +53,8 @@ $executor->runNewTask(call_user_func(function () {
     
     $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
     
-    yield runTask($http->run($action), $http->getTitle());
-    yield runTask($fcgi->run($action), $fcgi->getTitle());
-}));
+    $executor->runNewTask($http->run($action), $http->getTitle());
+    $executor->runNewTask($fcgi->run($action), $fcgi->getTitle());
+});
 
 $executor->run();

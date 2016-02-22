@@ -296,7 +296,7 @@ class Stream
     public function handleFrame(Frame $frame): \Generator
     {
         if ($this->body === NULL) {
-            $this->body = new Http2InputStream($this, yield eventEmitter(), ($this->id % 2) !== 0);
+            $this->body = new Http2InputStream($this, yield eventEmitter(true), ($this->id % 2) !== 0);
         }
         
         try {
