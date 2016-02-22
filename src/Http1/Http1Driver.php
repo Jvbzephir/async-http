@@ -330,7 +330,7 @@ class Http1Driver implements HttpDriverInterface
         
         $chunked = (!$head && $response->getProtocolVersion() !== '1.0');
         
-        $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
+        $response = $response->withHeader('Date', gmdate(Http::DATE_FORMAT_RFC1123, time()));
         $response = $response->withHeader('Connection', 'close');
         
         if ('' === trim($response->getReasonPhrase())) {
