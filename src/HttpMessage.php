@@ -55,7 +55,7 @@ abstract class HttpMessage
             }
         }
     }
-
+        
     public function getProtocolVersion(): string
     {
         return $this->protocolVersion;
@@ -186,6 +186,11 @@ abstract class HttpMessage
         return $message;
     }
     
+    public function getAttribute(string $name, mixed $default = NULL)
+    {
+        return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
+    }
+    
     public function withAttribute(string $name, $value): HttpMessage
     {
         $message = clone $this;
@@ -198,6 +203,19 @@ abstract class HttpMessage
     {
         $message = clone $this;
         unset($message->attributes[$name]);
+        
+        return $message;
+    }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function withAttributes(array $attributes): HttpMessage
+    {
+        $message = clone $this;
+        $message->attributes = $attributes;
         
         return $message;
     }

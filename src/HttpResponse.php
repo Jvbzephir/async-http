@@ -31,6 +31,27 @@ class HttpResponse extends HttpMessage
         $this->status = $this->filterStatus(($status === NULL) ? 200 : $status);
         $this->reason = '';
     }
+    
+    public function __debugInfo(): array
+    {
+        $headers = [];
+        foreach ($this->getHeaders() as $k => $header) {
+            foreach ($header as $v) {
+                $headers[] = sprintf('%s: %s', $k, $v);
+            }
+        }
+        
+        sort($headers, SORT_NATURAL);
+        
+        return [
+            'protocol' => sprintf('HTTP/%s', $this->protocolVersion),
+            'status' => $this->status,
+            'reason' => $this->reason,
+            'headers' => $headers,
+            'body' => $this->body,
+            'attributes' => array_keys($this->attributes)
+        ];
+    }
 
     public function getStatusCode(): int
     {
