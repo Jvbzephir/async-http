@@ -11,7 +11,9 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-class DataReceivedEvent
+use KoolKode\Async\Event\Event;
+
+class DataReceivedEvent extends Event
 {
     public $data;
     

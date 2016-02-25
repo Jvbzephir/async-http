@@ -11,7 +11,9 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-class WindowUpdatedEvent
+use KoolKode\Async\Event\Event;
+
+class WindowUpdatedEvent extends Event
 {
     public $increment;
     
