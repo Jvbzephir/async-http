@@ -1,4 +1,5 @@
 /doc export-ignore
+/example export-ignore
 /test export-ignore
 /vendor export-ignore
 .gitattributes export-ignore
