@@ -20,7 +20,6 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Task;
-use KoolKode\Async\TaskInterruptedException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
@@ -28,7 +27,6 @@ use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentTask;
 use function KoolKode\Async\runTask;
-use KoolKode\Async\TaskCanceledException;
 
 /**
  * Handles FCGI request multiplexing via socket connection.
@@ -231,10 +229,6 @@ class ConnectionHandler
                     break;
                 }
             }
-        } catch (TaskCanceledException $e) {
-            // Task canceled (could be auto-shutdown).
-        } catch (TaskInterruptedException $e) {
-            // Bail out due to max requests reached.
         } catch (StreamClosedException $e) {
             // Connection error, gracefully shutdown.
         } finally {
