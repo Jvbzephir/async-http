@@ -26,6 +26,8 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
 
+// TODO: Implement shutdown of HTTP2 server.
+
 /**
  * HTTP/2 driver.
  * 
@@ -273,6 +275,5 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
                 ]);
             }
         }
-        
     }
 }

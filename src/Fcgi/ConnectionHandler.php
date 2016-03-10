@@ -210,6 +210,7 @@ class ConnectionHandler
         static $hf = 'Cversion/Ctype/nrequestId/ncontentLength/CpaddingLength/x';
         
         $this->task = yield currentTask();
+        $this->task->setAutoShutdown(true);
         
         try {
             while (true) {

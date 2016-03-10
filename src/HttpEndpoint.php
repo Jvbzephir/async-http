@@ -21,6 +21,7 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
+use function KoolKode\Async\currentTask;
 use function KoolKode\Async\runTask;
 
 /**
@@ -232,6 +233,8 @@ class HttpEndpoint
                 ]);
             }
             
+            (yield currentTask())->setAutoShutdown(true);
+            
             while (true) {
                 yield awaitRead($server);
                 
@@ -248,7 +251,7 @@ class HttpEndpoint
                         ]);
                     }
                     
-                    yield from $this->handleClient($stream, $action);
+                    yield runTask($this->handleClient($stream, $action));
                 }
             }
         } finally {

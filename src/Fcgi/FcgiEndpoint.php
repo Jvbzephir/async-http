@@ -15,6 +15,7 @@ use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
+use function KoolKode\Async\currentTask;
 use function KoolKode\Async\runTask;
 
 /**
@@ -23,14 +24,7 @@ use function KoolKode\Async\runTask;
  * @author Martin Schröder
  */
 class FcgiEndpoint
-{    
-    /**
-     * PHP file descriptor being used to talk FCGI over a UNIX domain socket.
-     *
-     * @var int
-     */
-    const FCGI_LISTENSOCK_FILENO = 0;
-    
+{
     /**
      * TCP port to be used, a value of 0 will use a UNIX domain socket instead.
      * 
@@ -44,6 +38,13 @@ class FcgiEndpoint
      * @var string
      */
     protected $address;
+    
+    /**
+     * TCP backlog size.
+     * 
+     * @var int
+     */
+    protected $backlogSize = 128;
     
     /**
      * PSR logger instance or NULL.
@@ -64,6 +65,16 @@ class FcgiEndpoint
         $this->port = $port;
         $this->address = (strpos($address, ':') === false) ? $address : '[' . trim($address, '][') . ']';
         $this->logger = $logger;
+    }
+    
+    /**
+     * Set the desired TCP backlog size.
+     * 
+     * @param int $size
+     */
+    public function setBacklogSize(int $size)
+    {
+        $this->backlogSize = $size;
     }
     
     /**
@@ -89,56 +100,67 @@ class FcgiEndpoint
      */
     public function run(callable $action): \Generator
     {
-        if ($this->port) {
-            $errno = NULL;
-            $errstr = NULL;
-            $address = sprintf('%s:%u', $this->address, $this->port);
-            
-            $server = @stream_socket_server($address, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
-            
-            if ($server === false) {
-                throw new \RuntimeException(sprintf('Unable to create TCP-based FCGI responder: %s', $address));
+        $errno = NULL;
+        $errstr = NULL;
+        
+        if ($this->port == 0) {
+            if (!SocketStream::isUnixSocketSupported()) {
+                throw new \RuntimeException('Unix domain sockets are not available');
             }
             
-            try {
-                stream_set_blocking($server, 0);
-                
-                if ($this->logger) {
-                    $this->logger->info('Started FCGI endpoint: {address}:{port}', [
-                        'address' => $this->address,
-                        'port' => $this->port
-                    ]);
-                }
-                
-                while (true) {
-                    yield awaitRead($server);
-                    
-                    $socket = @stream_socket_accept($server, 0);
-                    
-                    if ($socket !== false) {
-                        stream_set_blocking($socket, 0);
-                        
-                        $stream = new SocketStream($socket);
-                        
-                        if ($this->logger) {
-                            $this->logger->debug('Accepted FCGI connection from {peer}', [
-                                'peer' => stream_socket_get_name($socket, true)
-                            ]);
-                        }
-                        
-                        $handler = new ConnectionHandler($stream, $this->logger);
-                        
-                        yield runTask($handler->run($action), 'FCGI TCP Connection Handler');
-                    }
-                }
-            } finally {
-                @fclose($server);
-            }
+            $address = sprintf('unix://%s', $this->address);
         } else {
-            $stream = yield from SocketStream::open(sprintf('php://fd/%u', self::FCGI_LISTENSOCK_FILENO), 'rb');
-            $handler = new ConnectionHandler($stream);
+            $address = sprintf('tcp://%s:%u', $this->address, $this->port);
+        }
+        
+        $context = stream_context_create([
+            'socket' => [
+                'backlog' => $this->backlogSize
+            ]
+        ]);
+        
+        $server = @stream_socket_server($address, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN, $context);
+        
+        if ($server === false) {
+            throw new \RuntimeException(sprintf('Unable to create TCP-based FCGI responder: %s', $address));
+        }
+        
+        try {
+            stream_set_blocking($server, 0);
             
-            yield from $handler->run($action);
+            if ($this->logger) {
+                $this->logger->info('Started FCGI endpoint: {address}:{port}', [
+                    'address' => $this->address,
+                    'port' => $this->port
+                ]);
+            }
+            
+            // Enable auto-shutdown for FCGI server task.
+            (yield currentTask())->setAutoShutdown(true);
+            
+            while (true) {
+                yield awaitRead($server);
+                
+                $socket = @stream_socket_accept($server, 0);
+                
+                if ($socket !== false) {
+                    stream_set_blocking($socket, 0);
+                    
+                    $stream = new SocketStream($socket);
+                    
+                    if ($this->logger) {
+                        $this->logger->debug('Accepted FCGI connection from {peer}', [
+                            'peer' => stream_socket_get_name($socket, true)
+                        ]);
+                    }
+                    
+                    $handler = new ConnectionHandler($stream, $this->logger);
+                    
+                    yield runTask($handler->run($action), 'FCGI TCP Connection Handler');
+                }
+            }
+        } finally {
+            @fclose($server);
         }
     }
 }
