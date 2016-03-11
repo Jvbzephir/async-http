@@ -19,7 +19,6 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Task;
-use KoolKode\Async\TaskInterruptedException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
@@ -228,8 +227,6 @@ class ConnectionHandler
                     break;
                 }
             }
-        } catch (TaskInterruptedException $e) {
-            // Bail out due to max requests reached.
         } finally {
             if ($this->workers->count()) {
                 yield awaitAll(iterator_to_array($this->workers));
@@ -565,7 +562,7 @@ class ConnectionHandler
                     $this->task = NULL;
                     $this->workers->detach(yield currentTask());
                     
-                    $task->notify();
+                    $task->cancel();
                 }
             }
         }
