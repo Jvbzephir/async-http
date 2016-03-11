@@ -18,6 +18,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Task;
 use Psr\Log\LoggerInterface;
 
@@ -208,6 +209,7 @@ class ConnectionHandler
         static $hf = 'Cversion/Ctype/nrequestId/ncontentLength/CpaddingLength/x';
         
         $this->task = yield currentTask();
+        $this->task->setAutoShutdown(true);
         
         try {
             while (true) {
@@ -227,6 +229,8 @@ class ConnectionHandler
                     break;
                 }
             }
+        } catch (StreamClosedException $e) {
+            // Connection error, gracefully shutdown.
         } finally {
             if ($this->workers->count()) {
                 yield awaitAll(iterator_to_array($this->workers));
@@ -371,7 +375,12 @@ class ConnectionHandler
         }
         
         $response = $response->withProtocolVersion($request->getProtocolVersion());
-        $response = yield from $this->writeResponse($requestId, $request, $response);
+        
+        try {
+            $response = yield from $this->writeResponse($requestId, $request, $response);
+        } catch (StreamClosedException $e) {
+            // Gracefully handle connection terminated.
+        }
         
         yield from $this->endRequest($requestId);
         
@@ -545,22 +554,20 @@ class ConnectionHandler
     {
         $content = pack('NCx3', $appStatus, $protocolStatus);
         
-        yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $requestId, $content));
-        
-        if (isset($this->requests[$requestId])) {
-            $keep = $this->requests[$requestId]['keep-alive'];
-            
-            $this->requests[$requestId]['stdin']->close();
-            
-            unset($this->requests[$requestId]);
-            
-            if (!$keep || ($this->maxRequests > 0 && $this->processed >= $this->maxRequests)) {
-                $this->processed = PHP_INT_MAX;
+        try {
+            yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $requestId, $content));
+        } catch (StreamClosedException $e) {
+            // Ignore this case as we are attempting to end the request anyways.
+        } finally {
+            if (isset($this->requests[$requestId])) {
+                $keep = $this->requests[$requestId]['keep-alive'];
                 
-                if ($this->task !== NULL) {
-                    $task = $this->task;
-                    $this->task = NULL;
-                    $this->workers->detach(yield currentTask());
+                $this->requests[$requestId]['stdin']->close();
+                
+                unset($this->requests[$requestId]);
+                
+                if (!$keep || ($this->maxRequests > 0 && $this->processed >= $this->maxRequests)) {
+                    $this->processed = PHP_INT_MAX;
                     
                     $task->cancel();
                 }

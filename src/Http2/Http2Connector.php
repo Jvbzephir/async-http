@@ -60,7 +60,10 @@ class Http2Connector
         
         $conn = yield from Connection::connectClient($socket, $this->logger);
         
-        $this->tasks[] = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
+        $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
+        $handler->setAutoShutdown(true);
+        
+        $this->tasks[] = $handler;
         
         $stream = yield from $conn->openStream();
         
