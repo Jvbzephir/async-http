@@ -132,20 +132,6 @@ class ConnectionHandler
     protected $stream;
     
     /**
-     * Max number of HTTP requests to be processed before closing the connection.
-     * 
-     * @var int
-     */
-    protected $maxRequests = 0;
-    
-    /**
-     * Number of HTTP requests that habe been processed.
-     * 
-     * @var int
-     */
-    protected $processed = 0;
-    
-    /**
      * PSR logger isntance or NULL.
      * 
      * @var LoggerInterface
@@ -184,18 +170,6 @@ class ConnectionHandler
         $this->stream = $stream;
         $this->logger = $logger;
         $this->workers = new \SplObjectStorage();
-    }
-    
-    /**
-     * Set max number of HTTP requests to be processed by the handler.
-     * 
-     * A value of "0" will never close the handler.
-     * 
-     * @param int $maxRequests
-     */
-    public function setMaxRequests(int $maxRequests)
-    {
-        $this->maxRequests = max(0, $maxRequests);
     }
     
     /**
@@ -251,10 +225,6 @@ class ConnectionHandler
     protected function handleRecord(Record $record, callable $action): \Generator
     {
         if ($record->type === Record::FCGI_BEGIN_REQUEST) {
-            if ($this->processed > $this->maxRequests) {
-                return yield from $this->endRequest($record->requestId);
-            }
-            
             return yield from $this->handleBeginRecord($record);
         }
      
@@ -344,12 +314,6 @@ class ConnectionHandler
      */
     protected function dispatch(int $requestId, callable $action): \Generator
     {
-        yield;
-        
-        if ($this->maxRequests > 0){
-            $this->processed++;
-        }
-        
         $request = $this->createHttpRequest($requestId);
         $started = $this->requests[$requestId]['started'] ?? microtime(true);
         
@@ -560,16 +524,13 @@ class ConnectionHandler
             // Ignore this case as we are attempting to end the request anyways.
         } finally {
             if (isset($this->requests[$requestId])) {
-                $keep = $this->requests[$requestId]['keep-alive'];
-                
+                $keep = $this->requests[$requestId]['keep-alive'];     
                 $this->requests[$requestId]['stdin']->close();
                 
                 unset($this->requests[$requestId]);
                 
-                if (!$keep || ($this->maxRequests > 0 && $this->processed >= $this->maxRequests)) {
-                    $this->processed = PHP_INT_MAX;
-                    
-                    $task->cancel();
+                if (!$keep && isset($this->task)) {
+                    $this->task->cancel();
                 }
             }
         }
