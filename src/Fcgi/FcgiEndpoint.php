@@ -19,7 +19,7 @@ use function KoolKode\Async\currentTask;
 use function KoolKode\Async\runTask;
 
 /**
- * FastCGI server endpoint.
+ * FastCGI server endpoint (responder role in FCGI terms).
  * 
  * @author Martin Schröder
  */
@@ -84,11 +84,7 @@ class FcgiEndpoint
      */
     public function getTitle(): string
     {
-        if ($this->port) {
-            return sprintf('FCGI Endpoint (TCP port %u)', $this->port);
-        }
-        
-        return 'FCGI Endpoint (FCGI_LISTENSOCK_FILENO)';
+        return 'FCGI Endpoint: ' . ($this->port ? sprintf('tcp://%s:%u', $this->address, $this->port) : sprintf('unix://%s', $this->address));
     }
     
     /**
@@ -122,16 +118,15 @@ class FcgiEndpoint
         $server = @stream_socket_server($address, $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN, $context);
         
         if ($server === false) {
-            throw new \RuntimeException(sprintf('Unable to create TCP-based FCGI responder: %s', $address));
+            throw new \RuntimeException(sprintf('Unable to create FCGI responder server socket %s: [%s] %s', $address, $errno, $errstr));
         }
         
         try {
             stream_set_blocking($server, 0);
             
             if ($this->logger) {
-                $this->logger->info('Started FCGI endpoint: {address}:{port}', [
-                    'address' => $this->address,
-                    'port' => $this->port
+                $this->logger->info('Started FCGI endpoint: {address}', [
+                    'address' => $address
                 ]);
             }
             
@@ -156,7 +151,7 @@ class FcgiEndpoint
                     
                     $handler = new ConnectionHandler($stream, $this->logger);
                     
-                    yield runTask($handler->run($action), 'FCGI TCP Connection Handler');
+                    yield runTask($handler->run($action), 'FCGI Connection Handler');
                 }
             }
         } finally {
