@@ -37,7 +37,11 @@ $executor->setErrorHanndler(function (\Throwable $e) {
 
 $executor->runCallback(function () use ($executor) {
     
-    $logger = new Logger($executor, 'php://stderr', $_SERVER['argv'][1] ?? LogLevel::INFO);
+    if (class_exists(Logger::class)) {
+        $logger = new Logger($executor, 'php://stderr', $_SERVER['argv'][1] ?? LogLevel::INFO);
+    } else {
+        $logger = NULL;
+    }
     
     $http = new HttpEndpoint(8000, '0.0.0.0', 'test.k1');
     $http->setCertificate(__DIR__ . '/cert.pem', true);
