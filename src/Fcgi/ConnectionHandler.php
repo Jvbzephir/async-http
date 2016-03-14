@@ -427,6 +427,7 @@ class ConnectionHandler
             'Content-Encoding',
             'Content-Length',
             'Keep-Alive',
+            'Status',
             'Trailer',
             'Transfer-Encoding',
             'Upgrade'
@@ -436,13 +437,13 @@ class ConnectionHandler
             $response = $response->withoutHeader($name);
         }
         
-        $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
-        
         if ('' === trim($response->getReasonPhrase())) {
             $response = $response->withStatus($response->getStatusCode(), Http::getReason($response->getStatusCode()));
         }
         
-        $message = rtrim(sprintf("HTTP/%s %03u %s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), $response->getReasonPhrase()));
+        $response = $response->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
+        
+        $message = sprintf("Status: %03u%s\r\n", $response->getStatusCode(), rtrim(' ' . $response->getReasonPhrase()));
         
         foreach ($response->getHeaders() as $name => $values) {
             foreach ($values as $value) {
@@ -450,9 +451,7 @@ class ConnectionHandler
             }
         }
         
-        $message .= "\r\n";
-        
-        yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, $message));
+        yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, $message . "\r\n"));
         
         $body = $response->getBody();
         
