@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\SocketStream;
@@ -18,7 +19,7 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\runTask;
 
-class Http2Connector
+class Http2Connector implements HttpConnectorInterface
 {
     protected $logger;
     
@@ -29,6 +30,9 @@ class Http2Connector
         $this->logger = $logger;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function shutdown()
     {
         try {
@@ -40,6 +44,20 @@ class Http2Connector
         }
     }
     
+    /**
+     * {@inheritdoc}
+     */
+    public function getProtocols(): array
+    {
+        return [
+            'h2',
+            'h2c'
+        ];
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function send(HttpRequest $request, float $timeout = 5): \Generator
     {
         $uri = $request->getUri();

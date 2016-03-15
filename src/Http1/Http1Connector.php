@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\BufferedDuplexStream;
@@ -26,7 +27,7 @@ use Psr\Log\LoggerInterface;
  * 
  * @author Martin Schröder
  */
-class Http1Connector
+class Http1Connector implements HttpConnectorInterface
 {
     protected $logger;
     
@@ -35,6 +36,24 @@ class Http1Connector
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function shutdown()
+    {
+        // TODO: Implement HTTP/1 keep-alive and kill pending connections here...
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getProtocols(): array
+    {
+        return [
+            'http/1.1'
+        ];
     }
     
     /**
@@ -50,12 +69,7 @@ class Http1Connector
     }
     
     /**
-     * Coroutine that sends an HTTP/1 request and returns the received HTTP response.
-     * 
-     * @param HttpRequest $request
-     * @param float $timeout Connect timeout in seconds.
-     * @param array $options Stream context options.
-     * @return Generator
+     * {@inheritdoc}
      */
     public function send(HttpRequest $request, float $timeout = 5, array $options = []): \Generator
     {
