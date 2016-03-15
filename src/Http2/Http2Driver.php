@@ -139,7 +139,11 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             return false;
         }
         
-        return Connection::PREFACE === yield from IO::readBuffer($stream, strlen(Connection::PREFACE));
+        try {
+            return Connection::PREFACE === yield from IO::readBuffer($stream, strlen(Connection::PREFACE), true);
+        } catch (StreamException $e) {
+            return false;
+        }
     }
     
     /**

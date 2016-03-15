@@ -78,7 +78,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
             $in = yield from InflateInputStream::open(yield from Stream::temp(gzencode('Hello World')), InflateInputStream::GZIP);
             
             $this->assertFalse($in->eof());
-            $this->assertEquals('Hello W', yield from Stream::readBuffer($in, 7));
+            $this->assertEquals('Hello W', yield from Stream::readBuffer($in, 7, true));
             $this->assertFalse($in->eof());
             
             $in->close();

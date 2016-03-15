@@ -187,16 +187,16 @@ class ConnectionHandler
         
         try {
             while (true) {
-                list ($version, $type, $requestId, $len, $pad) = array_values(unpack($hf, yield from Stream::readBuffer($this->stream, 8)));
+                list ($version, $type, $requestId, $len, $pad) = array_values(unpack($hf, yield from Stream::readBuffer($this->stream, 8, true)));
                 
                 if ($len > 0) {
-                    $data = yield from Stream::readBuffer($this->stream, $len);
+                    $data = yield from Stream::readBuffer($this->stream, $len, true);
                 } else {
                     $data = '';
                 }
                 
                 if ($pad > 0) {
-                    yield from Stream::readBuffer($this->stream, $pad);
+                    yield from Stream::readBuffer($this->stream, $pad, true);
                 }
                 
                 if (false === yield from $this->handleRecord(new Record($version, $type, $requestId, $data), $action)) {

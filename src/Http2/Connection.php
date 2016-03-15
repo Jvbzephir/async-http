@@ -195,7 +195,7 @@ class Connection
      */
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
-        $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE));
+        $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE), true);
     
         if ($preface !== self::PREFACE) {
             throw new ConnectionException('Client did not send valid HTTP/2 connection preface');
@@ -255,11 +255,7 @@ class Connection
      */
     public function readNextFrame(): \Generator
     {
-        $header = yield from IO::readBuffer($this->socket, 9);
-        
-        if (strlen($header) !== 9) {
-            throw new StreamException('Connection terminated');
-        }
+        $header = yield from IO::readBuffer($this->socket, 9, true);
         
         $m = NULL;
         if (preg_match("'^HTTP/(1.[0-1])\s+'i", $header, $m)) {
@@ -296,7 +292,7 @@ class Connection
                 throw (new Http2StreamException('Frame exceeds max frame size setting', Frame::FRAME_SIZE_ERROR))->setStreamId($stream);
             }
             
-            $data = yield from IO::readBuffer($this->socket, $length);
+            $data = yield from IO::readBuffer($this->socket, $length, true);
         } else {
             $data = '';
         }
