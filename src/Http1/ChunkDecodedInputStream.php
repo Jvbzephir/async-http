@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\BufferedDuplexStream;
+use KoolKode\Async\Stream\BufferedInputStreamInterface;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\StreamClosedException;
 
@@ -100,7 +101,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     public static function open(InputStreamInterface $stream, bool $cascadeClose = true): \Generator
     {
-        if (!$stream instanceof BufferedDuplexStream) {
+        if (!$stream instanceof BufferedInputStreamInterface) {
             $stream = new BufferedDuplexStream($stream);
         }
         

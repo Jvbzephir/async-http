@@ -19,6 +19,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
+use KoolKode\Async\Stream\BufferedInputStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
@@ -110,7 +111,7 @@ class Http1Driver implements HttpDriverInterface
         }
         
         try {
-            $reader = new BufferedDuplexStream($socket);
+            $reader = ($socket instanceof BufferedInputStreamInterface) ? $socket : new BufferedDuplexStream($socket);
             
             // Bail out when no HTTP request line is received.
             try {
