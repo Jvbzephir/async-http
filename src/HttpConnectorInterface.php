@@ -30,11 +30,13 @@ interface HttpConnectorInterface
      */
     public function getProtocols(): array;
     
+    public function getRequestContext(HttpRequest $request): array;
+    
     /**
      * Send the given HTTP request.
      * 
      * @param HttpRequest $request
      * @return HttpResponse
      */
-    public function send(HttpRequest $request): \Generator;
+    public function send(HttpRequest $request, array $context = []): \Generator;
 }

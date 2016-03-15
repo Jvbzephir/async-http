@@ -56,6 +56,14 @@ class HttpClient
     
     public function send(HttpRequest $request): \Generator
     {
+        foreach ($this->connectors as $connector) {
+            $context = $connector->getRequestContext($request);
+            
+            if (!empty($context)) {
+                return yield from $connector->send($request, $context);
+            }
+        }
+        
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
         
@@ -63,9 +71,27 @@ class HttpClient
         $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
         $options = $this->createStreamContextoptions();
         
-        // TODO: Connectors need a way to re-use connections...
-        
         $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
+        
+        if ($secure) {
+            yield from $socket->encrypt();
+        }
+        
+        $context = [
+            'socket' => $socket
+        ];
+        
+        if ($secure) {
+            $protocol = $socket->getMetadata()['crypto']['alpn_protocol'] ?? '';
+            
+            foreach ($this->connectors as $connector) {
+                if (in_array($protocol, $connector->getProtocols(), true)) {
+                    return yield from $connector->send($request, $context);
+                }
+            }
+        }
+        
+        return yield from $this->getHttp1Connector()->send($request, $context);
     }
     
     protected function createStreamContextoptions(): array
@@ -80,7 +106,7 @@ class HttpClient
             }
             
             $alpn = array_unique($alpn);
-            $ssl['alpn_protocols'] = implode(' ', $alpn);
+            $ssl['alpn_protocols'] = implode(' ', array_reverse($alpn));
         }
         
         return [

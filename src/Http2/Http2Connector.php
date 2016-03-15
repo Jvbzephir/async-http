@@ -36,7 +36,7 @@ class Http2Connector implements HttpConnectorInterface
     public function shutdown()
     {
         try {
-            foreach ($this->tasks as $task) {
+            foreach ($this->tasks as list (, $task)) {
                 $task->cancel();
             }
         } finally {
@@ -50,42 +50,87 @@ class Http2Connector implements HttpConnectorInterface
     public function getProtocols(): array
     {
         return [
-            'h2',
-            'h2c'
+            'h2'
         ];
     }
     
     /**
      * {@inheritdoc}
      */
-    public function send(HttpRequest $request, float $timeout = 5): \Generator
+    public function getRequestContext(HttpRequest $request): array
     {
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
+        
         $host = $uri->getHost();
         $port = $uri->getPort() ?: ($secure ? 443 : 80);
+        $key = sprintf('%s://%s:%u', $secure ? 'https' : 'http', $host, $port);
         
-        $context = [];
-        if (SocketStream::isAlpnSupported()) {
-            $context['ssl']['alpn_protocols'] = 'h2';
+        if (isset($this->tasks[$key])) {
+            return [
+                'conn' => $this->tasks[$key][0]
+            ];
         }
         
-        $socket = yield from SocketStream::connect($host, $port, 'tcp', $timeout, $context);
+        return [];
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function send(HttpRequest $request, array $context = []): \Generator
+    {
+        $uri = $request->getUri();
+        $secure = ($uri->getScheme() === 'https');
         
-        if ($secure) {
-            yield from $socket->encrypt();
+        $host = $uri->getHost();
+        $port = $uri->getPort() ?: ($secure ? 443 : 80);
+        $key = sprintf('%s://%s:%u', $secure ? 'https' : 'http', $host, $port);
+        
+        if (isset($context['socket']) && $context['socket'] instanceof SocketStream) {
+            $conn = yield from Connection::connectClient($context['socket'], $this->logger);
+            
+            $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
+            $handler->setAutoShutdown(true);
+            
+            $this->tasks[$key] = [
+                $conn,
+                $handler
+            ];
+        } elseif (isset($context['conn']) && $context['conn'] instanceof Connection) {
+            $conn = $context['conn'];
+        } else {
+            $options = [];
+            if (SocketStream::isAlpnSupported()) {
+                $options['ssl']['alpn_protocols'] = 'h2';
+            }
+            
+            $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
+            
+            try {
+                if ($secure) {
+                    yield from $socket->encrypt();
+                }
+            } catch (\Throwable $e) {
+                $socket->close();
+                
+                throw $e;
+            }
+            
+            $conn = yield from Connection::connectClient($socket, $this->logger);
+            
+            $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
+            $handler->setAutoShutdown(true);
+            
+            $this->tasks[$key] = [
+                $conn,
+                $handler
+            ];
         }
-        
-        $conn = yield from Connection::connectClient($socket, $this->logger);
-        
-        $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
-        $handler->setAutoShutdown(true);
-        
-        $this->tasks[] = $handler;
         
         $stream = yield from $conn->openStream();
         
-        return yield from $this->createResponse(yield from $stream->sendRequest($request));
+        return $this->createResponse(yield from $stream->sendRequest($request));
     }
     
     protected function handleConnectionFrames(Connection $conn): \Generator
@@ -97,10 +142,8 @@ class Http2Connector implements HttpConnectorInterface
         }
     }
 
-    protected function createResponse(MessageReceivedEvent $event): \Generator
+    protected function createResponse(MessageReceivedEvent $event): HttpResponse
     {
-        yield;
-        
         $response = new HttpResponse($event->getHeaderValue(':status'), $event->body);
         $response = $response->withProtocolVersion('2.0');
         

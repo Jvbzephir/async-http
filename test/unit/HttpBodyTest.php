@@ -25,6 +25,28 @@ use function KoolKode\Async\runTask;
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
     use AsyncTrait;
+
+    public function testClient()
+    {
+        $executor = $this->createExecutor();
+        
+        $executor->runCallback(function () {
+            $client = new HttpClient();
+            $client->addConnector(new \KoolKode\Async\Http\Http2\Http2Connector());
+            
+            $request = new HttpRequest(Uri::parse('https://http2.golang.org/reqinfo'), yield from Stream::temp());
+            
+            try {
+                $response = yield from $client->send($request);
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
+            } finally {
+                $client->shutdown();
+            }
+        });
+        
+        $executor->run();
+    }
     
     public function testHttp1Client()
     {
@@ -34,7 +56,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $connector = new Http1Connector();
             
             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from Stream::temp());
-            $response = yield from $connector->send($request, 5, [
+            $response = yield from $connector->send($request, [
                 'ssl' => [
                     'ciphers' => 'DEFAULT'
                 ]

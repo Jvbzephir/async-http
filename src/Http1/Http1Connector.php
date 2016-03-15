@@ -51,9 +51,17 @@ class Http1Connector implements HttpConnectorInterface
      */
     public function getProtocols(): array
     {
-        return [
-            'http/1.1'
-        ];
+        return [];
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getRequestContext(HttpRequest $request): array
+    {
+        // TODO: Context can be populated when keep-alive is implemented.
+        
+        return [];
     }
     
     /**
@@ -71,21 +79,31 @@ class Http1Connector implements HttpConnectorInterface
     /**
      * {@inheritdoc}
      */
-    public function send(HttpRequest $request, float $timeout = 5, array $options = []): \Generator
+    public function send(HttpRequest $request, array $context = []): \Generator
     {
-        $uri = $request->getUri();
-        $secure = $uri->getScheme() === 'https';
-        
-        $host = $uri->getHost();
-        $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
-        
-        $stream = yield from SocketStream::connect($host, $port, 'tcp', $timeout, $options);
+        if (isset($context['socket']) && $context['socket'] instanceof SocketStream) {
+            $stream = $context['socket'];
+        } else {
+            $uri = $request->getUri();
+            $secure = $uri->getScheme() === 'https';
+            
+            $host = $uri->getHost();
+            $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
+            
+            $stream = yield from SocketStream::connect($host, $port);
+            
+            try {
+                if ($secure) {
+                    yield from $stream->encrypt();
+                }
+            } catch (\Throwable $e) {
+                $stream->close();
+                
+                throw $e;
+            }
+        }
         
         try {
-            if ($secure) {
-                yield from $stream->encrypt();
-            }
-            
             $request = $this->prepareRequest($request);
             
             yield from $this->sendRequest($stream, $request);
