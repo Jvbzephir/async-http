@@ -302,7 +302,7 @@ class Connection
         if ($this->logger) {
             $this->logger->debug('IN <{id}> {frame}', [
                 'id' => $stream,
-                'frame' => (string) new Frame(ord($header[3]), $data, ord($header[4]))
+                'frame' => (string) new Frame($type, $data, ord($header[4]))
             ]);
         }
         
@@ -419,8 +419,8 @@ class Connection
                 }
                 
                 $increment = unpack('N', "\0" . $frame->data)[1];
-                if ($increment < 1) {
-                    throw new ConnectionException('WINDOW_UPDATE increment must be positive and not 0', Frame::PROTOCOL_ERROR);
+                if ($increment == 1) {
+                    throw new ConnectionException('WINDOW_UPDATE increment must not be 0', Frame::PROTOCOL_ERROR);
                 }
                 
                 $this->incrementWindow($increment);
