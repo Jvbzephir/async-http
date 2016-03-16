@@ -233,6 +233,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     
     public function handleMessage(MessageReceivedEvent $event, HttpEndpoint $endpoint, callable $action): \Generator
     {
+        $event->consume();
+        
         $authority = $event->getHeaderValue(':authority');
         $path = ltrim($event->getHeaderValue(':path'), '/');
         

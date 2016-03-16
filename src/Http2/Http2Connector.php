@@ -133,7 +133,9 @@ class Http2Connector implements HttpConnectorInterface
             ];
         }
         
-        return $this->createResponse(yield from (yield from $conn->openStream())->sendRequest($request));
+        $stream = yield from $conn->openStream();
+        
+        return $this->createResponse(yield from $stream->sendRequest($request));
     }
     
     protected function handleConnectionFrames(Connection $conn): \Generator
@@ -147,6 +149,8 @@ class Http2Connector implements HttpConnectorInterface
     
     protected function createResponse(MessageReceivedEvent $event): HttpResponse
     {
+        $event->consume();
+        
         $response = new HttpResponse($event->getHeaderValue(':status'), $event->body);
         $response = $response->withProtocolVersion('2.0');
         

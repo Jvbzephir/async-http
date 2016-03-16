@@ -601,10 +601,12 @@ class Stream
                 
                 if ($len < 1) {
                     if ($this->window < 1) {
-                        yield from $this->events->await(WindowUpdatedEvent::class);
+                        $event = yield from $this->events->await(WindowUpdatedEvent::class);
                     } else {
-                        yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
+                        $event = yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
                     }
+                    
+                    $event->consume();
                     
                     continue;
                 }

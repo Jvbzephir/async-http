@@ -99,11 +99,11 @@ class Http2InputStream implements InputStreamInterface
     public function __debugInfo()
     {
         return [
-            'stream' => $this->stream->getId(),
             'eof' => $this->eof,
             'buffer' => sprintf('%u / %s bytes buffered', strlen($this->buffer), $this->size),
             'drained' => $this->drained,
-            'timeout' => $this->timeout
+            'timeout' => $this->timeout,
+            'stream' => $this->stream
         ];
     }
     
@@ -158,7 +158,8 @@ class Http2InputStream implements InputStreamInterface
                 $timeout = min($timeout, $this->timeout);
             }
             
-            yield from $this->events->await(DataReceivedEvent::class, $timeout);
+            $event = yield from $this->events->await(DataReceivedEvent::class, $timeout);
+            $event->consume();
         }
         
         $chunk = substr($this->buffer, 0, $length);

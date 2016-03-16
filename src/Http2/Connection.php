@@ -125,6 +125,8 @@ class Connection
      */
     protected $streams = [];
     
+    protected $streamCounter = 1;
+    
     /**
      * Create a new HTTP/2 connection.
      * 
@@ -464,15 +466,11 @@ class Connection
      */
     public function openStream(): \Generator
     {
-        for ($i = (($this->mode === self::MODE_CLIENT) ? 1 : 2); $i < 9999; $i += 2) {
-            if (isset($this->streams[$i])) {
-                continue;
-            }
-            
-            return $this->streams[$i] = new Stream($i, $this, yield eventEmitter(), $this->logger);
+        try {
+            return $this->streams[$this->streamCounter] = new Stream($this->streamCounter, $this, yield eventEmitter(), $this->logger);
+        } finally {
+            $this->streamCounter += 2;
         }
-        
-        throw new StreamException('Maximum number of concurrent streams exceeded');
     }
     
     /**

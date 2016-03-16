@@ -104,7 +104,10 @@ class HttpClient
             }
             
             $alpn = array_unique($alpn);
-            $ssl['alpn_protocols'] = implode(' ', array_reverse($alpn));
+            
+            if (!empty($alpn)) {
+                $ssl['alpn_protocols'] = implode(' ', array_reverse($alpn));
+            }
         }
         
         return [
