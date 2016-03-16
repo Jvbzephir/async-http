@@ -117,10 +117,7 @@ class Http1Connector implements HttpConnectorInterface
     
     protected function prepareRequest(HttpRequest $request): HttpRequest
     {
-        $request = $request->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
-        $request = $request->withHeader('Connection', 'close');
-        
-        $remove = [
+        static $remove = [
             'Accept-Encoding',
             'Content-Encoding',
             'Content-Length',
@@ -128,6 +125,9 @@ class Http1Connector implements HttpConnectorInterface
             'TE',
             'Transfer-Encoding'
         ];
+        
+        $request = $request->withHeader('Date', gmdate('D, d M Y H:i:s \G\M\T', time()));
+        $request = $request->withHeader('Connection', 'close');
         
         foreach ($remove as $header) {
             $request = $request->withoutHeader($header);
@@ -286,7 +286,7 @@ class Http1Connector implements HttpConnectorInterface
             }
         }
         
-        $remove = [
+        static $remove = [
             'connection',
             'content-encoding',
             'keep-alive',

@@ -244,7 +244,7 @@ class Http1Driver implements HttpDriverInterface
         }
         
         try {
-            $remove = [
+            static $remove = [
                 'Connection',
                 'Transfer-Encoding',
                 'Content-Encoding',
@@ -324,10 +324,12 @@ class Http1Driver implements HttpDriverInterface
             $started = microtime(true);
         }
         
-        $remove = [
-            'Transfer-Encoding',
+        static $remove = [
             'Content-Encoding',
-            'Keep-Alive'
+            'Content-Length',
+            'Keep-Alive',
+            'TE',
+            'Transfer-Encoding'
         ];
         
         foreach ($remove as $name) {
