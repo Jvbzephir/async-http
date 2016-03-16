@@ -277,13 +277,9 @@ class Connection
             throw new ConnectionException(sprintf('Received HTTP/%s response', $m[1]));
         }
         
-        $stream = unpack('N', substr($header, 5, 4))[1];
-        if ($stream < 0) {
-            $stream = ~$stream;
-        }
-        
-        $type = ord($header[3]);
         $length = unpack('N', "\0" . $header)[1];
+        $type = ord($header[3]);
+        $stream = unpack('N', "\x7F\xFF\xFF\xFF" & substr($header, 5, 4))[1];
         
         if ($length > 0) {
             if ($length > $this->settings[self::SETTING_MAX_FRAME_SIZE]) {
