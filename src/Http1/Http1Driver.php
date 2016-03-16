@@ -389,7 +389,7 @@ class Http1Driver implements HttpDriverInterface
                         yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                         
                         while (!$in->eof()) {
-                            $chunk = yield from $in->read(8184);
+                            $chunk = yield from $in->read();
                             
                             yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                         }

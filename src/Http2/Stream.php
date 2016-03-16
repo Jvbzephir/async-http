@@ -623,7 +623,7 @@ class Stream
             
             while (!$eof) {
                 $window = min($this->window, $this->conn->getWindow());
-                $len = min(8183, $window);
+                $len = min(8192, $window);
                 
                 if ($len < 1) {
                     if ($this->window < 1) {
