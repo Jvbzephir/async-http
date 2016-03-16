@@ -71,7 +71,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $body = yield from Stream::readContents($response->getBody());
                 $this->assertNotFalse(stripos($body, 'Protocol: HTTP/' . $response->getProtocolVersion()));
                 
-                $response = yield from $client->send($request2);
+                $response = yield from $client->send($request2, $options);
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 
@@ -92,8 +92,14 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $connector = new Http1Connector();
             
+            $options = [
+                'ssl' => [
+                    'ciphers' => 'DEFAULT'
+                ]
+            ];
+            
             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from Stream::temp());
-            $response = yield from $connector->send($request);
+            $response = yield from $connector->send($request, $options);
             
             $body = $response->getBody();
             
