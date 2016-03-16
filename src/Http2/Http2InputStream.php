@@ -188,9 +188,6 @@ class Http2InputStream implements InputStreamInterface
             return;
         }
         
-        // Pause right here to avoid sync call to stream!
-        yield;
-        
         yield from $this->stream->incrementRemoteWindow($increment);
     }
 }

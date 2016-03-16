@@ -50,10 +50,12 @@ class Connection
     
     const SETTING_MAX_HEADER_LIST_SIZE = 0x06;
     
-//     const INITIAL_WINDOW_SIZE = 65535;
-    const INITIAL_WINDOW_SIZE = 2 ** 30;
-    
-    // FIXME: Need to separate local and remote windows size into distinct properties!!!
+    /**
+     * Initial window is 64 KB.
+     * 
+     * @var int
+     */
+    const INITIAL_WINDOW_SIZE = 65536;
     
     /**
      * PING frame payload.
@@ -125,6 +127,11 @@ class Connection
      */
     protected $streams = [];
     
+    /**
+     * Counter being used to open new streams (odd numbers needed in this case).
+     * 
+     * @var int
+     */
     protected $streamCounter = 1;
     
     /**
@@ -181,7 +188,10 @@ class Connection
         $conn = new static(self::MODE_CLIENT, $socket, yield eventEmitter(), $logger);
     
         yield from $socket->write(self::PREFACE);
-        yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', Connection::SETTING_INITIAL_WINDOW_SIZE, Stream::INITIAL_WINDOW_SIZE)), 500);
+        yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)), 500);
+        
+        // Disable connection-level flow control.
+        yield from $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
         
         return $conn;
     }
@@ -204,15 +214,18 @@ class Connection
         }
     
         $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
-    
+        
         list ($id, $frame) = yield from $conn->readNextFrame();
         if ($id !== 0 || $frame->type !== Frame::SETTINGS) {
             throw new StreamException('Missing initial settings frame');
         }
-    
+        
         yield from $conn->handleFrame($frame);
-        yield from $conn->syncSettings();
-    
+        yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)));
+        
+        // Disable connection-level flow control.
+        yield from $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
+        
         return $conn;
     }
     
@@ -407,7 +420,6 @@ class Connection
                 
                 foreach (str_split($frame->data, 6) as $setting) {
                     list ($key, $value) = array_values(unpack('nk/Nv', $setting));
-                    
                     $this->applySetting($key, $value);
                 }
                 
@@ -418,9 +430,9 @@ class Connection
                     throw new ConnectionException('WINDOW_UPDATE payload must consist of 4 bytes', Frame::FRAME_SIZE_ERROR);
                 }
                 
-                $increment = unpack('N', "\0" . $frame->data)[1];
-                if ($increment == 1) {
-                    throw new ConnectionException('WINDOW_UPDATE increment must not be 0', Frame::PROTOCOL_ERROR);
+                $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
+                if ($increment < 1) {
+                    throw new ConnectionException('WINDOW_UPDATE increment must be positive and bigger than 0', Frame::PROTOCOL_ERROR);
                 }
                 
                 $this->incrementWindow($increment);
@@ -441,15 +453,16 @@ class Connection
         if (empty($this->streams[$id])) {
             switch ($frame->type) {
                 case Frame::PRIORITY:
-                case Frame::WINDOW_UPDATE:
                 case Frame::RST_STREAM:
                     return;
+                case Frame::WINDOW_UPDATE:
                 case Frame::HEADERS:
                     if (($id % 2) === 0) {
                         throw new ConnectionException('Streams opened by a client must be assigned an uneven ID', Frame::PROTOCOL_ERROR);
                     }
                     
                     $this->streams[$id] = new Stream($id, $this, yield eventEmitter(), $this->logger);
+                    $this->streams[$id]->setLocalWindowSize($this->settings[self::SETTING_INITIAL_WINDOW_SIZE]);
                     break;
                 default:
                     throw new ConnectionException('HEADERS frame is required', Frame::PROTOCOL_ERROR);
@@ -542,11 +555,14 @@ class Connection
                     throw new ConnectionException('Header table size must be at least 4096 bytes', Frame::COMPRESSION_ERROR);
                 }
                 break;
+            case self::SETTING_INITIAL_WINDOW_SIZE:
+                $this->settings[self::SETTING_INITIAL_WINDOW_SIZE] = $value;
+                break;
             case self::SETTING_ENABLE_PUSH:
             case self::SETTING_MAX_CONCURRENT_STREAMS:
-            case self::SETTING_INITIAL_WINDOW_SIZE:
             case self::SETTING_MAX_FRAME_SIZE:
             case self::SETTING_MAX_HEADER_LIST_SIZE:
+                $this->settings[$key] = $value;
                 break;
         }
     }

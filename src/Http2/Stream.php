@@ -83,10 +83,12 @@ class Stream
     
     const MAX_HEADER_SIZE = 16384;
     
-//     const INITIAL_WINDOW_SIZE = 65535;
-    const INITIAL_WINDOW_SIZE = 2 ** 30;
-    
-    // FIXME: Need to separate local and remote windows size into distinct properties!!!
+    /**
+     * Initial windows size is 64 KB.
+     * 
+     * @var int
+     */
+    const INITIAL_WINDOW_SIZE = 65535;
     
     /**
      * Identifier of the stream instance.
@@ -110,7 +112,7 @@ class Stream
     protected $priority = 0;
     
     /**
-     * Current flow control window size.
+     * Flow control window size, the window determines the number of bytes the remote peer is willing to receive.
      * 
      * @var int
      */
@@ -154,6 +156,34 @@ class Stream
     protected $tasks;
     
     protected $started;
+    
+    /**
+     * Has END_STREAM flag been received?
+     *
+     * @var bool
+     */
+    protected $ended = false;
+    
+    /**
+     * Keeps a reference to the preceeding frame.
+     *
+     * @var Frame
+     */
+    protected $lastFrame;
+    
+    /**
+     * Buffered compressed header data.
+     *
+     * @var string
+     */
+    protected $headers;
+    
+    /**
+     * HTTP/2 message body stream.
+     *
+     * @var Http2InputStream
+     */
+    protected $body;
     
     public function __construct(int $id, Connection $conn, EventEmitter $events, LoggerInterface $logger = NULL)
     {
@@ -262,39 +292,6 @@ class Stream
     {
         $this->priority = max(1, min(256, $priority));
     }
-    
-    public function getWindow(int $window): int
-    {
-        return $this->window;
-    }
-    
-    /**
-     * Has END_STREAM flag been received?
-     * 
-     * @var bool
-     */
-    protected $ended = false;
-    
-    /**
-     * Keeps a reference to the preceeding frame.
-     * 
-     * @var Frame
-     */
-    protected $lastFrame;
-    
-    /**
-     * Buffered compressed header data.
-     * 
-     * @var string
-     */
-    protected $headers;
-    
-    /**
-     * HTTP/2 message body stream.
-     * 
-     * @var Http2InputStream
-     */
-    protected $body;
     
     public function handleFrame(Frame $frame): \Generator
     {
@@ -418,19 +415,20 @@ class Stream
                     $this->conn->closeStream($this->id);
                     break;
                 case Frame::SETTINGS:
-                    throw new ConnectionException('SETTINGS frames must not be sent to a stream', Frame::PROTOCOL_ERROR);
+                    throw new ConnectionException('SETTINGS frames must not be sent to an open stream', Frame::PROTOCOL_ERROR);
                 case Frame::WINDOW_UPDATE:
                     if (strlen($frame->data) !== 4) {
                         throw new ConnectionException('WINDOW_UPDATE payload must consist of 4 bytes', Frame::FRAME_SIZE_ERROR);
                     }
                     
-                    $increment = unpack('N', "\0" . $frame->data)[1];
+                    $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
                     if ($increment < 1) {
                         throw new Http2StreamException('WINDOW_UPDATE increment must be positive and not 0', Frame::PROTOCOL_ERROR);
                     }
                     
                     $this->window += $increment;
                     $this->events->emit(new WindowUpdatedEvent($increment));
+                    
                     break;
             }
         } finally {
@@ -480,6 +478,19 @@ class Stream
         
         $this->events->emit($event);
         $this->conn->getEvents()->emit($event);
+    }
+    
+    protected function incrementLocalWindow(int $delta)
+    {
+        $this->window += $delta;
+    
+        $this->conn->incrementWindow($delta);
+        $this->events->emit(new WindowUpdatedEvent($delta));
+    }
+    
+    public function setLocalWindowSize(int $size)
+    {
+        $this->window = $size;
     }
     
     /**
@@ -568,6 +579,20 @@ class Stream
     
     protected function sendHeaders(HttpMessage $message, array $headers): \Generator
     {
+        static $remove = [
+            'Connection',
+            'Content-Length',
+            'Content-Encoding',
+            'Keep-Alive',
+            'Transfer-Encoding',
+            'Upgrade',
+            'TE'
+        ];
+        
+        foreach ($remove as $name) {
+            $message = $message->withoutHeader($name);
+        }
+        
         $headers = HPack::encode(array_merge($headers, array_change_key_case($message->getHeaders(), CASE_LOWER)));
         
         if (strlen($headers) > self::MAX_HEADER_SIZE) {
@@ -613,7 +638,7 @@ class Stream
                 }
                 
                 // Reduce local flow control window prior to actually reading data...
-                $this->updateLocalWindow(-1 * $len);
+                $this->incrementLocalWindow(-1 * $len);
                 
                 $chunk = yield from $in->read($len);
                 $eof = $in->eof();
@@ -621,7 +646,7 @@ class Stream
                 // Increase local flow control window in case response body does not return the desired number of bytes.
                 $delta = $len - strlen($chunk);
                 if ($delta > 0) {
-                    $this->updateLocalWindow($delta);
+                    $this->incrementLocalWindow($delta);
                 }
                 
                 yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
@@ -629,13 +654,5 @@ class Stream
         } finally {
             $in->close();
         }
-    }
-    
-    protected function updateLocalWindow(int $delta)
-    {
-        $this->window += $delta;
-        
-        $this->conn->incrementWindow($delta);
-        $this->events->emit(new WindowUpdatedEvent($delta));
     }
 }
