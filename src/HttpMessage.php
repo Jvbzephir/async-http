@@ -74,7 +74,7 @@ abstract class HttpMessage
         $headers = [];
         
         foreach ($this->headers as $data) {
-            $headers[$data[0][0]] = array_map(function (array $header) {
+            $headers[Http::normalizeHeaderName($data[0][0])] = array_map(function (array $header) {
                 return $header[1];
             }, $data);
         }

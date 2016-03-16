@@ -342,7 +342,7 @@ class Connection
         } catch (ConnectionException $e) {
             yield captureError($e);
             yield from $this->writeFrame(new Frame(Frame::GOAWAY, $e->getCode()), 1000);
-            
+          
             return false;
         } catch (StreamException $e) {
             if ($this->logger) {
@@ -352,7 +352,7 @@ class Connection
                     'line' => $e->getLine()
                 ]);
             }
-            
+
             return false;
         }
     }
@@ -481,10 +481,6 @@ class Connection
     public function closeStream(int $id)
     {
         unset($this->streams[$id]);
-        
-        if ($this->mode === self::MODE_CLIENT && empty($this->streams)) {
-            $this->socket->close();
-        }
     }
     
     /**

@@ -415,7 +415,8 @@ class Stream
                         throw new ConnectionException('Cannot reset stream in idle state', Frame::PROTOCOL_ERROR);
                     }
                     
-                    return false;
+                    $this->conn->closeStream($this->id);
+                    break;
                 case Frame::SETTINGS:
                     throw new ConnectionException('SETTINGS frames must not be sent to a stream', Frame::PROTOCOL_ERROR);
                 case Frame::WINDOW_UPDATE:
