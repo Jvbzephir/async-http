@@ -30,13 +30,20 @@ interface HttpConnectorInterface
      */
     public function getProtocols(): array;
     
-    public function getRequestContext(HttpRequest $request): array;
+    /**
+     * Get a connector context that can be used to re-use resources.
+     * 
+     * @param HttpRequest $request
+     * @return HttpConnectorContext or NULL.
+     */
+    public function getConnectorContext(HttpRequest $request);
     
     /**
      * Send the given HTTP request.
      * 
      * @param HttpRequest $request
+     * @param HttpConnectorContext $context
      * @return HttpResponse
      */
-    public function send(HttpRequest $request, array $context = []): \Generator;
+    public function send(HttpRequest $request, HttpConnectorContext $context = NULL): \Generator;
 }

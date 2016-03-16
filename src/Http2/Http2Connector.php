@@ -18,6 +18,7 @@ use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\runTask;
+use KoolKode\Async\Http\HttpConnectorContext;
 
 class Http2Connector implements HttpConnectorInterface
 {
@@ -57,7 +58,7 @@ class Http2Connector implements HttpConnectorInterface
     /**
      * {@inheritdoc}
      */
-    public function getRequestContext(HttpRequest $request): array
+    public function getConnectorContext(HttpRequest $request)
     {
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
@@ -67,18 +68,14 @@ class Http2Connector implements HttpConnectorInterface
         $key = sprintf('%s://%s:%u', $secure ? 'https' : 'http', $host, $port);
         
         if (isset($this->tasks[$key])) {
-            return [
-                'conn' => $this->tasks[$key][0]
-            ];
+            return new Http2ConnectorContext($this->tasks[$key][0]);
         }
-        
-        return [];
     }
     
     /**
      * {@inheritdoc}
      */
-    public function send(HttpRequest $request, array $context = []): \Generator
+    public function send(HttpRequest $request, HttpConnectorContext $context = NULL): \Generator
     {
         $uri = $request->getUri();
         $secure = ($uri->getScheme() === 'https');
@@ -87,34 +84,28 @@ class Http2Connector implements HttpConnectorInterface
         $port = $uri->getPort() ?: ($secure ? 443 : 80);
         $key = sprintf('%s://%s:%u', $secure ? 'https' : 'http', $host, $port);
         
-        if (isset($context['socket']) && $context['socket'] instanceof SocketStream) {
-            $conn = yield from Connection::connectClient($context['socket'], $this->logger);
-            
-            $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
-            $handler->setAutoShutdown(true);
-            
-            $this->tasks[$key] = [
-                $conn,
-                $handler
-            ];
-        } elseif (isset($context['conn']) && $context['conn'] instanceof Connection) {
-            $conn = $context['conn'];
+        if ($context instanceof Http2ConnectorContext) {
+            $conn = $context->conn;
         } else {
-            $options = [];
-            if (SocketStream::isAlpnSupported()) {
-                $options['ssl']['alpn_protocols'] = 'h2';
-            }
-            
-            $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
-            
-            try {
-                if ($secure) {
-                    yield from $socket->encrypt();
+            if ($context instanceof HttpConnectorContext) {
+                $socket = $context->socket;
+            } else {
+                $options = [];
+                if (SocketStream::isAlpnSupported()) {
+                    $options['ssl']['alpn_protocols'] = 'h2';
                 }
-            } catch (\Throwable $e) {
-                $socket->close();
                 
-                throw $e;
+                $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
+                
+                try {
+                    if ($secure) {
+                        yield from $socket->encrypt();
+                    }
+                } catch (\Throwable $e) {
+                    $socket->close();
+                    
+                    throw $e;
+                }
             }
             
             $conn = yield from Connection::connectClient($socket, $this->logger);
@@ -128,9 +119,7 @@ class Http2Connector implements HttpConnectorInterface
             ];
         }
         
-        $stream = yield from $conn->openStream();
-        
-        return $this->createResponse(yield from $stream->sendRequest($request));
+        return $this->createResponse(yield from (yield from $conn->openStream())->sendRequest($request));
     }
     
     protected function handleConnectionFrames(Connection $conn): \Generator

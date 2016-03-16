@@ -56,11 +56,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $connector = new Http1Connector();
             
             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from Stream::temp());
-            $response = yield from $connector->send($request, [
-                'ssl' => [
-                    'ciphers' => 'DEFAULT'
-                ]
-            ]);
+            $response = yield from $connector->send($request);
             
             $body = $response->getBody();
             

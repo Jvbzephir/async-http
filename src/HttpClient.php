@@ -57,9 +57,9 @@ class HttpClient
     public function send(HttpRequest $request): \Generator
     {
         foreach ($this->connectors as $connector) {
-            $context = $connector->getRequestContext($request);
+            $context = $connector->getConnectorContext($request);
             
-            if (!empty($context)) {
+            if ($context !== NULL) {
                 return yield from $connector->send($request, $context);
             }
         }
@@ -77,9 +77,7 @@ class HttpClient
             yield from $socket->encrypt();
         }
         
-        $context = [
-            'socket' => $socket
-        ];
+        $context = new HttpConnectorContext($socket);
         
         if ($secure) {
             $protocol = $socket->getMetadata()['crypto']['alpn_protocol'] ?? '';

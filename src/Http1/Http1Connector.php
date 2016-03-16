@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -57,11 +58,9 @@ class Http1Connector implements HttpConnectorInterface
     /**
      * {@inheritdoc}
      */
-    public function getRequestContext(HttpRequest $request): array
+    public function getConnectorContext(HttpRequest $request)
     {
         // TODO: Context can be populated when keep-alive is implemented.
-        
-        return [];
     }
     
     /**
@@ -79,10 +78,10 @@ class Http1Connector implements HttpConnectorInterface
     /**
      * {@inheritdoc}
      */
-    public function send(HttpRequest $request, array $context = []): \Generator
+    public function send(HttpRequest $request, HttpConnectorContext $context = NULL): \Generator
     {
-        if (isset($context['socket']) && $context['socket'] instanceof SocketStream) {
-            $stream = $context['socket'];
+        if ($context  !== NULL && $context->socket instanceof SocketStream) {
+            $stream = $context->socket;
         } else {
             $uri = $request->getUri();
             $secure = $uri->getScheme() === 'https';
