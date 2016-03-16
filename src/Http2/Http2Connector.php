@@ -20,6 +20,11 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\runTask;
 
+/**
+ * Provides an HTTP/2 client.
+ * 
+ * @author Martin Schröder
+ */
 class Http2Connector implements HttpConnectorInterface
 {
     protected $logger;
@@ -31,7 +36,12 @@ class Http2Connector implements HttpConnectorInterface
         $this->logger = $logger;
     }
     
-    public static function isAvailable()
+    /**
+     * Check if the HTTP/2 client is available in your environment.
+     * 
+     * The HTTP/2 client requires SSL with ALPN support.
+     */
+    public static function isAvailable(): bool
     {
         return SocketStream::isAlpnSupported();
     }

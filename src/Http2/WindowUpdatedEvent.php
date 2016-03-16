@@ -11,12 +11,27 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Async\Event\StoredEvent;
+use KoolKode\Async\Event\Event;
 
-class WindowUpdatedEvent extends StoredEvent
+/**
+ * Is triggered whenever a WINDOW_UPDATE frame has been received and applied.
+ * 
+ * @author Martin Schröder
+ */
+class WindowUpdatedEvent extends Event
 {
+    /**
+     * The increment as specified by the frame.
+     * 
+     * @var int
+     */
     public $increment;
     
+    /**
+     * Create a window update event.
+     * 
+     * @param int $increment Increment as specified by frame.
+     */
     public function __construct(int $increment)
     {
         $this->increment = $increment;

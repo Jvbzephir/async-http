@@ -22,10 +22,25 @@ use Psr\Log\LoggerInterface;
  */
 class HttpClient
 {
+    /**
+     * PSR logger instance.
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
     
+    /**
+     * Registered HTTP connectors.
+     * 
+     * @var array
+     */
     protected $connectors = [];
     
+    /**
+     * Create a new HTTP client.
+     * 
+     * @param LoggerInterface $logger
+     */
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
@@ -33,6 +48,9 @@ class HttpClient
         $this->addConnector(new Http1Connector($logger));
     }
     
+    /**
+     * Shutdown will delegate the shutdown call to all registered connectors.
+     */
     public function shutdown()
     {
         foreach ($this->connectors as $connector) {
@@ -40,11 +58,21 @@ class HttpClient
         }
     }
     
+    /**
+     * Attach an HTTP connector to the client.
+     * 
+     * @param HttpConnectorInterface $connector
+     */
     public function addConnector(HttpConnectorInterface $connector)
     {
         $this->connectors[] = $connector;
     }
     
+    /**
+     * Get the default HTTP/1 connector.
+     * 
+     * @return Http1Connector
+     */
     public function getHttp1Connector(): Http1Connector
     {
         foreach ($this->connectors as $connector) {
@@ -54,6 +82,13 @@ class HttpClient
         }
     }
     
+    /**
+     * Coroutine that sends an HTTP request using a connector and returns the response.
+     * 
+     * @param HttpRequest $request
+     * @param array $contextOptions
+     * @return HttpResponse
+     */
     public function send(HttpRequest $request, array $contextOptions = []): \Generator
     {
         foreach ($this->connectors as $connector) {
@@ -92,6 +127,12 @@ class HttpClient
         return yield from $this->getHttp1Connector()->send($request, $context);
     }
     
+    /**
+     * Assemble stream context options from given options and connector-specific options.
+     * 
+     * @param array $contextOptions
+     * @return array
+     */
     protected function createStreamContextoptions(array $contextOptions): array
     {
         $ssl = [];

@@ -13,12 +13,33 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\StoredEvent;
 
+/**
+ * Is triggered whenever a DATA frame has been received by an HTTP/2 stream.
+ * 
+ * @author Martin Schröder
+ */
 class DataReceivedEvent extends StoredEvent
 {
+    /**
+     * Received data (without header and padding).
+     * 
+     * @var string
+     */
     public $data;
     
+    /**
+     * set to true when the DATA frame provides the END_STREAM flag.
+     * 
+     * @var bool
+     */
     public $eof;
     
+    /**
+     * DATA frame has been received.
+     * 
+     * @param string $data
+     * @param bool $eof
+     */
     public function __construct(string $data, bool $eof = false)
     {
         $this->data = $data;

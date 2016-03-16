@@ -13,6 +13,11 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\SocketStream;
 
+/**
+ * Context being used to pass additional values into an HTTP connector.
+ * 
+ * @author Martin Schröder
+ */
 class HttpConnectorContext
 {
     /**
@@ -29,6 +34,11 @@ class HttpConnectorContext
      */
     public $options = [];
     
+    /**
+     * Passing a socket stream will have the connector use the socket instead of creating a new socket connection.
+     * 
+     * @param SocketStream $socket
+     */
     public function __construct(SocketStream $socket = NULL)
     {
         $this->socket = $socket;
