@@ -77,177 +77,177 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->run();
     }
     
-//     public function testHttp1Client()
-//     {
-//         $executor = $this->createExecutor();
+    public function testHttp1Client()
+    {
+        $executor = $this->createExecutor();
         
-//         $executor->runCallback(function () {
-//             $connector = new Http1Connector();
+        $executor->runCallback(function () {
+            $connector = new Http1Connector();
             
-//             $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from Stream::temp());
-//             $response = yield from $connector->send($request);
+            $request = new HttpRequest(Uri::parse('https://github.com/koolkode'), yield from Stream::temp());
+            $response = yield from $connector->send($request);
             
-//             $body = $response->getBody();
+            $body = $response->getBody();
             
-//             try {
-//                 while (!$body->eof()) {
-//                     yield from $body->read();
-//                 }
-//             } finally {
-//                 $body->close();
-//             }
-//         });
+            try {
+                while (!$body->eof()) {
+                    yield from $body->read();
+                }
+            } finally {
+                $body->close();
+            }
+        });
         
-//         $executor->run();
-//     }
+        $executor->run();
+    }
     
-//     public function testCTH()
-//     {
-//         $executor = $this->createExecutor();
+    public function testCTH()
+    {
+        $executor = $this->createExecutor();
         
-//         $executor->runCallback(function () {
-//             $message = new HttpResponse(200, yield from Stream::temp());
-//             $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
+        $executor->runCallback(function () {
+            $message = new HttpResponse(200, yield from Stream::temp());
+            $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
             
-//             $type = ContentTypeHeader::fromMessage($message);
-//             $this->assertEquals('text/plain', (string) $type->getMediaType());
-//             $this->assertEquals([
-//                 'charset' => 'utf-8',
-//                 'wrap' => true,
-//                 'max-age' => 20
-//             ], $type->getAttributes());
+            $type = ContentTypeHeader::fromMessage($message);
+            $this->assertEquals('text/plain', (string) $type->getMediaType());
+            $this->assertEquals([
+                'charset' => 'utf-8',
+                'wrap' => true,
+                'max-age' => 20
+            ], $type->getAttributes());
             
-//             $this->assertTrue($type->getAttribute('wrap'));
+            $this->assertTrue($type->getAttribute('wrap'));
             
-//             $this->assertFalse($type->hasAttribute('foo'));
-//             $this->assertEquals('FOO', $type->getAttribute('foo', 'FOO'));
-//         });
+            $this->assertFalse($type->hasAttribute('foo'));
+            $this->assertEquals('FOO', $type->getAttribute('foo', 'FOO'));
+        });
         
-//         $executor->run();
-//     }
+        $executor->run();
+    }
     
-//     public function testHeaderParsing()
-//     {
-//         $executor = $this->createExecutor();
+    public function testHeaderParsing()
+    {
+        $executor = $this->createExecutor();
         
-//         $executor->runCallback(function () {
-//             $message = new HttpResponse(200, yield from Stream::temp());
-//             $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
+        $executor->runCallback(function () {
+            $message = new HttpResponse(200, yield from Stream::temp());
+            $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
             
-//             $accept = AcceptHeader::fromMessage($message);
-//             $this->assertCount(6, $accept);
+            $accept = AcceptHeader::fromMessage($message);
+            $this->assertCount(6, $accept);
             
-//             $it = $accept->getIterator();
+            $it = $accept->getIterator();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('text/html', (string) $type->getMediaType());
-//             $this->assertEquals(1, $type->getAttribute('level'));
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $this->assertEquals(1, $type->getAttribute('level'));
+            $it->next();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('application/xml', (string) $type->getMediaType());
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('application/xml', (string) $type->getMediaType());
+            $it->next();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('text/html', (string) $type->getMediaType());
-//             $this->assertEquals(2, $type->getAttribute('level'));
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $this->assertEquals(2, $type->getAttribute('level'));
+            $it->next();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('text/html', (string) $type->getMediaType());
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/html', (string) $type->getMediaType());
+            $it->next();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('text/*', (string) $type->getMediaType());
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('text/*', (string) $type->getMediaType());
+            $it->next();
             
-//             $type = $it->current();
-//             $this->assertTrue($type instanceof ContentType);
-//             $this->assertEquals('*/*', (string) $type->getMediaType());
-//             $it->next();
+            $type = $it->current();
+            $this->assertTrue($type instanceof ContentType);
+            $this->assertEquals('*/*', (string) $type->getMediaType());
+            $it->next();
             
-//             $this->assertFalse($it->valid());
-//         });
+            $this->assertFalse($it->valid());
+        });
         
-//         $executor->run();
-//     }
+        $executor->run();
+    }
     
-//     public function provideChunkedSetting()
-//     {
-//         yield [false];
-//         yield [true];
-//     }
+    public function provideChunkedSetting()
+    {
+        yield [false];
+        yield [true];
+    }
     
-//     /**
-//      * @dataProvider provideChunkedSetting
-//      */
-//     public function testHttp1Server(bool $chunked)
-//     {
-//         $executor = $this->createExecutor();
+    /**
+     * @dataProvider provideChunkedSetting
+     */
+    public function testHttp1Server(bool $chunked)
+    {
+        $executor = $this->createExecutor();
         
-//         $executor->runCallback(function () use ($chunked, $executor) {
-//             $server = new HttpEndpoint(12345);
-//             $server->setCiphers('ALL');
+        $executor->runCallback(function () use ($chunked, $executor) {
+            $server = new HttpEndpoint(12345);
+            $server->setCiphers('ALL');
             
-//             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
-//                 return $response->withBody(yield from Stream::temp('RECEIVED: ' . (yield from Stream::readContents($request->getBody()))));
-//             }), 'Test Server', true);
+            $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
+                return $response->withBody(yield from Stream::temp('RECEIVED: ' . (yield from Stream::readContents($request->getBody()))));
+            }), 'Test Server', true);
             
-//             try {
-//                 $connector = new Http1Connector();
-//                 $connector->setChunkedRequests($chunked);
+            try {
+                $connector = new Http1Connector();
+                $connector->setChunkedRequests($chunked);
                 
-//                 $message = 'Hi there!';
-//                 $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield from Stream::temp($message), 'POST');
+                $message = 'Hi there!';
+                $request = new HttpRequest(Uri::parse('http://localhost:12345/test'), yield from Stream::temp($message), 'POST');
                 
-//                 if (!$chunked) {
-//                     $request = $request->withProtocolVersion('1.0');
-//                 }
+                if (!$chunked) {
+                    $request = $request->withProtocolVersion('1.0');
+                }
                 
-//                 $response = yield from $connector->send($request);
+                $response = yield from $connector->send($request);
                 
-//                 $this->assertTrue($response instanceof HttpResponse);
-//                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
-//                 $this->assertEquals('RECEIVED: ' . $message, yield from Stream::readContents($response->getBody()));
-//             } finally {
-//                 $worker->cancel();
-//             }
-//         });
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
+                $this->assertEquals('RECEIVED: ' . $message, yield from Stream::readContents($response->getBody()));
+            } finally {
+                $worker->cancel();
+            }
+        });
         
-//         $executor->run();
-//     }
+        $executor->run();
+    }
     
-//     public function testHttp2Client()
-//     {
-//         if (!Http2Connector::isAvailable()) {
-//             return $this->markTestSkipped('Test requires ALPN support');
-//         }
+    public function testHttp2Client()
+    {
+        if (!Http2Connector::isAvailable()) {
+            return $this->markTestSkipped('Test requires ALPN support');
+        }
         
-//         $executor = $this->createExecutor();
+        $executor = $this->createExecutor();
         
-//         $executor->runCallback(function () use ($executor) {
-//             $connector = new Http2Connector();
+        $executor->runCallback(function () use ($executor) {
+            $connector = new Http2Connector();
             
-//             $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield from Stream::temp());
-//             $response = yield from $connector->send($request);
+            $request = new HttpRequest(Uri::parse('https://http2.golang.org/gophertiles'), yield from Stream::temp());
+            $response = yield from $connector->send($request);
             
-//             try {
-//                 $body = $response->getBody();
+            try {
+                $body = $response->getBody();
                 
-//                 while (!$body->eof()) {
-//                     yield from $body->read();
-//                 }
-//             } finally {
-//                 $body->close();
-//                 $connector->shutdown();
-//             }
-//         });
+                while (!$body->eof()) {
+                    yield from $body->read();
+                }
+            } finally {
+                $body->close();
+                $connector->shutdown();
+            }
+        });
         
-//         $executor->run();
-//     }
+        $executor->run();
+    }
 }

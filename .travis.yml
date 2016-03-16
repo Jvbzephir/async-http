@@ -19,6 +19,8 @@ matrix:
     - env: LOOP=ev
 
 before_install:
+  - apt-get update
+  - apt-get install openssl
   - composer selfupdate --no-interaction
 
 install:
