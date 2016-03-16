@@ -31,11 +31,13 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             []
         ];
         
-        yield [
-            [
-                new Http2Connector()
-            ]
-        ];
+        if (Http2Connector::isAvailable()) {
+            yield [
+                [
+                    new Http2Connector()
+                ]
+            ];
+        }
     }
 
     /**
@@ -52,11 +54,17 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $client->addConnector($connector);
             }
             
+            $options = [
+                'ssl' => [
+                    'ciphers' => 'DEFAULT'
+                ]
+            ];
+            
             $request = new HttpRequest(Uri::parse('https://http2.golang.org/reqinfo'), yield from Stream::temp());
             $request2 = new HttpRequest(Uri::parse('https://http2.golang.org/reqinfo'), yield from Stream::temp());
             
             try {
-                $response = yield from $client->send($request);
+                $response = yield from $client->send($request, $options);
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 

@@ -54,7 +54,7 @@ class HttpClient
         }
     }
     
-    public function send(HttpRequest $request): \Generator
+    public function send(HttpRequest $request, array $contextOptions = []): \Generator
     {
         foreach ($this->connectors as $connector) {
             $context = $connector->getConnectorContext($request);
@@ -69,7 +69,7 @@ class HttpClient
         
         $host = $uri->getHost();
         $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
-        $options = $this->createStreamContextoptions();
+        $options = $this->createStreamContextoptions($contextOptions);
         
         $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
         
@@ -92,7 +92,7 @@ class HttpClient
         return yield from $this->getHttp1Connector()->send($request, $context);
     }
     
-    protected function createStreamContextoptions(): array
+    protected function createStreamContextoptions(array $contextOptions): array
     {
         $ssl = [];
         
@@ -110,8 +110,8 @@ class HttpClient
             }
         }
         
-        return [
+        return array_replace_recursive($contextOptions, [
             'ssl' => $ssl
-        ];
+        ]);
     }
 }
