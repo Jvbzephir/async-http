@@ -244,7 +244,9 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         $request = $request->withProtocolVersion('2.0');
     
         foreach ($event->headers as $header) {
-            $request = $request->withAddedHeader($header[0], $header[1]);
+            if ($header[0][0] !== ':') {
+                $request = $request->withAddedHeader($header[0], $header[1]);
+            }
         }
     
         if ($this->logger) {

@@ -165,7 +165,9 @@ class Http2Connector implements HttpConnectorInterface
         $response = $response->withProtocolVersion('2.0');
         
         foreach ($event->headers as $header) {
-            $response = $response->withAddedHeader($header[0], $header[1]);
+            if ($header[0][0] !== ':') {
+                $response = $response->withAddedHeader($header[0], $header[1]);
+            }
         }
         
         return $response;
