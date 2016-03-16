@@ -89,7 +89,7 @@ class Http1Connector implements HttpConnectorInterface
             $host = $uri->getHost();
             $port = $uri->getPort() ?? ($secure ? Http::PORT_SECURE : Http::PORT);
             
-            $stream = yield from SocketStream::connect($host, $port);
+            $stream = yield from SocketStream::connect($host, $port, 'tcp', 5, $context->options ?? []);
             
             try {
                 if ($secure) {

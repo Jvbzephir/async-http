@@ -103,11 +103,11 @@ class Http2Connector implements HttpConnectorInterface
                     throw new \RuntimeException('Cannot use HTTP/2 without ALPN support');
                 }
                 
-                $options = [
+                $options = array_replace_recursive($context->options ?? [], [
                     'ssl' => [
                         'alpn_protocols' => 'h2'
                     ]
-                ];
+                ]);
                 
                 $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
                 
