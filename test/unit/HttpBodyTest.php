@@ -17,7 +17,6 @@ use KoolKode\Async\Http\Header\ContentTypeHeader;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
 use KoolKode\Async\Stream\Stream;
-use KoolKode\Async\Stream\SocketStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
@@ -195,7 +194,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     public function testHttp2Client()
     {
-        if (!SocketStream::isAlpnSupported()) {
+        if (!Http2Connector::isAvailable()) {
             return $this->markTestSkipped('Test requires ALPN support');
         }
         

@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -18,7 +19,6 @@ use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\runTask;
-use KoolKode\Async\Http\HttpConnectorContext;
 
 class Http2Connector implements HttpConnectorInterface
 {
@@ -29,6 +29,11 @@ class Http2Connector implements HttpConnectorInterface
     public function __construct(LoggerInterface $logger = NULL)
     {
         $this->logger = $logger;
+    }
+    
+    public static function isAvailable()
+    {
+        return SocketStream::isAlpnSupported();
     }
     
     /**
@@ -50,6 +55,10 @@ class Http2Connector implements HttpConnectorInterface
      */
     public function getProtocols(): array
     {
+        if (!SocketStream::isAlpnSupported()) {
+            return [];
+        }
+        
         return [
             'h2'
         ];
@@ -90,10 +99,15 @@ class Http2Connector implements HttpConnectorInterface
             if ($context instanceof HttpConnectorContext) {
                 $socket = $context->socket;
             } else {
-                $options = [];
-                if (SocketStream::isAlpnSupported()) {
-                    $options['ssl']['alpn_protocols'] = 'h2';
+                if (!SocketStream::isAlpnSupported()) {
+                    throw new \RuntimeException('Cannot use HTTP/2 without ALPN support');
                 }
+                
+                $options = [
+                    'ssl' => [
+                        'alpn_protocols' => 'h2'
+                    ]
+                ];
                 
                 $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
                 
@@ -130,7 +144,7 @@ class Http2Connector implements HttpConnectorInterface
             }
         }
     }
-
+    
     protected function createResponse(MessageReceivedEvent $event): HttpResponse
     {
         $response = new HttpResponse($event->getHeaderValue(':status'), $event->body);
