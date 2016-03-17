@@ -24,6 +24,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\SocketStream;
 use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
@@ -150,9 +151,7 @@ class Http1Driver implements HttpDriverInterface
             
             $uri = $endpoint->isEncrypted() ? 'https://' : 'http://';
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
-            
-            $uri = Uri::parse($uri);
-            $uri = $uri->withPort($endpoint->getPort());
+            $uri = Uri::parse($uri)->withPort($endpoint->getPort());
             
             // Signal clients to send body immediately for now...
             if (isset($headers['expect']) && (float) $m[3] >= 1.1) {
@@ -179,10 +178,10 @@ class Http1Driver implements HttpDriverInterface
                     throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
-                $body = ($len === 0) ? yield from Stream::temp(): new LimitInputStream($reader, $len, false);
+                $body = ($len === 0) ? new StringInputStream(): new LimitInputStream($reader, $len, false);
             } else {
                 // Dropping request body if neighter content-length nor chunked encoding are specified.
-                $body = yield from Stream::temp();
+                $body = new StringInputStream();
             }
             
             $request = new HttpRequest($uri, $body, $m[1], $headers);
@@ -196,12 +195,12 @@ class Http1Driver implements HttpDriverInterface
                 ]);
             }
             
-            $response = new HttpResponse(Http::CODE_OK, yield from Stream::temp());
+            $response = new HttpResponse();
             $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
             yield captureError($e);
             
-            $response = new HttpResponse($e->getCode(), yield from Stream::temp());
+            $response = new HttpResponse($e->getCode());
             
             yield from $this->sendResponse($socket, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
             

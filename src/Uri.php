@@ -63,6 +63,10 @@ class Uri implements \JsonSerializable
      */
     public static function parse(string $uri): Uri
     {
+        if ($uri instanceof static) {
+            return clone $uri;
+        }
+        
         if (false === ($parts = parse_url((string) $uri))) {
             throw new \InvalidArgumentException('Seriously malformed URI detected');
         }

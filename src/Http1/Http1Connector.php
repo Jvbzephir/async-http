@@ -21,6 +21,7 @@ use KoolKode\Async\Stream\BufferedInputStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\SocketStream;
 use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -157,7 +158,7 @@ class Http1Connector implements HttpConnectorInterface
             $chunked = false;
             
             if ($chunk === '') {
-                $tmp = yield from Stream::temp();
+                $tmp = new StringInputStream();
                 $request = $request->withHeader('Content-Length', '0');
             } elseif (!$this->chunkedRequests || $request->getProtocolVersion() === '1.0') {
                 $tmp = yield from Stream::temp();
@@ -253,7 +254,7 @@ class Http1Connector implements HttpConnectorInterface
         }
         
         if ($request->getMethod() == 'HEAD') {
-            $stream = yield from Stream::temp();
+            $stream = new StringInputStream();
         } else {
             if (isset($headers['transfer-encoding'])) {
                 $encodings = strtolower(implode(',', $headers['transfer-encoding']));
@@ -267,7 +268,7 @@ class Http1Connector implements HttpConnectorInterface
             } elseif (isset($headers['content-length'])) {
                 $len = Http::parseContentLength(implode(', ', $headers['content-length']));
                 
-                $stream = ($len === 0) ? yield from Stream::temp() : new LimitInputStream($stream, $len);
+                $stream = ($len === 0) ? new StringInputStream() : new LimitInputStream($stream, $len);
             } else {
                 throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
             }

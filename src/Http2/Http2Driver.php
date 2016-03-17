@@ -257,7 +257,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield from IO::temp());
+        $response = new HttpResponse();
         $response = $response->withProtocolVersion('2.0');
         
         $response = $action($request, $response);

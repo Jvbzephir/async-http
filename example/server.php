@@ -16,7 +16,7 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Log\Logger;
-use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LogLevel;
 
 error_reporting(-1);
@@ -52,7 +52,7 @@ $executor->runCallback(function () use ($executor) {
     $http->addDriver(new Http2Driver($logger));
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
-        return $response->withBody(yield from Stream::temp('KoolKode Async HTTP :)'));
+        return $response->withBody(new StringInputStream('KoolKode Async HTTP :)'));
     };
     
     $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);

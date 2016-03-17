@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\StringInputStream;
 
 /**
  * Implementation of a PSR-7 HTTP response.
@@ -24,9 +25,9 @@ class HttpResponse extends HttpMessage
 
     protected $reason;
 
-    public function __construct(int $status, InputStreamInterface $body, array $headers = [])
+    public function __construct(int $status = Http::CODE_OK, InputStreamInterface $body = NULL, array $headers = [])
     {
-        parent::__construct($body, $headers);
+        parent::__construct($body ?? new StringInputStream(), $headers);
         
         $this->status = $this->filterStatus(($status === NULL) ? 200 : $status);
         $this->reason = '';

@@ -23,7 +23,6 @@ use KoolKode\Async\Task;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;
-use function KoolKode\Async\awaitRead;
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentTask;
 use function KoolKode\Async\runTask;
@@ -325,7 +324,7 @@ class ConnectionHandler
             ]);
         }
         
-        $response = new HttpResponse(Http::CODE_OK, yield from Stream::temp());
+        $response = new HttpResponse();
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         
         $response = $action($request, $response);

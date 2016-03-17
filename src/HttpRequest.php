@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\StringInputStream;
 
 /**
  * Implementation of a PSR-7 HTTP request.
@@ -26,12 +27,12 @@ class HttpRequest extends HttpMessage
 
     protected $uri;
 
-    public function __construct(Uri $uri, InputStreamInterface $body, string $method = NULL, array $headers = [])
+    public function __construct($uri, InputStreamInterface $body = NULL, string $method = NULL, array $headers = [])
     {
-        parent::__construct($body, $headers);
+        parent::__construct($body ?? new StringInputStream(), $headers);
         
         $this->method = $this->filterMethod(($method === NULL) ? 'GET' : $method);
-        $this->uri = $uri ?: new Uri();
+        $this->uri = Uri::parse($uri);
     }
     
     public function __debugInfo(): array
