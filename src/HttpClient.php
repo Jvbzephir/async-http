@@ -12,7 +12,8 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\Http1Connector;
-use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Socket\Socket;
+use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -137,7 +138,7 @@ class HttpClient
     {
         $ssl = [];
         
-        if (SocketStream::isAlpnSupported()) {
+        if (Socket::isAlpnSupported()) {
             $alpn = [];
             
             foreach ($this->connectors as $connector) {

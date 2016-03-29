@@ -11,7 +11,8 @@
 
 namespace KoolKode\Async\Http\Fcgi;
 
-use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Socket\Socket;
+use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
@@ -100,7 +101,7 @@ class FcgiEndpoint
         $errstr = NULL;
         
         if ($this->port == 0) {
-            if (!SocketStream::isUnixSocketSupported()) {
+            if (!Socket::isUnixSocketSupported()) {
                 throw new \RuntimeException('Unix domain sockets are not available');
             }
             

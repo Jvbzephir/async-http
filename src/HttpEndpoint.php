@@ -15,8 +15,9 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\DirectUpgradeDuplexStream;
 use KoolKode\Async\Http\Http1\Http1Driver;
+use KoolKode\Async\Socket\Socket;
+use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamException;
-use KoolKode\Async\Stream\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitRead;
@@ -367,7 +368,7 @@ class HttpEndpoint
             $alpn = array_merge($alpn, $driver->getProtocols());
         }
         
-        if (!empty($alpn) && SocketStream::isAlpnSupported()) {
+        if (!empty($alpn) && Socket::isAlpnSupported()) {
             $sslOptions['alpn_protocols'] = implode(',', array_unique($alpn));
         }
         

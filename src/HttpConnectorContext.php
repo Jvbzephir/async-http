@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Socket\SocketStream;
 
 /**
  * Context being used to pass additional values into an HTTP connector.

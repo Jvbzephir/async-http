@@ -15,7 +15,8 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Stream\SocketStream;
+use KoolKode\Async\Socket\Socket;
+use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\runTask;
@@ -43,7 +44,7 @@ class Http2Connector implements HttpConnectorInterface
      */
     public static function isAvailable(): bool
     {
-        return SocketStream::isAlpnSupported();
+        return Socket::isAlpnSupported();
     }
     
     /**
@@ -65,7 +66,7 @@ class Http2Connector implements HttpConnectorInterface
      */
     public function getProtocols(): array
     {
-        if (!SocketStream::isAlpnSupported()) {
+        if (!Socket::isAlpnSupported()) {
             return [];
         }
         
@@ -109,7 +110,7 @@ class Http2Connector implements HttpConnectorInterface
             if ($context instanceof HttpConnectorContext) {
                 $socket = $context->socket;
             } else {
-                if (!SocketStream::isAlpnSupported()) {
+                if (!Socket::isAlpnSupported()) {
                     throw new \RuntimeException('Cannot use HTTP/2 without ALPN support');
                 }
                 
