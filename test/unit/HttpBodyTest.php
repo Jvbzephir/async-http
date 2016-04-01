@@ -21,6 +21,7 @@ use KoolKode\Async\Stream\StringInputStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
+use KoolKode\Async\LibUvExecutor;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -47,6 +48,10 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     public function testClient(array $connectors)
     {
         $executor = $this->createExecutor();
+        
+        if ($executor instanceof LibUvExecutor) {
+            return $this->markTestSkipped('No SSL support in libuv executor');
+        }
         
         $executor->runCallback(function () use ($connectors) {
             $client = new HttpClient();
@@ -89,6 +94,10 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     public function testHttp1Client()
     {
         $executor = $this->createExecutor();
+        
+        if ($executor instanceof LibUvExecutor) {
+            return $this->markTestSkipped('No SSL support in libuv executor');
+        }
         
         $executor->runCallback(function () {
             $connector = new Http1Connector();
@@ -245,6 +254,10 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         }
         
         $executor = $this->createExecutor();
+        
+        if ($executor instanceof LibUvExecutor) {
+            return $this->markTestSkipped('No SSL support in libuv executor');
+        }
         
         $executor->runCallback(function () use ($executor) {
             $connector = new Http2Connector();

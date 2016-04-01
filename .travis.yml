@@ -15,14 +15,34 @@ matrix:
       env: DEPS=--prefer-lowest
     - php: 7.0
       env: LOOP=ev
+    - php: 7.0
+      env: LOOP=uv
   allow_failures:
     - env: LOOP=ev
+    - env: LOOP=uv
 
 before_install:
   - composer selfupdate --no-interaction
 
 install:
   - if [[ "$LOOP" == "ev" ]]; then yes '' | pecl install ev-beta; fi
+  - if [[ "$LOOP" == "uv" ]]; then
+    curl -LS https://github.com/libuv/libuv/archive/v1.8.0.tar.gz | tar -xz;
+    pushd libuv-*;
+    ./autogen.sh;
+    ./configure --prefix=$(dirname `pwd`)/libuv;
+    make;
+    make install;
+    popd;
+    git clone https://github.com/bwoebi/php-uv.git;
+    pushd php-uv;
+    phpize;
+    ./configure --with-uv=$(dirname `pwd`)/libuv;
+    make;
+    make install;
+    popd;
+    echo "extension=uv.so" >> "$(php -r 'echo php_ini_loaded_file();')";
+    fi;
   - travis_retry composer update --no-interaction --prefer-source $DEPS
   - composer info -i
 
