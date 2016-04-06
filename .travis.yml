@@ -18,7 +18,6 @@ before_install:
   - composer selfupdate --no-interaction
 
 install:
-  - yes '' | pecl install pthreads
   - travis_retry composer update --no-interaction --prefer-source $DEPS
   - composer info
 
