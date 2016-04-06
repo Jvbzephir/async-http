@@ -21,7 +21,6 @@ use KoolKode\Async\Stream\StringInputStream;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
-use KoolKode\Async\LibUvExecutor;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -48,10 +47,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     public function testClient(array $connectors)
     {
         $executor = $this->createExecutor();
-        
-        if ($executor instanceof LibUvExecutor) {
-            return $this->markTestSkipped('No SSL support in libuv executor');
-        }
         
         $executor->runCallback(function () use ($connectors) {
             $client = new HttpClient();
@@ -94,10 +89,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     public function testHttp1Client()
     {
         $executor = $this->createExecutor();
-        
-        if ($executor instanceof LibUvExecutor) {
-            return $this->markTestSkipped('No SSL support in libuv executor');
-        }
         
         $executor->runCallback(function () {
             $connector = new Http1Connector();
@@ -216,7 +207,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($chunked, $executor) {
-            $server = new HttpEndpoint(12345);
+            $server = new HttpEndpoint(22222);
             $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
@@ -228,7 +219,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $connector->setChunkedRequests($chunked);
                 
                 $message = 'Hi there!';
-                $request = new HttpRequest('http://localhost:12345/test', new StringInputStream($message), 'POST');
+                $request = new HttpRequest('http://localhost:22222/test', new StringInputStream($message), 'POST');
                 
                 if (!$chunked) {
                     $request = $request->withProtocolVersion('1.0');
@@ -254,10 +245,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         }
         
         $executor = $this->createExecutor();
-        
-        if ($executor instanceof LibUvExecutor) {
-            return $this->markTestSkipped('No SSL support in libuv executor');
-        }
         
         $executor->runCallback(function () use ($executor) {
             $connector = new Http2Connector();
