@@ -1,27 +1,29 @@
 #!/bin/bash
 
 sudo apt-get update
-yes 'Y' | sudo apt-get install git pkg-config autoconf bison libxml2-dev libssl-dev libtool
+sudo apt-get install git pkg-config autoconf bison libxml2-dev libssl-dev libtool -y
 
 # Install PHP7:
 
 sudo mkdir /etc/php7
 cd /etc/php7
 
-sudo git clone -b master https://git.php.net/repository/php-src.git
+sudo mkdir php-src
+sudo curl -LSs https://github.com/php/php-src/archive/php-7.0.5.tar.gz | sudo tar -xz -C "php-src" --strip-components 1
 
 pushd php-src
-sudo ./buildconf
+sudo ./buildconf --force
 sudo ./configure \
 	--prefix=/etc/php7/usr \
 	--with-config-file-path=/etc/php7/usr/etc \
+	--enable-maintainer-zts \
 	--enable-pcntl \
 	--enable-sockets \
 	--with-iconv \
 	--with-openssl \
 	--with-zlib=/usr
 	
-sudo make
+sudo make -j $(($(cat /proc/cpuinfo | grep processor | wc -l) + 1))
 sudo make install
 popd
 
@@ -39,11 +41,11 @@ sudo pecl config-set php_ini /etc/php7/usr/etc/php.ini
 
 sudo pecl channel-update pecl.php.net
 
-sudo pecl uninstall ev
+yes '' | sudo pecl install pthreads
 yes '' | sudo pecl install ev-beta
 
 # Install libuv
-sudo curl -LS https://github.com/libuv/libuv/archive/v1.8.0.tar.gz | sudo tar -xz
+sudo curl -LSs https://github.com/libuv/libuv/archive/v1.8.0.tar.gz | sudo tar -xz
 pushd libuv-*
 sudo ./autogen.sh
 sudo ./configure --prefix=$(dirname `pwd`)/libuv
