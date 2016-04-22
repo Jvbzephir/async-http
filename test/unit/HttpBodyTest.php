@@ -204,10 +204,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
      */
     public function testHttp1Server(bool $chunked)
     {
-        if (isset($_SERVER['TRAVIS'])) {
-            return $this->markTestSkipped('Test segfaults on in build');
-        }
-        
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($chunked, $executor) {
