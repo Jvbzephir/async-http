@@ -120,37 +120,6 @@ class HttpEndpoint
         $this->http1Driver = new Http1Driver();
     }
     
-    /**
-     * Find an unused TCP port by starting a temporary TCP server (server will be closed before method returns).
-     * 
-     * @throws \RuntimeException
-     * @return int
-     */
-    public static function findUnusedPort(): int
-    {
-        $errno = NULL;
-        $errstr = NULL;
-        
-        $server = @stream_socket_server('tcp://0.0.0.0:0', $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
-        
-        if (!is_resource($server)) {
-            throw new \RuntimeException(sprintf('Failed to start temporary TCP server: [%s] %s', $errno, $errstr));
-        }
-        
-        try {
-            $address = @stream_socket_get_name($server, false);
-            $m = NULL;
-            
-            if (preg_match("':([1-9][0-9]*)$'", $address, $m)) {
-                return (int) $m[1];
-            }
-            
-            throw new \RuntimeException(sprintf('Failed to read port from address: "%s"', $address));
-        } finally {
-            @fclose($server);
-        }
-    }
-    
     public function getPeerName(): string
     {
         return $this->sslOptions['peer_name'];

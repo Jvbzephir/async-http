@@ -16,6 +16,7 @@ use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Header\ContentTypeHeader;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
 use KoolKode\Async\Test\AsyncTrait;
@@ -207,7 +208,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($chunked, $executor) {
-            $port = HttpEndpoint::findUnusedPort();
+            $port = Socket::findUnusedPort();
             $server = new HttpEndpoint($port);
             $server->setCiphers('ALL');
             
