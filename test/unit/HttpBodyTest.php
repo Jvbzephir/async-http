@@ -207,7 +207,8 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor = $this->createExecutor();
         
         $executor->runCallback(function () use ($chunked, $executor) {
-            $server = new HttpEndpoint(22222);
+            $port = HttpEndpoint::findUnusedPort();
+            $server = new HttpEndpoint($port);
             $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
@@ -219,7 +220,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $connector->setChunkedRequests($chunked);
                 
                 $message = 'Hi there!';
-                $request = new HttpRequest('http://localhost:22222/test', new StringInputStream($message), 'POST');
+                $request = new HttpRequest(sprintf('http://localhost:%u/test', $port), new StringInputStream($message), 'POST');
                 
                 if (!$chunked) {
                     $request = $request->withProtocolVersion('1.0');
