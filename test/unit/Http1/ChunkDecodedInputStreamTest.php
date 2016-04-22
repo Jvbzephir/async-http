@@ -15,7 +15,7 @@ use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Test\AsyncTrait;
 
-class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
+class ChunkDecodedInputStreamTest // extends \PHPUnit_Framework_TestCase
 {
     use AsyncTrait;
     
