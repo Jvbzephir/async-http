@@ -833,27 +833,4 @@ abstract class Http
             return strtoupper($m[0]);
         }, ucfirst(strtolower(trim($name))));
     }
-
-    /**
-     * Parse content length from header value.
-     * 
-     * @param string $len
-     * @return int
-     * 
-     * @throws \RuntimeException When the given contnet length is not valid.
-     */
-    public static function parseContentLength(string $len): int
-    {
-        if (!preg_match("'^[0-9]+$'", $len)) {
-            throw new \RuntimeException(sprintf('Invalid content length value specified: "%s"', $len));
-        }
-        
-        $len = (int) $len;
-        
-        if ($len < 0) {
-            throw new \RuntimeException('Content length must not be negative');
-        }
-        
-        return $len;
-    }
 }
