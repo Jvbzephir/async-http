@@ -18,13 +18,14 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
+
 
 // TODO: Implement shutdown of HTTP2 server.
 
@@ -47,7 +48,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         'reneg_limit_callback' => NULL
     ];
     
-    protected $upgradeEnabled = false;
+    protected $upgradeEnabled = true;
     
     protected $logger;
     
@@ -127,23 +128,26 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     }
     
     /**
-     * {@inheritdoc}
+     * Check for a pre-parsed HTTP/2 connection preface.
+     * 
+     * @param HttpRequest $request
+     * @return bool
      */
-    public function isDirectUpgradeSupported(HttpEndpoint $endpoint, InputStreamInterface $stream): \Generator
+    protected function isPrefaceRequest(HttpRequest $request): bool
     {
-        if (!$this->upgradeEnabled) {
+        if ($request->getMethod() !== 'PRI') {
             return false;
         }
         
-        if ($endpoint->isEncrypted()) {
+        if ($request->getRequestTarget() !== '*') {
             return false;
         }
         
-        try {
-            return Connection::PREFACE === yield from IO::readBuffer($stream, strlen(Connection::PREFACE), true);
-        } catch (StreamException $e) {
+        if ($request->getProtocolVersion() !== '2.0') {
             return false;
         }
+        
+        return true;
     }
     
     /**
@@ -153,6 +157,10 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     {
         if (!$this->upgradeEnabled) {
             return false;
+        }
+        
+        if ($protocol === '') {
+            return $this->isPrefaceRequest($request);
         }
         
         if ($request->getUri()->getScheme() === 'https') {
@@ -167,41 +175,37 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         if (!in_array('http2-settings', $upgrade)) {
             return false;
         }
-    
+        
         return count($request->getHeader('HTTP2-Settings')) === 1;
     }
     
     /**
      * {@inheritdoc}
      */
-    public function upgradeDirectConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
+    public function upgradeConnection(BufferedDuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, callable $action): \Generator
     {
-        return yield from $this->handleConnection($endpoint, $socket, $action);
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function upgradeConnection(HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
-    {
+        if ($this->isPrefaceRequest($request)) {
+            return yield from $this->upgradeConnectionDirect($socket, $request, $response, $endpoint, $action);
+        }
+        
         $settings = @base64_decode($request->getHeaderLine('HTTP2-Settings'));
         if ($settings === false) {
             return $response->withStatus(Http::CODE_BAD_REQUEST, 'HTTP/2 settings are not properly encoded');
         }
-    
+        
         try {
             $message = sprintf("HTTP/%s 101 Switching Protocols\r\n", $request->getProtocolVersion());
             $message .= "Connection: Upgrade\r\n";
             $message .= "Upgrade: h2c\r\n";
             $message .= "\r\n";
-        
+            
             yield from $socket->write($message);
             
             $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
             
             $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE));
             
-            if ($preface !== self::PREFACE) {
+            if ($preface !== Connection::PREFACE) {
                 if ($this->logger) {
                     $this->logger->warning('Client did no send valid HTTP/2 connection preface');
                 }
@@ -213,14 +217,14 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
                 yield from $this->handleMessage($event, $endpoint, $action);
             });
             
-            yield from $conn->handleFrame(new Frame(Frame::SETTINGS, $settings));
+            yield from $conn->handleServerHandshake(new Frame(Frame::SETTINGS, $settings));
             
             if ($this->logger) {
                 $this->logger->debug('HTTP/{version} connection upgraded to HTTP/2', [
                     'version' => $request->getProtocolVersion()
-                ]); 
+                ]);
             }
-    
+            
             while (true) {
                 if (false === yield from $conn->handleNextFrame()) {
                     break;
@@ -231,6 +235,59 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         }
     }
     
+    /**
+     * Upgrade connection by reading HTTP/2 connection preface body and switching to HTTP/2 connection.
+     * 
+     * @param BufferedDuplexStreamInterface $socket
+     * @param HttpRequest $request
+     * @param HttpResponse $response
+     * @param HttpEndpoint $endpoint
+     * @param callable $action
+     */
+    protected function upgradeConnectionDirect(BufferedDuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, callable $action)
+    {
+        try {
+            $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE_BODY));
+            
+            if ($preface !== Connection::PREFACE_BODY) {
+                if ($this->logger) {
+                    $this->logger->warning('Client did no send valid HTTP/2 connection preface');
+                }
+                
+                return;
+            }
+            
+            $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
+            
+            $conn->getEvents()->observe(MessageReceivedEvent::class, function (MessageReceivedEvent $event) use ($endpoint, $action) {
+                yield from $this->handleMessage($event, $endpoint, $action);
+            });
+            
+            yield from $conn->handleServerHandshake();
+            
+            if ($this->logger) {
+                $this->logger->debug('HTTP/{version} connection upgraded to HTTP/2', [
+                    'version' => $request->getProtocolVersion()
+                ]);
+            }
+            
+            while (true) {
+                if (false === yield from $conn->handleNextFrame()) {
+                    break;
+                }
+            }
+        } finally {
+            $socket->close();
+        }
+    }
+    
+    /**
+     * Handle an incoming HTTP/2 request.
+     * 
+     * @param MessageReceivedEvent $event
+     * @param HttpEndpoint $endpoint
+     * @param callable $action
+     */
     public function handleMessage(MessageReceivedEvent $event, HttpEndpoint $endpoint, callable $action): \Generator
     {
         $event->consume();

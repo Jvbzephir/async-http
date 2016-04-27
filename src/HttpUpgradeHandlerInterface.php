@@ -11,8 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\DuplexStreamInterface;
-use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 
 /**
  * Contract for a handler that can upgrade an HTTP/1.1 connection.
@@ -24,39 +23,22 @@ interface HttpUpgradeHandlerInterface
     /**
      * Check if the handler can upgrade the connection to the given protocol.
      * 
+     * Each upgrade handler will be invoked once with an empty protocol, this allows for direct upgrades based on the parsed HTTP header data.
+     * 
      * @param string $protocol Protocol as specified by the HTTP upgrade header.
      * @param HttpRequest $request Upgrade HTTP request.
      */
     public function isUpgradeSupported(string $protocol, HttpRequest $request): bool;
-    
-    /**
-     * Check if the connection can be upgraded based on data sent by client.
-     * 
-     * @param HttpEndpoint $endpoint
-     * @param InputStreamInterface $stream
-     * @return bool
-     */
-    public function isDirectUpgradeSupported(HttpEndpoint $endpoint, InputStreamInterface $stream): \Generator;
 
     /**
      * Take control of the given connection and handle it according to the upgraded protocol.
      * 
+     * @param BufferedDuplexStreamInterface $socket
      * @param HttpRequest $request Upgrade HTTP request.
      * @param HttpResponse $response HTTP response that can be modified and returned in order to be sent as HTTP/1.1 response.
      * @param HttpEndpoint $endpoint
-     * @param DuplexStreamInterface $socket
      * @param callable $action
      * @return Generator
      */
-    public function upgradeConnection(HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator;
-    
-    /**
-     * Direct connection upgrade.
-     * 
-     * @param HttpEndpoint $endpoint
-     * @param DuplexStreamInterface $socket
-     * @param callable $action
-     * @return Generator
-     */
-    public function upgradeDirectConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator;
+    public function upgradeConnection(BufferedDuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, callable $action): \Generator;
 }

@@ -13,7 +13,6 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Http\Http1\DirectUpgradeDuplexStream;
 use KoolKode\Async\Http\Http1\Http1Driver;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
@@ -163,6 +162,11 @@ class HttpEndpoint
         $this->logger = $logger;
     }
     
+    /**
+     * Driver will also be added as upgrade handler if it implements the upgrade handler interface.
+     * 
+     * @param HttpDriverInterface $driver
+     */
     public function addDriver(HttpDriverInterface $driver)
     {
         $this->drivers[] = $driver;
@@ -314,24 +318,7 @@ class HttpEndpoint
     }
     
     /**
-     * Find an HTTP/1.1 upgrade handler that can upgrade a connection based on the first line of input.
-     *
-     * @param DirectUpgradeDuplexStream $stream
-     * @return HttpUpgradeHandlerInterface or NULL when no such handler was found.
-     */
-    public function findDirectUpgradeHandler(DirectUpgradeDuplexStream $stream): \Generator
-    {
-        foreach ($this->upgradeHandlers as $handler) {
-            $stream->rewind();
-            
-            if (yield from $handler->isDirectUpgradeSupported($this, $stream)) {
-                return $handler;
-            }
-        }
-    }
-    
-    /**
-     * Find an HTTP/1.1 upgrade handler that can upgrade the connection to the requested protocl.
+     * Find an HTTP upgrade handler that can upgrade the connection to the requested protocl.
      * 
      * @param string $protocol
      * @param HttpRequest $request

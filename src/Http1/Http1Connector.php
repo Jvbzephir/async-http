@@ -18,7 +18,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\BufferedDuplexStream;
-use KoolKode\Async\Stream\BufferedInputStreamInterface;
+use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
@@ -229,7 +229,7 @@ class Http1Connector implements HttpConnectorInterface
      */
     protected function processResponse(DuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
-        if (!$stream instanceof BufferedInputStreamInterface) {
+        if (!$stream instanceof BufferedDuplexStreamInterface) {
             $stream = new BufferedDuplexStream($stream);
         }
         

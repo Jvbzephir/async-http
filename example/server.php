@@ -44,7 +44,7 @@ $executor->runCallback(function () use ($executor) {
     }
     
     $http = new HttpEndpoint(8888, '0.0.0.0', 'test.k1');
-    $http->setCertificate(__DIR__ . '/cert.pem', true);
+//     $http->setCertificate(__DIR__ . '/cert.pem', true);
     
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
@@ -55,10 +55,10 @@ $executor->runCallback(function () use ($executor) {
         return $response->withBody(new StringInputStream('KoolKode Async HTTP :)'));
     };
     
-    $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
+//     $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
     
     $executor->runNewTask($http->run($action), $http->getTitle());
-    $executor->runNewTask($fcgi->run($action), $fcgi->getTitle());
+//     $executor->runNewTask($fcgi->run($action), $fcgi->getTitle());
 });
 
 $executor->run();

@@ -18,9 +18,8 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\BufferedDuplexStream;
-use KoolKode\Async\Stream\BufferedInputStreamInterface;
+use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\Stream;
@@ -77,46 +76,13 @@ class Http1Driver implements HttpDriverInterface
     public function handleConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
     {
         $started = microtime(true);
-        $cached = true;
-        $raw = $socket;
-        
-        $socket = new DirectUpgradeDuplexStream($socket, $cached);
-        
-        // Attempt to upgrade HTTP connection based on data sent by client
-        if (NULL !== ($handler = yield from $endpoint->findDirectUpgradeHandler($socket))) {
-            $socket->rewind();
-            $cached = false;
-            
-            $response = yield from $handler->upgradeDirectConnection($endpoint, $socket, $action);
-            
-            if ($response instanceof HttpResponse) {
-                try {
-                    if ($raw instanceof SocketStream) {
-                        $raw->setTimeout(5);
-                    }
-                    
-                    return yield from $this->sendResponse($socket, $response, false, $started);
-                } finally {
-                    $socket->close();
-                }
-            }
-            
-            return;
-        }
-        
-        $socket->rewind();
-        $cached = false;
-        
-        if ($raw instanceof SocketStream) {
-            $raw->setTimeout(5);
-        }
         
         try {
-            $reader = ($socket instanceof BufferedInputStreamInterface) ? $socket : new BufferedDuplexStream($socket);
+            $socket = ($socket instanceof BufferedDuplexStreamInterface) ? $socket : new BufferedDuplexStream($socket);
             
             // Bail out when no HTTP request line is received.
             try {
-                $line = yield from $reader->readLine();
+                $line = yield from $socket->readLine();
             } catch (StreamException $e) {
                 return;
             }
@@ -127,14 +93,14 @@ class Http1Driver implements HttpDriverInterface
             
             $m = NULL;
             
-            if (!preg_match("'^(\S+)\s+(.+)\s+HTTP/(1\\.[01])$'i", $line, $m)) {
+            if (!preg_match("'^(\S+)\s+(.+)\s+HTTP/([1-9]+(?:\\.[0-9]+)?)$'i", $line, $m)) {
                 throw new StatusException(Http::CODE_BAD_REQUEST);
             }
             
             $headers = [];
             
-            while (!$reader->eof()) {
-                $line = yield from $reader->readLine();
+            while (!$socket->eof()) {
+                $line = yield from $socket->readLine();
                 
                 if ($line === '') {
                     break;
@@ -153,12 +119,29 @@ class Http1Driver implements HttpDriverInterface
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
             $uri = Uri::parse($uri)->withPort($endpoint->getPort());
             
+            $request = new HttpRequest($uri, $socket, $m[1], $headers);
+            $request = $request->withProtocolVersion($m[3]);
+            
+            $response = new HttpResponse();
+            $response = $response->withProtocolVersion($request->getProtocolVersion());
+            
+            // Attempt to upgrade HTTP connection before further processing.
+            if (NULL !== ($handler = $this->findUpgradeHandler($request, $endpoint))) {
+                $response = yield from $handler->upgradeConnection($socket, $request, $response, $endpoint, $action);
+            
+                if ($response instanceof HttpResponse) {
+                    return yield from $this->sendResponse($socket, $response, false, $started);
+                }
+            
+                return;
+            }
+            
             // Signal clients to send body immediately for now...
             if (isset($headers['expect']) && (float) $m[3] >= 1.1) {
                 $expected = array_map('strtolower', array_map('trim', explode(',', $headers['expect'])));
                 
                 if (in_array('100-continue', $expected)) {
-                    $reader = new ExpectContinueInputStream($reader, $m[3]);
+                    $socket = new ExpectContinueInputStream($socket, $m[3]);
                 }
             }
             
@@ -167,7 +150,7 @@ class Http1Driver implements HttpDriverInterface
                 $encodings = array_map('trim', explode(',', $encodings));
                 
                 if (in_array('chunked', $encodings)) {
-                    $body = yield from ChunkDecodedInputStream::open($reader, false);
+                    $body = yield from ChunkDecodedInputStream::open($socket, false);
                 } else {
                     throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
                 }
@@ -178,14 +161,13 @@ class Http1Driver implements HttpDriverInterface
                     throw new StatusException(Http::CODE_BAD_REQUEST, $e);
                 }
                 
-                $body = ($len === 0) ? new StringInputStream(): new LimitInputStream($reader, $len, false);
+                $body = ($len === 0) ? new StringInputStream(): new LimitInputStream($socket, $len, false);
             } else {
                 // Dropping request body if neighter content-length nor chunked encoding are specified.
                 $body = new StringInputStream();
             }
             
-            $request = new HttpRequest($uri, $body, $m[1], $headers);
-            $request = $request->withProtocolVersion($m[3]);
+            $request = $request->withBody($body);
             
             if ($this->logger) {
                 $this->logger->debug('>> {method} {target} HTTP/{version}', [
@@ -194,9 +176,6 @@ class Http1Driver implements HttpDriverInterface
                     'version' => $request->getProtocolVersion()
                 ]);
             }
-            
-            $response = new HttpResponse();
-            $response = $response->withProtocolVersion($request->getProtocolVersion());
         } catch (StatusException $e) {
             yield captureError($e);
             
@@ -225,21 +204,6 @@ class Http1Driver implements HttpDriverInterface
             $socket->close();
             
             throw $e;
-        }
-        
-        // Attempt to upgrade HTTP connection if requested by the client:
-        if (NULL !== ($handler = $this->findUpgradeHandler($request, $endpoint))) {
-            if ($raw instanceof SocketStream) {
-                $raw->setTimeout(0);
-            }
-            
-            $response = yield from $handler->upgradeConnection($request, $response, $endpoint, $reader, $action);
-            
-            if ($response instanceof HttpResponse) {
-                return yield from $this->sendResponse($socket, $response, false, $started);
-            }
-            
-            return;
         }
         
         try {
@@ -279,15 +243,15 @@ class Http1Driver implements HttpDriverInterface
      */
     protected function findUpgradeHandler(HttpRequest $request, HttpEndpoint $endpoint)
     {
-        if (!in_array('upgrade', $this->splitHeaderValues($request->getHeaderLine('Connection')), true)) {
-            return;
+        $upgrade = [];
+        
+        if (in_array('upgrade', $this->splitHeaderValues($request->getHeaderLine('Connection')), true)) {
+            $upgrade = $this->splitHeaderValues($request->getHeaderLine('Upgrade'));
+        } else {
+            $upgrade = [];
         }
         
-        $upgrade = $this->splitHeaderValues($request->getHeaderLine('Upgrade'));
-        
-        if (empty($upgrade)) {
-            return;
-        }
+        $upgrade[] = '';
         
         foreach ($upgrade as $protocol) {
             if (NULL !== ($handler = $endpoint->findUpgradeHandler($protocol, $request))) {

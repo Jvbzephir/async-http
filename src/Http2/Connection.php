@@ -34,6 +34,13 @@ class Connection
      */
     const PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     
+    /**
+     * Connection preface request "body" that must be skipped in a direct upgrade.
+     * 
+     * @var string
+     */
+    const PREFACE_BODY = "SM\r\n\r\n";
+    
     const MODE_CLIENT = 1;
     
     const MODE_SERVER = 2;
@@ -208,25 +215,40 @@ class Connection
     public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE), true);
-    
+        
         if ($preface !== self::PREFACE) {
             throw new ConnectionException('Client did not send valid HTTP/2 connection preface');
         }
-    
+        
         $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
         
-        list ($id, $frame) = yield from $conn->readNextFrame();
-        if ($id !== 0 || $frame->type !== Frame::SETTINGS) {
+        yield from $conn->handleServerHandshake();
+        
+        return $conn;
+    }
+    
+    /**
+     * Perform server handshake after initial SETTINGS frame sent by client has been processed.
+     * 
+     * @param Frame $settings Initial SETTINGS frame, will read next frame when not specified.
+     * 
+     * @throws StreamException When no initial SETTINGS frame is available.
+     */
+    public function handleServerHandshake(Frame $settings = NULL): \Generator
+    {
+        if ($settings === NULL) {
+            list ($id, $settings) = yield from $this->readNextFrame();
+        }
+        
+        if ($id !== 0 || $settings->type !== Frame::SETTINGS) {
             throw new StreamException('Missing initial settings frame');
         }
         
-        yield from $conn->handleFrame($frame);
-        yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)));
+        yield from $this->handleFrame($settings);
+        yield from $this->writeFrame(new Frame(Frame::SETTINGS, pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)));
         
         // Disable connection-level flow control.
-        yield from $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
-        
-        return $conn;
+        yield from $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
     }
     
     public function getSocket(): DuplexStreamInterface
