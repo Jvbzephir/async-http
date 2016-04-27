@@ -13,13 +13,38 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\StringInputStream;
 
+/**
+ * HTTP message body wrapping a string.
+ * 
+ * @author Martin Schröder
+ */
 class StringBody implements HttpBodyInterface
 {
+    /**
+     * Message body.
+     * 
+     * @var string
+     */
     protected $contents;
-    
+  
+    /**
+     * Create a message body around the given contents.
+     * 
+     * @param string $contents
+     */
     public function __construct(string $contents = '')
     {
         $this->contents = $contents;
+    }
+    
+    /**
+     * Dump the message body.
+     * 
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->contents;
     }
     
     /**

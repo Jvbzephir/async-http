@@ -14,10 +14,25 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 
+/**
+ * HTTP message body based on an input stream.
+ * 
+ * @author Martin Schröder
+ */
 class StreamBody implements HttpBodyInterface
 {
+    /**
+     * Body data stream.
+     * 
+     * @var InputStreamInterface
+     */
     protected $stream;
     
+    /**
+     * Create message body backed by the given stream.
+     * 
+     * @param InputStreamInterface $stream
+     */
     public function __construct(InputStreamInterface $stream)
     {
         $this->stream = $stream;

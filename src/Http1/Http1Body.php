@@ -14,11 +14,11 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBodyInterface;
 use KoolKode\Async\Http\HttpMessage;
-use KoolKode\Async\Stream\BufferedInputStreamInterface;
-use KoolKode\Async\Stream\Stream;
-use KoolKode\Async\Stream\StringInputStream;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StringInputStream;
 
 /**
  * HTTP/1 message body decoder implementation.
@@ -32,31 +32,89 @@ class Http1Body implements HttpBodyInterface
     const COMPRESSION_GZIP = 'gzip';
     
     const COMPRESSION_DEFLATE = 'deflate';
-    
+ 
+    /**
+     * HTTP protocol version (needed by expect-continue).
+     * 
+     * @var string
+     */
     protected $protocolVersion;
     
+    /**
+     * Wrapped input stream that is being used to receive data from the remote peer.
+     * 
+     * @var InputStreamInterface
+     */
     protected $socket;
     
+    /**
+     * Input stream that is being used to read decoded data.
+     * 
+     * @var InputStreamInterface
+     */
     protected $stream;
     
+    /**
+     * Is incoming data chunk-encoded?
+     * 
+     * @var bool
+     */
     protected $chunked = false;
     
+    /**
+     * Length of input data as specified by Content-Length.
+     * 
+     * A value of NULL indicates that the HTTP header was not set.
+     * 
+     * @var int
+     */
     protected $length;
     
+    /**
+     * Compression method being used by the remote peer.
+     * 
+     * A value of NULL indicates thatincoming data is not compressed.
+     * 
+     * @var string
+     */
     protected $compression;
     
+    /**
+     * Indicates that the remote peer expects a 100 Continue response before data will be sent.
+     * 
+     * @var bool
+     */
     protected $expectContinue = false;
     
+    /**
+     * Cascade the close operation of the input stream to the socket being used to communicate with the remote peer.
+     * 
+     * @var bool
+     */
     protected $cascadeClose = true;
     
+    /**
+     * Is zlib-based streaming compression available?
+     * 
+     * @var bool
+     */
     protected static $compressionSupported;
     
-    public function __construct(BufferedInputStreamInterface $socket, string $protocolVersion)
+    /**
+     * Create a body that can decode contents received by the given socket.
+     * 
+     * @param InputStreamInterface $socket
+     * @param string $protocolVersion
+     */
+    public function __construct(InputStreamInterface $socket, string $protocolVersion)
     {
         $this->protocolVersion = $protocolVersion;
         $this->socket = $socket;
     }
     
+    /**
+     * Ensure the underlying stream is closed in case of cascaded close.
+     */
     public function __destruct()
     {
         if ($this->cascadeClose) {
@@ -64,7 +122,16 @@ class Http1Body implements HttpBodyInterface
         }
     }
     
-    public static function fromHeaders(BufferedInputStreamInterface $socket, HttpMessage $message): Http1Body
+    /**
+     * Assemble HTTP body settings from the given HTTP message.
+     * 
+     * Exceptions thrown by this method use codes that can be sent as HTTP response status codes.
+     * 
+     * @param InputStreamInterface $socket
+     * @param HttpMessage $message
+     * @return Http1Body
+     */
+    public static function fromHeaders(InputStreamInterface $socket, HttpMessage $message): Http1Body
     {
         $body = new static($socket, $message->getProtocolVersion());
         
@@ -108,6 +175,11 @@ class Http1Body implements HttpBodyInterface
         return $body;
     }
     
+    /**
+     * Check if streaming compression is available.
+     * 
+     * @return bool
+     */
     public static function isCompressionSupported(): bool
     {
         if (self::$compressionSupported === NULL) {
@@ -117,7 +189,12 @@ class Http1Body implements HttpBodyInterface
         return self::$compressionSupported;
     }
     
-    public static function getSupportedCompressionEncodings(): array
+    /**
+     * Get available compression encoding names.
+     * 
+     * @return array
+     */
+    public static function getAvailableCompressionEncodings(): array
     {
         if (!self::isCompressionSupported()) {
             return [];
@@ -129,41 +206,65 @@ class Http1Body implements HttpBodyInterface
         ];
     }
     
+    /**
+     * Cascade the close operation to the underlying data stream being used to communicate with the remote peer?
+     * 
+     * @param bool $cascadeClose
+     */
     public function setCascadeClose(bool $cascadeClose)
     {
         $this->cascadeClose = $cascadeClose;
     }
     
+    /**
+     * Apply chunk-decoding to the message body?
+     * 
+     * @param bool $chunked
+     */
     public function setChunkEncoded(bool $chunked)
     {
         $this->chunked = $chunked;
     }
     
+    /**
+     * Apply length encoding to the message body.
+     * 
+     * @param int $length
+     * 
+     * @throws \InvalidArgumentException When a negative length is given.
+     */
     public function setLength(int $length)
     {
         if ($length < 0) {
-            throw new \RuntimeException('Content length must not be negative', Http::CODE_BAD_REQUEST);
+            throw new \InvalidArgumentException('Content length must not be negative', Http::CODE_BAD_REQUEST);
         }
         
         $this->length = $length;
     }
     
+    /**
+     * Set encoding being used to decompress body data.
+     * 
+     * @param string $encoding
+     * 
+     * @throws \InvalidArgumentException
+     */
     public function setCompression(string $encoding)
     {
-        if (!self::isCompressionSupported()) {
-            throw new \RuntimeException('Compression is not supported (zlib is required)', Http::CODE_NOT_IMPLEMENTED);
+        $encoding = strtolower($encoding);
+        
+        if (!in_array($encoding, self::getAvailableCompressionEncodings(), true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported compression encoding: "%s"', $encoding), Http::CODE_NOT_IMPLEMENTED);
         }
         
-        switch ($encoding) {
-            case self::COMPRESSION_DEFLATE:
-            case self::COMPRESSION_GZIP:
-                $this->compression = $encoding;
-                break;
-            default:
-                throw new \InvalidArgumentException(sprintf('Unsupported compression encoding: "%s"', $encoding), Http::CODE_NOT_IMPLEMENTED);
-        }
+        $this->compression = $encoding;
     }
     
+    /**
+     * Send 100 Continue response line before reading data from remote peer?
+     * 
+     * @param bool $expectContinue
+     */
     public function setExpectContinue(bool $expectContinue)
     {
         $this->expectContinue = $expectContinue;
@@ -203,6 +304,11 @@ class Http1Body implements HttpBodyInterface
         return yield from Stream::readContents($this->stream);
     }
     
+    /**
+     * Create the input stream being used to read decoded body data from the remote peer.
+     * 
+     * @return InputStreamInterface
+     */
     protected function createInputStream(): \Generator
     {
         if ($this->expectContinue) {

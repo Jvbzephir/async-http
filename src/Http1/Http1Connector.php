@@ -132,7 +132,7 @@ class Http1Connector implements HttpConnectorInterface
             $request = $request->withoutHeader($header);
         }
         
-        $encodings = Http1Body::getSupportedCompressionEncodings();
+        $encodings = Http1Body::getAvailableCompressionEncodings();
         
         if (!empty($encodings)) {
             $request = $request->withHeader('Accept-Encoding', implode(', ', $encodings));

@@ -120,8 +120,12 @@ class Http1Driver implements HttpDriverInterface
             
             $request = new HttpRequest($uri, $m[1], $headers, $m[3]);
             
-            $body = Http1Body::fromHeaders($socket, $request);
-            $body->setCascadeClose(false);
+            try {
+                $body = Http1Body::fromHeaders($socket, $request);
+                $body->setCascadeClose(false);
+            } catch (\Exception $e) {
+                throw new StatusException($e->getCode(), $e);
+            }
             
             $request = $request->withBody($body);
             

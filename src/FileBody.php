@@ -16,15 +16,35 @@ use KoolKode\Async\Stream\Stream;
 use function KoolKode\Async\currentExecutor;
 use function KoolKode\Async\fileOpenRead;
 
+/**
+ * HTTP body that can stream contents of a file.
+ * 
+ * @author Martin Schröder
+ */
 class FileBody implements HttpBodyInterface
 {
+    /**
+     * Path the file being transfered.
+     * 
+     * @var string
+     */
     protected $file;
 
+    /**
+     * Create a message body that can stream a file.
+     * 
+     * @param string $file
+     */
     public function __construct(string $file)
     {
         $this->file = $file;
     }
 
+    /**
+     * Get the path of the transfered file.
+     * 
+     * @return string
+     */
     public function getFile(): string
     {
         return $this->file;
