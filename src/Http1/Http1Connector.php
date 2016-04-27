@@ -16,11 +16,8 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
-use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
@@ -82,7 +79,7 @@ class Http1Connector implements HttpConnectorInterface
      */
     public function send(HttpRequest $request, HttpConnectorContext $context = NULL): \Generator
     {
-        if ($context  !== NULL && $context->socket instanceof SocketStream) {
+        if ($context  !== NULL && $context->socket instanceof BufferedDuplexStreamInterface) {
             $stream = $context->socket;
         } else {
             $uri = $request->getUri();
@@ -135,8 +132,10 @@ class Http1Connector implements HttpConnectorInterface
             $request = $request->withoutHeader($header);
         }
         
-        if (function_exists('inflate_init')) {
-            $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $encodings = Http1Body::getSupportedCompressionEncodings();
+        
+        if (!empty($encodings)) {
+            $request = $request->withHeader('Accept-Encoding', implode(', ', $encodings));
         }
         
         return $request;
@@ -145,12 +144,12 @@ class Http1Connector implements HttpConnectorInterface
     /**
      * Assemble and stream request data to the remote endpoint.
      * 
-     * @param SocketStream $stream
+     * @param BufferedDuplexStreamInterface $stream
      * @param HttpRequest $request
      * 
      * @throws \RuntimeException
      */
-    protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
+    protected function sendRequest(BufferedDuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
         $body = yield from $request->getBody()->getInputStream();
         
@@ -223,17 +222,13 @@ class Http1Connector implements HttpConnectorInterface
     /**
      * Read and parse raw HTTP response.
      * 
-     * @param DuplexStreamInterface $stream
+     * @param BufferedDuplexStreamInterface $stream
      * @param HttpRequest $request
      * 
      * @throws \RuntimeException
      */
-    protected function processResponse(DuplexStreamInterface $stream, HttpRequest $request): \Generator
+    protected function processResponse(BufferedDuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
-        if (!$stream instanceof BufferedDuplexStreamInterface) {
-            $stream = new BufferedDuplexStream($stream);
-        }
-        
         $line = yield from $stream->readLine();
         $headers = [];
         $m = NULL;
@@ -253,57 +248,24 @@ class Http1Connector implements HttpConnectorInterface
             $headers[strtolower($header[0])][] = $header[1];
         }
         
-        if ($request->getMethod() == 'HEAD') {
-            $stream = new StringInputStream();
-        } else {
-            if (isset($headers['transfer-encoding'])) {
-                $encodings = strtolower(implode(',', $headers['transfer-encoding']));
-                $encodings = array_map('trim', explode(',', $encodings));
-                
-                if (in_array('chunked', $encodings)) {
-                    $stream = yield from ChunkDecodedInputStream::open($stream);
-                } else {
-                    throw new \RuntimeException(sprintf('Unsupported transfer encoding: "%s"', implode(', ', $headers['transfer-encoding'])));
-                }
-            } elseif (isset($headers['content-length'])) {
-                $len = Http::parseContentLength(implode(', ', $headers['content-length']));
-                
-                $stream = ($len === 0) ? new StringInputStream() : new LimitInputStream($stream, $len);
-            } else {
-                throw new \RuntimeException('Neighter transfer encoding nor content length specified in HTTP response');
-            }
-            
-            if (isset($headers['content-encoding'])) {
-                switch (implode(', ', $headers['content-encoding'])) {
-                    case 'gzip':
-                        $stream = yield from InflateInputStream::open($stream, InflateInputStream::GZIP);
-                        break;
-                    case 'deflate':
-                        $stream = yield from InflateInputStream::open($stream, InflateInputStream::DEFLATE);
-                        break;
-                    default:
-                        throw new \RuntimeException(sprintf('Unsupported content-encoding: "%s"', implode(', ', $headers['content-encoding'])));
-                }
-            }
-        }
+        $response = new HttpResponse((int) $m[2], $headers, $m[1]);
+        $response = $response->withStatus((int) $m[2], trim($m[3]));
+        
+        $body = Http1Body::fromHeaders($stream, $response);
+        
+        $response = $response->withBody($body);
         
         static $remove = [
-            'connection',
-            'content-encoding',
-            'keep-alive',
-            'trailer',
-            'transfer-encoding'
+            'Connection',
+            'Content-Encoding',
+            'Keep-Alive',
+            'Trailer',
+            'Transfer-Encoding'
         ];
         
         foreach ($remove as $name) {
-            if (isset($headers[$name])) {
-                unset($headers[$name]);
-            }
+            $response = $response->withoutHeader($name);
         }
-        
-        $response = new HttpResponse((int) $m[2], $headers, $m[1]);
-        $response = $response->withStatus((int) $m[2], trim($m[3]));
-        $response = $response->withBody(new StreamBody($stream));
         
         if ($this->logger) {
             $this->logger->debug('>> HTTP/{version} {status} {reason}', [

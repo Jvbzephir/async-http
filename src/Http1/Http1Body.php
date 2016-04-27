@@ -17,7 +17,16 @@ use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Stream\BufferedInputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 
+/**
+ * HTTP/1 message body decoder implementation.
+ * 
+ * Supports chunked-encoding, length-encoding, compression and expect-continue.
+ * 
+ * @author Martin Schröder
+ */
 class Http1Body implements HttpBodyInterface
 {
     const COMPRESSION_GZIP = 'gzip';
@@ -78,16 +87,22 @@ class Http1Body implements HttpBodyInterface
             $body->setLength((int) $len);
         }
         
-        if ($message->hasHeader('Content-Encoding')) {
-            $body->setCompression($message->getHeaderLine('Content-Encoding'));
+        if ($message instanceof HttpRequest) {
+            if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
+                $expected = array_map('strtolower', array_map('trim', $message->getHeaderLine('Expect')));
+                
+                if (in_array('100-continue', $expected)) {
+                    $body->setExpectContinue(true);
+                }
+            }
         }
         
-        if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
-            $expected = array_map('strtolower', array_map('trim', $message->getHeaderLine('Expect')));
-            
-            if (in_array('100-continue', $expected)) {
-                $body->setExpectContinue(true);
+        if ($message->hasHeader('Content-Encoding')) {
+            if (!$message instanceof HttpResponse) {
+                throw new \RuntimeException('Compressed request bodies are not supported', Http::CODE_BAD_REQUEST);
             }
+            
+            $body->setCompression($message->getHeaderLine('Content-Encoding'));
         }
         
         return $body;
@@ -100,6 +115,18 @@ class Http1Body implements HttpBodyInterface
         }
         
         return self::$compressionSupported;
+    }
+    
+    public static function getSupportedCompressionEncodings(): array
+    {
+        if (!self::isCompressionSupported()) {
+            return [];
+        }
+        
+        return [
+            self::COMPRESSION_GZIP,
+            self::COMPRESSION_DEFLATE
+        ];
     }
     
     public function setCascadeClose(bool $cascadeClose)
@@ -123,7 +150,7 @@ class Http1Body implements HttpBodyInterface
     
     public function setCompression(string $encoding)
     {
-        if (self::isCompressionSupported()) {
+        if (!self::isCompressionSupported()) {
             throw new \RuntimeException('Compression is not supported (zlib is required)', Http::CODE_NOT_IMPLEMENTED);
         }
         
