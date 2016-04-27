@@ -11,11 +11,12 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBodyInterface;
+use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Stream\BufferedInputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
-use KoolKode\Async\Http\Http;
 
 class Http1Body implements HttpBodyInterface
 {
@@ -37,6 +38,8 @@ class Http1Body implements HttpBodyInterface
     
     protected $expectContinue = false;
     
+    protected $cascadeClose = true;
+    
     protected static $compressionSupported;
     
     public function __construct(BufferedInputStreamInterface $socket, string $protocolVersion)
@@ -45,12 +48,19 @@ class Http1Body implements HttpBodyInterface
         $this->socket = $socket;
     }
     
-    public static function fromHeaders(BufferedInputStreamInterface $socket, array $headers, string $protocolVersion): Http1Body
+    public function __destruct()
     {
-        $body = new static($socket, $protocolVersion);
+        if ($this->cascadeClose) {
+            $this->socket->close();
+        }
+    }
+    
+    public static function fromHeaders(BufferedInputStreamInterface $socket, HttpMessage $message): Http1Body
+    {
+        $body = new static($socket, $message->getProtocolVersion());
         
-        if (isset($headers['transfer-encoding'])) {
-            $encodings = strtolower(implode(',', $headers['transfer-encoding']));
+        if ($message->hasHeader('Transfer-Encoding')) {
+            $encodings = strtolower($message->getHeaderLine('Transfer-Encoding'));
             $encodings = array_map('trim', explode(',', $encodings));
             
             if (in_array('chunked', $encodings)) {
@@ -58,8 +68,8 @@ class Http1Body implements HttpBodyInterface
             } elseif (!empty($encodings)) {
                 throw new \RuntimeException('Unsupported transfer encoding detected', Http::CODE_NOT_IMPLEMENTED);
             }
-        } elseif (isset($headers['content-length'])) {
-            $len = implode(', ', $headers['content-length']);
+        } elseif ($message->hasHeader('Content-Length')) {
+            $len = $message->getHeaderLine('Content-Length');
             
             if (!preg_match("'^[0-9]+$'", $len)) {
                 throw new \RuntimeException(sprintf('Invalid content length value specified: "%s"', $len), Http::CODE_BAD_REQUEST);
@@ -68,12 +78,12 @@ class Http1Body implements HttpBodyInterface
             $body->setLength((int) $len);
         }
         
-        if (isset($headers['content-encoding'])) {
-            $body->setCompression(implode(', ', $headers['content-encoding']));
+        if ($message->hasHeader('Content-Encoding')) {
+            $body->setCompression($message->getHeaderLine('Content-Encoding'));
         }
         
-        if (isset($headers['expect']) && $protocolVersion == '1.1') {
-            $expected = array_map('strtolower', array_map('trim', explode(',', $headers['expect'])));
+        if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
+            $expected = array_map('strtolower', array_map('trim', $message->getHeaderLine('Expect')));
             
             if (in_array('100-continue', $expected)) {
                 $body->setExpectContinue(true);
@@ -90,6 +100,11 @@ class Http1Body implements HttpBodyInterface
         }
         
         return self::$compressionSupported;
+    }
+    
+    public function setCascadeClose(bool $cascadeClose)
+    {
+        $this->cascadeClose = $cascadeClose;
     }
     
     public function setChunkEncoded(bool $chunked)
@@ -168,10 +183,14 @@ class Http1Body implements HttpBodyInterface
         }
         
         if ($this->chunked) {
-            $stream = yield from ChunkDecodedInputStream::open($this->socket);
+            $stream = yield from ChunkDecodedInputStream::open($this->socket, $this->cascadeClose);
         } elseif ($this->length > 0) {
-            $stream = new LimitInputStream($this->socket, $this->length);
+            $stream = new LimitInputStream($this->socket, $this->length, $this->cascadeClose);
         } else {
+            if ($this->cascadeClose) {
+                $this->socket->close();
+            }
+            
             return new StringInputStream();
         }
         

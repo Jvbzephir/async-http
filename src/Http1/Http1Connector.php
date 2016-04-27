@@ -235,13 +235,12 @@ class Http1Connector implements HttpConnectorInterface
         }
         
         $line = yield from $stream->readLine();
+        $headers = [];
         $m = NULL;
         
         if (!preg_match("'^HTTP/(1\\.[0-1])\s+([0-9]{3})\s*(.*)$'i", $line, $m)) {
             throw new \RuntimeException('Response did not contain a valid HTTP status line');
         }
-        
-        $headers = [];
         
         while (!$stream->eof()) {
             $line = yield from $stream->readLine();

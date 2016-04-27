@@ -23,7 +23,6 @@ use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\Stream;
-use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
@@ -121,6 +120,11 @@ class Http1Driver implements HttpDriverInterface
             
             $request = new HttpRequest($uri, $m[1], $headers, $m[3]);
             
+            $body = Http1Body::fromHeaders($socket, $request);
+            $body->setCascadeClose(false);
+            
+            $request = $request->withBody($body);
+            
             $response = new HttpResponse();
             $response = $response->withProtocolVersion($request->getProtocolVersion());
             
@@ -134,8 +138,6 @@ class Http1Driver implements HttpDriverInterface
                 
                 return;
             }
-            
-            $request = $request->withBody(Http1Body::fromHeaders($socket, $headers, $request->getProtocolVersion()));
             
             if ($this->logger) {
                 $this->logger->debug('>> {method} {target} HTTP/{version}', [
