@@ -616,7 +616,7 @@ class Stream
     
     protected function sendBody(HttpMessage $message): \Generator
     {
-        $in = $message->getBody();
+        $in = yield from $message->getBody()->getInputStream();
         
         try {
             $eof = $in->eof();

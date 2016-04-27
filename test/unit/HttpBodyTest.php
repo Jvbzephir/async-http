@@ -70,14 +70,14 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 
-                $body = yield from Stream::readContents($response->getBody());
+                $body = yield from $response->getBody()->getContents();
                 $this->assertNotFalse(stripos($body, 'Protocol: HTTP/' . $response->getProtocolVersion()));
                 
                 $response = yield from $client->send($request2, $options);
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 
-                $body = yield from Stream::readContents($response->getBody());
+                $body = yield from $response->getBody()->getContents();
                 $this->assertNotFalse(stripos($body, 'Protocol: HTTP/' . $response->getProtocolVersion()));
             } finally {
                 $client->shutdown();
@@ -104,7 +104,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $request = new HttpRequest('https://github.com/koolkode');
             $response = yield from $connector->send($request, $context);
             
-            $body = $response->getBody();
+            $body = yield from $response->getBody()->getInputStream();
             
             try {
                 while (!$body->eof()) {
@@ -213,7 +213,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
-                return $response->withBody(new StringInputStream('RECEIVED: ' . (yield from Stream::readContents($request->getBody()))));
+                return $response->withBody(new StringBody('RECEIVED: ' . yield from $request->getBody()->getContents()));
             }), 'Test Server', true);
             
             try {
@@ -221,7 +221,8 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $connector->setChunkedRequests($chunked);
                 
                 $message = 'Hi there!';
-                $request = new HttpRequest(sprintf('http://localhost:%u/test', $port), new StringInputStream($message), 'POST');
+                $request = new HttpRequest(sprintf('http://localhost:%u/test', $port), 'POST');
+                $request = $request->withBody(new StringBody($message));
                 
                 if (!$chunked) {
                     $request = $request->withProtocolVersion('1.0');
@@ -231,7 +232,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
-                $this->assertEquals('RECEIVED: ' . $message, yield from Stream::readContents($response->getBody()));
+                $this->assertEquals('RECEIVED: ' . $message, yield from $response->getBody()->getContents());
             } finally {
                 $worker->cancel();
             }
@@ -255,7 +256,7 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
             $response = yield from $connector->send($request);
             
             try {
-                $body = $response->getBody();
+                $body = yield from $response->getBody()->getInputStream();
                 
                 while (!$body->eof()) {
                     yield from $body->read();

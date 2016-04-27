@@ -17,6 +17,7 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\HttpUpgradeHandlerInterface;
+use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
@@ -297,9 +298,9 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         
         $uri = Uri::parse(sprintf('%s://%s/%s', $endpoint->isEncrypted() ? 'https' : 'http', $authority, $path));
         
-        $request = new HttpRequest($uri, $event->body, $event->getHeaderValue(':method'));
-        $request = $request->withProtocolVersion('2.0');
-    
+        $request = new HttpRequest($uri, $event->getHeaderValue(':method'), [], '2.0');
+        $request = $request->withBody(new StreamBody($event->body));
+        
         foreach ($event->headers as $header) {
             if ($header[0][0] !== ':') {
                 $request = $request->withAddedHeader($header[0], $header[1]);
@@ -314,8 +315,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             ]);
         }
         
-        $response = new HttpResponse();
-        $response = $response->withProtocolVersion('2.0');
+        $response = new HttpResponse(Http::CODE_OK, [], '2.0');
         
         $response = $action($request, $response);
         

@@ -15,6 +15,7 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
@@ -162,8 +163,8 @@ class Http2Connector implements HttpConnectorInterface
     {
         $event->consume();
         
-        $response = new HttpResponse($event->getHeaderValue(':status'), $event->body);
-        $response = $response->withProtocolVersion('2.0');
+        $response = new HttpResponse($event->getHeaderValue(':status'), [], '2.0');
+        $response = $response->withBody(new StreamBody($event->body));
         
         foreach ($event->headers as $header) {
             if ($header[0][0] !== ':') {

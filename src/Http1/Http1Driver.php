@@ -119,8 +119,7 @@ class Http1Driver implements HttpDriverInterface
             $uri .= $endpoint->getPeerName() . '/' . ltrim($m[2], '/');
             $uri = Uri::parse($uri)->withPort($endpoint->getPort());
             
-            $request = new HttpRequest($uri, $socket, $m[1], $headers);
-            $request = $request->withProtocolVersion($m[3]);
+            $request = new HttpRequest($uri, $m[1], $headers, $m[3]);
             
             $response = new HttpResponse();
             $response = $response->withProtocolVersion($request->getProtocolVersion());
@@ -128,46 +127,15 @@ class Http1Driver implements HttpDriverInterface
             // Attempt to upgrade HTTP connection before further processing.
             if (NULL !== ($handler = $this->findUpgradeHandler($request, $endpoint))) {
                 $response = yield from $handler->upgradeConnection($socket, $request, $response, $endpoint, $action);
-            
+                
                 if ($response instanceof HttpResponse) {
                     return yield from $this->sendResponse($socket, $response, false, $started);
                 }
-            
+                
                 return;
             }
             
-            // Signal clients to send body immediately for now...
-            if (isset($headers['expect']) && (float) $m[3] >= 1.1) {
-                $expected = array_map('strtolower', array_map('trim', explode(',', $headers['expect'])));
-                
-                if (in_array('100-continue', $expected)) {
-                    $socket = new ExpectContinueInputStream($socket, $m[3]);
-                }
-            }
-            
-            if (isset($headers['transfer-encoding'])) {
-                $encodings = strtolower(implode(',', $headers['transfer-encoding']));
-                $encodings = array_map('trim', explode(',', $encodings));
-                
-                if (in_array('chunked', $encodings)) {
-                    $body = yield from ChunkDecodedInputStream::open($socket, false);
-                } else {
-                    throw new StatusException(Http::CODE_NOT_IMPLEMENTED);
-                }
-            } elseif (isset($headers['content-length'])) {
-                try {
-                    $len = Http::parseContentLength(implode(', ', $headers['content-length']));
-                } catch (\Throwable $e) {
-                    throw new StatusException(Http::CODE_BAD_REQUEST, $e);
-                }
-                
-                $body = ($len === 0) ? new StringInputStream(): new LimitInputStream($socket, $len, false);
-            } else {
-                // Dropping request body if neighter content-length nor chunked encoding are specified.
-                $body = new StringInputStream();
-            }
-            
-            $request = $request->withBody($body);
+            $request = $request->withBody(Http1Body::fromHeaders($socket, $headers, $request->getProtocolVersion()));
             
             if ($this->logger) {
                 $this->logger->debug('>> {method} {target} HTTP/{version}', [
@@ -319,7 +287,7 @@ class Http1Driver implements HttpDriverInterface
         }
         
         if ($chunked) {
-            $in = $response->getBody();
+            $in = yield from $response->getBody()->getInputStream();
             $chunk = $in->eof() ? '' : yield from $in->read();
             
             if ($chunk === '') {
@@ -328,7 +296,7 @@ class Http1Driver implements HttpDriverInterface
                 $message .= "Transfer-Encoding: chunked\r\n";
             }
         } else {
-            $in = $response->getBody();
+            $in = yield from $response->getBody()->getInputStream();
             $body = yield from Stream::temp();
             $length = 0;
             

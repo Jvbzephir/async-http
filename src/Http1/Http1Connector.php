@@ -16,6 +16,7 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
@@ -151,7 +152,7 @@ class Http1Connector implements HttpConnectorInterface
      */
     protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
     {
-        $body = $request->getBody();
+        $body = yield from $request->getBody()->getInputStream();
         
         try {
             $chunk = $body->eof() ? '' : yield from $body->read();
@@ -301,9 +302,9 @@ class Http1Connector implements HttpConnectorInterface
             }
         }
         
-        $response = new HttpResponse((int) $m[2], $stream, $headers);
-        $response = $response->withProtocolVersion($m[1]);
+        $response = new HttpResponse((int) $m[2], $headers, $m[1]);
         $response = $response->withStatus((int) $m[2], trim($m[3]));
+        $response = $response->withBody(new StreamBody($stream));
         
         if ($this->logger) {
             $this->logger->debug('>> HTTP/{version} {status} {reason}', [

@@ -15,6 +15,7 @@ use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
@@ -375,7 +376,9 @@ class ConnectionHandler
         
         $uri = Uri::parse($uri . '/' . ltrim($params['REQUEST_URI'] ?? '', '/'));
         
-        $request = new HttpRequest($uri, $this->requests[$requestId]['stdin']->rewind(), $params['REQUEST_METHOD'] ?? 'GET');
+        $request = new HttpRequest($uri, $params['REQUEST_METHOD'] ?? 'GET');
+        $request = $request->withBody(new StreamBody($this->requests[$requestId]['stdin']->rewind()));
+        
         $m = NULL;
         
         if (preg_match("'^HTTP/([1-9]\\.[0-9])$'i", $params['SERVER_PROTOCOL'] ?? '', $m)) {
@@ -452,7 +455,7 @@ class ConnectionHandler
         
         yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, $message . "\r\n"));
         
-        $body = $response->getBody();
+        $body = yield from $response->getBody()->getInputStream();
         
         try {
             while (!$body->eof()) {
