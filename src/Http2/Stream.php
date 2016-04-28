@@ -18,7 +18,6 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use Psr\Log\LoggerInterface;
 
-use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\currentTask;
 use function KoolKode\Async\eventEmitter;
 
