@@ -305,14 +305,21 @@ class MyPack
             $offset += $len;
         }
     }
-    
+        
     /**
      * Contains encoded symbols (characters), keys are the Huffman codes.
      * 
      * @var array
      */
     private static $symbols = [];
-
+    
+    /**
+     * Keeps track of all codes accessible via sorted index.
+     * 
+     * @var array
+     */
+    private static $codes = [];
+    
     /**
      * Contains the number of codes by code length (bit count).
      * 
@@ -359,6 +366,8 @@ class MyPack
         }
         
         // Compute code length distribution and keep track of first code for each length.
+        $i = 0;
+        
         foreach ($sorter as list ($code, $len)) {
             if (isset(self::$codeLengths[$len])) {
                 self::$codeLengths[$len]++;
@@ -367,8 +376,10 @@ class MyPack
             }
             
             if (!isset(self::$startCodes[$len])) {
-                self::$startCodes[$len] = $code;
+                self::$startCodes[$len] = $i;
             }
+            
+            self::$codes[$i++] = $code;
         }
         
         // Compute number of additional bits to be read when switching to next code length.
@@ -406,7 +417,7 @@ class MyPack
             
             // Increment in steps to avoid checking codes with a length that is not used by Huffman codes.
             for ($step = 0; $step < self::$stepCount; $step++) {
-                for ($n = 0; $n < self::$steps[$step]; $n++) {
+                for ($i = 0; $i < self::$steps[$step]; $i++) {
                     if ($buffer === '') {
                         if ($byteOffset == strlen($encoded)) {
                             if ($this->isHuffmanPaddingCode($code)) {
@@ -431,11 +442,13 @@ class MyPack
                 
                 $codeLen += self::$steps[$step];
                 
-                // Range checks are sufficient due to canonical Huffman encoding using a continuous sequence of codes for each length.
-                if ($code > self::$startCodes[$codeLen] && ($code - self::$startCodes[$codeLen]) < self::$codeLengths[$codeLen]) {
-                    $decoded .= self::$symbols[$code];
-                    
-                    continue 2;
+                // Macth code against all codes with the same length.
+                for ($i = 0; $i < self::$codeLengths[$codeLen]; $i++) {
+                    if (self::$codes[self::$startCodes[$codeLen] + $i] == $code) {
+                        $decoded .= self::$symbols[$code];
+                        
+                        continue 3;
+                    }
                 }
             }
             
