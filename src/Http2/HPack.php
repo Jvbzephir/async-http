@@ -1,479 +1,1395 @@
 <?php
 
+/*
+ * This file is part of KoolKode Async HTTP.
+ *
+ * (c) Martin Schröder <m.schroeder2007@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace KoolKode\Async\Http\Http2;
 
 /**
- * HPack header compression / decompression.
+ * HPACK implementation.
  * 
- * Code copied from Aerys.
- * 
- * @link https://github.com/amphp/aerys
+ * @author Martin Schröder
  */
-class HPack {
-    const HUFFMAN_CODE = [
-        /* 0x00 */ 0x1ff8, 0x7fffd8, 0xfffffe2, 0xfffffe3, 0xfffffe4, 0xfffffe5, 0xfffffe6, 0xfffffe7,
-        /* 0x08 */ 0xfffffe8, 0xffffea, 0x3ffffffc, 0xfffffe9, 0xfffffea, 0x3ffffffd, 0xfffffeb, 0xfffffec,
-        /* 0x10 */ 0xfffffed, 0xfffffee, 0xfffffef, 0xffffff0, 0xffffff1, 0xffffff2, 0x3ffffffe, 0xffffff3,
-        /* 0x18 */ 0xffffff4, 0xffffff5, 0xffffff6, 0xffffff7, 0xffffff8, 0xffffff9, 0xffffffa, 0xffffffb,
-        /* 0x20 */ 0x14, 0x3f8, 0x3f9, 0xffa, 0x1ff9, 0x15, 0xf8, 0x7fa,
-        /* 0x28 */ 0x3fa, 0x3fb, 0xf9, 0x7fb, 0xfa, 0x16, 0x17, 0x18,
-        /* 0x30 */ 0x0, 0x1, 0x2, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,
-        /* 0x38 */ 0x1e, 0x1f, 0x5c, 0xfb, 0x7ffc, 0x20, 0xffb, 0x3fc,
-        /* 0x40 */ 0x1ffa, 0x21, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62,
-        /* 0x48 */ 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a,
-        /* 0x50 */ 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72,
-        /* 0x58 */ 0xfc, 0x73, 0xfd, 0x1ffb, 0x7fff0, 0x1ffc, 0x3ffc, 0x22,
-        /* 0x60 */ 0x7ffd, 0x3, 0x23, 0x4, 0x24, 0x5, 0x25, 0x26,
-        /* 0x68 */ 0x27, 0x6, 0x74, 0x75, 0x28, 0x29, 0x2a, 0x7,
-        /* 0x70 */ 0x2b, 0x76, 0x2c, 0x8, 0x9, 0x2d, 0x77, 0x78,
-        /* 0x78 */ 0x79, 0x7a, 0x7b, 0x7ffe, 0x7fc, 0x3ffd, 0x1ffd, 0xffffffc,
-        /* 0x80 */ 0xfffe6, 0x3fffd2, 0xfffe7, 0xfffe8, 0x3fffd3, 0x3fffd4, 0x3fffd5, 0x7fffd9,
-        /* 0x88 */ 0x3fffd6, 0x7fffda, 0x7fffdb, 0x7fffdc, 0x7fffdd, 0x7fffde, 0xffffeb, 0x7fffdf,
-        /* 0x90 */ 0xffffec, 0xffffed, 0x3fffd7, 0x7fffe0, 0xffffee, 0x7fffe1, 0x7fffe2, 0x7fffe3,
-        /* 0x98 */ 0x7fffe4, 0x1fffdc, 0x3fffd8, 0x7fffe5, 0x3fffd9, 0x7fffe6, 0x7fffe7, 0xffffef,
-        /* 0xA0 */ 0x3fffda, 0x1fffdd, 0xfffe9, 0x3fffdb, 0x3fffdc, 0x7fffe8, 0x7fffe9, 0x1fffde,
-        /* 0xA8 */ 0x7fffea, 0x3fffdd, 0x3fffde, 0xfffff0, 0x1fffdf, 0x3fffdf, 0x7fffeb, 0x7fffec,
-        /* 0xB0 */ 0x1fffe0, 0x1fffe1, 0x3fffe0, 0x1fffe2, 0x7fffed, 0x3fffe1, 0x7fffee, 0x7fffef,
-        /* 0xB8 */ 0xfffea, 0x3fffe2, 0x3fffe3, 0x3fffe4, 0x7ffff0, 0x3fffe5, 0x3fffe6, 0x7ffff1,
-        /* 0xC0 */ 0x3ffffe0, 0x3ffffe1, 0xfffeb, 0x7fff1, 0x3fffe7, 0x7ffff2, 0x3fffe8, 0x1ffffec,
-        /* 0xC8 */ 0x3ffffe2, 0x3ffffe3, 0x3ffffe4, 0x7ffffde, 0x7ffffdf, 0x3ffffe5, 0xfffff1, 0x1ffffed,
-        /* 0xD0 */ 0x7fff2, 0x1fffe3, 0x3ffffe6, 0x7ffffe0, 0x7ffffe1, 0x3ffffe7, 0x7ffffe2, 0xfffff2,
-        /* 0xD8 */ 0x1fffe4, 0x1fffe5, 0x3ffffe8, 0x3ffffe9, 0xffffffd, 0x7ffffe3, 0x7ffffe4, 0x7ffffe5,
-        /* 0xE0 */ 0xfffec, 0xfffff3, 0xfffed, 0x1fffe6, 0x3fffe9, 0x1fffe7, 0x1fffe8, 0x7ffff3,
-        /* 0xE8 */ 0x3fffea, 0x3fffeb, 0x1ffffee, 0x1ffffef, 0xfffff4, 0xfffff5, 0x3ffffea, 0x7ffff4,
-        /* 0xF0 */ 0x3ffffeb, 0x7ffffe6, 0x3ffffec, 0x3ffffed, 0x7ffffe7, 0x7ffffe8, 0x7ffffe9, 0x7ffffea,
-        /* 0xF8 */ 0x7ffffeb, 0xffffffe, 0x7ffffec, 0x7ffffed, 0x7ffffee, 0x7ffffef, 0x7fffff0, 0x3ffffee,
-        /* end! */ 0x3fffffff
-    ];
-
-    const HUFFMAN_CODE_LENGTHS = [
-        /* 0x00 */ 13, 23, 28, 28, 28, 28, 28, 28,
-        /* 0x08 */ 28, 24, 30, 28, 28, 30, 28, 28,
-        /* 0x10 */ 28, 28, 28, 28, 28, 28, 30, 28,
-        /* 0x18 */ 28, 28, 28, 28, 28, 28, 28, 28,
-        /* 0x20 */ 6, 10, 10, 12, 13, 6, 8, 11,
-        /* 0x28 */ 10, 10, 8, 11, 8, 6, 6, 6,
-        /* 0x30 */ 5, 5, 5, 6, 6, 6, 6, 6,
-        /* 0x38 */ 6, 6, 7, 8, 15, 6, 12, 10,
-        /* 0x40 */ 13, 6, 7, 7, 7, 7, 7, 7,
-        /* 0x48 */ 7, 7, 7, 7, 7, 7, 7, 7,
-        /* 0x50 */ 7, 7, 7, 7, 7, 7, 7, 7,
-        /* 0x58 */ 8, 7, 8, 13, 19, 13, 14, 6,
-        /* 0x60 */ 15, 5, 6, 5, 6, 5, 6, 6,
-        /* 0x68 */ 6, 5, 7, 7, 6, 6, 6, 5,
-        /* 0x70 */ 6, 7, 6, 5, 5, 6, 7, 7,
-        /* 0x78 */ 7, 7, 7, 15, 11, 14, 13, 28,
-        /* 0x80 */ 20, 22, 20, 20, 22, 22, 22, 23,
-        /* 0x88 */ 22, 23, 23, 23, 23, 23, 24, 23,
-        /* 0x90 */ 24, 24, 22, 23, 24, 23, 23, 23,
-        /* 0x98 */ 23, 21, 22, 23, 22, 23, 23, 24,
-        /* 0xA0 */ 22, 21, 20, 22, 22, 23, 23, 21,
-        /* 0xA8 */ 23, 22, 22, 24, 21, 22, 23, 23,
-        /* 0xB0 */ 21, 21, 22, 21, 23, 22, 23, 23,
-        /* 0xB8 */ 20, 22, 22, 22, 23, 22, 22, 23,
-        /* 0xC0 */ 26, 26, 20, 19, 22, 23, 22, 25,
-        /* 0xC8 */ 26, 26, 26, 27, 27, 26, 24, 25,
-        /* 0xD0 */ 19, 21, 26, 27, 27, 26, 27, 24,
-        /* 0xD8 */ 21, 21, 26, 26, 28, 27, 27, 27,
-        /* 0xE0 */ 20, 24, 20, 21, 22, 21, 21, 23,
-        /* 0xE8 */ 22, 22, 25, 25, 24, 24, 26, 23,
-        /* 0xF0 */ 26, 27, 26, 26, 27, 27, 27, 27,
-        /* 0xF8 */ 27, 28, 27, 27, 27, 27, 27, 26,
-        /* end! */ 30
-    ];
-
-    private static $huffman_lookup;
-    private static $huffman_codes;
-    private static $huffman_lens;
-
-    private $headers = [];
-    private $maxSize = 4096;
-    private $size = 0;
-
-    public static function init() {
-        self::$huffman_lookup = self::huffman_lookup_init();
-        self::$huffman_codes = self::huffman_codes_init();
-        self::$huffman_lens = self::huffman_lens_init();
+class HPack
+{
+    const SIZE_LIMIT = 4096;
+    
+    /**
+     * Size of the dynmic table.
+     * 
+     * @var int
+     */
+    protected $size = 0;
+    
+    /**
+     * Max dynmic table size.
+     * 
+     * @var int
+     */
+    protected $maxSize = 4096;
+    
+    /**
+     * Dynamic table.
+     * 
+     * @var array
+     */
+    protected $table = [];
+    
+    /**
+     * Get the current size of the dynamic table.
+     * 
+     * @return int
+     */
+    public function getDynamicTableSize(): int
+    {
+        return count($this->table);
     }
-
-    // (micro-)optimized decode
-    private static function huffman_lookup_init() {
-        $encodingAccess = [];
-        $terminals = [];
-        gc_disable();
-
-        foreach (self::HUFFMAN_CODE as $chr => $bits) {
-            $len = self::HUFFMAN_CODE_LENGTHS[$chr];
-            for ($bit = 0; $bit < 8; $bit++) {
-                $offlen = $len + $bit;
-                $next = &$encodingAccess[$bit];
-                for ($byte = (int)(($offlen - 1) / 8); $byte > 0; $byte--) {
-                    $cur = str_pad(decbin(($bits >> ($byte * 8 - (0x30 - $offlen) % 8)) & 0xFF), 8, "0", STR_PAD_LEFT);
-                    if (isset($next[$cur]) && $next[$cur][0] != $encodingAccess[0]) {
-                        $next = &$next[$cur][0];
+    
+    /**
+     * Encode the given HTTP headers using HPACK header compression.
+     * 
+     * Eeach header must be an array, element 0 must be the lowercased header name, element 1 holds the value.
+     * 
+     * @param array $headers
+     * @return string
+     */
+    public function encode(array $headers): string
+    {
+        $result = '';
+        
+        foreach ($headers as list ($k, $v)) {
+            $index = self::STATIC_TABLE_LOOKUP[$k . ':' . $v] ?? NULL;
+            
+            if ($index !== NULL) {
+                // Indexed Header Field
+                if ($index < 0x7F) {
+                    $result .= chr($index | 0x80);
+                } else {
+                    $result .= "\xFF" . $this->encodeInt($index - 0x7F);
+                }
+                
+                continue;
+            }
+            
+            $index = self::STATIC_TABLE_LOOKUP[$k] ?? NULL;
+            
+            if ($index !== NULL) {
+                // Literal Header Field without Indexing — Indexed Name
+                if ($index < 0x10) {
+                    $result .= chr($index);
+                } else {
+                    $result .= "\x0F" . $this->encodeInt($index - 0x0F);
+                }
+            } else {
+                // Literal Header Field without Indexing — New Name
+                if (strlen($k) < 0x7F) {
+                    $result .= "\x00" . chr(strlen($k)) . $k;
+                } else {
+                    $result .= "\x00\x7F" . $this->encodeInt(strlen($k) - 0x7F) . $k;
+                }
+            }
+            
+            if (strlen($v) < 0x7F) {
+                $result .= chr(strlen($v)) . $v;
+            } else {
+                $result .= "\x7F" . $this->encodeInt(strlen($v) - 0x7F) . $v;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Decode the given HPACK-encoded HTTP headers.
+     * 
+     * Returns an array of headers, each header is an array, element 0 is the name of the header and element 1 the value.
+     * 
+     * @param string $encoded
+     * @return array
+     * 
+     * @throws \RuntimeException
+     */
+    public function decode(string $encoded): array
+    {
+        $headers = [];
+        $encodedLength = strlen($encoded);
+        $offset = 0;
+        
+        while ($offset < $encodedLength) {
+            $index = ord($encoded[$offset++]);
+            
+            // Indexed Header Field Representation
+            if ($index & 0x80) {
+                if ($index <= self::STATIC_TABLE_SIZE + 0x80) {
+                    if ($index === 0x80) {
+                        throw new \RuntimeException(sprintf('Cannot access index %X in static table', $index));
+                    }
+                    
+                    $headers[] = self::STATIC_TABLE[$index - 0x80];
+                } else {
+                    if ($index == 0xFF) {
+                        $index = self::decodeInt($encoded, $offset) + 0xFF;
+                    }
+                    
+                    $index -= 0x81 + self::STATIC_TABLE_SIZE;
+                    
+                    if (!isset($this->table[$index])) {
+                        throw new \RuntimeException(sprintf('Missing index %X in dynamic table', $index));
+                    }
+                    
+                    $headers[] = $this->table[$index];
+                }
+                
+                continue;
+            }
+            
+            // Literal Header Field Representation
+            if (($index & 0x60) != 0x20) {
+                $dynamic = ($index & 0x40) ? true : false;
+                
+                if ($index & ($dynamic ? 0x3F : 0x0F)) {
+                    if ($dynamic) {
+                        if ($index == 0x7F) {
+                            $index = $this->decodeInt($encoded, $offset) + 0x3F;
+                        } else {
+                            $index &= 0x3F;
+                        }
                     } else {
-                        $tmp = &$next;
-                        unset($next);
-                        $tmp[$cur] = [&$next, null];
+                        $index &= 0x0F;
+                        
+                        if ($index == 0x0F) {
+                            $index = $this->decodeInt($encoded, $offset) + 0x0F;
+                        }
+                    }
+                    
+                    if ($index <= self::STATIC_TABLE_SIZE) {
+                        $name = self::STATIC_TABLE[$index][0];
+                    } else {
+                        $name = $this->table[$index - self::STATIC_TABLE_SIZE];
+                    }
+                } else {
+                    $name = $this->decodeString($encoded, $encodedLength, $offset);
+                }
+                
+                if ($offset === $encodedLength) {
+                    throw new \RuntimeException(sprintf('Failed to decode value of header "%s"', $name));
+                }
+                
+                $headers[] = $header = [
+                    $name,
+                    $this->decodeString($encoded, $encodedLength, $offset)
+                ];
+                
+                if ($dynamic) {
+                    array_unshift($this->table, $header);
+                    $this->size += 32 + strlen($header[0]) + strlen($header[1]);
+                    
+                    if ($this->maxSize < $this->size) {
+                        $this->resizeDynamicTable();
                     }
                 }
-                $key = str_pad(decbin($bits & ((1 << ((($offlen - 1) % 8) + 1)) - 1)), ((($offlen - 1) % 8) + 1), "0", STR_PAD_LEFT);
-                $next[$key] = [null, $chr > 0xFF ? "" : chr($chr)];
-                if ($offlen % 8) {
-                    $terminals[$offlen % 8][] = [$key, &$next];
-                } else {
-                    $next[$key][0] = &$encodingAccess[0];
+                
+                continue;
+            }
+            
+            // Dynamic Table Size Update
+            if ($index == 0x3F) {
+                $index = $this->decodeInt($encoded, $offset) + 0x40;
+                
+                if ($index > self::SIZE_LIMIT) {
+                    throw new \RuntimeException(sprintf('Attempting to resize dynamic table to %u, limit is %u', $index, self::SIZE_LIMIT));
                 }
+                
+                $this->resizeDynamicTable($index);
             }
         }
-
-        $memoize = [];
-        for ($off = 7; $off > 0; $off--) {
-            foreach ($terminals[$off] as &$terminal) {
-                $key = $terminal[0];
-                $next = &$terminal[1];
-                if ($next[$key][0] === null) {
-                    foreach ($encodingAccess[$off] as $chr => &$cur) {
-                        $next[($memoize[$key] ?? $memoize[$key] = str_pad($key, 8, "0", STR_PAD_RIGHT)) | $chr] = [&$cur[0], $next[$key][1] != "" ? $next[$key][1] . $cur[1] : ""];
-                    }
-
-                    unset($next[$key]);
-                }
-            }
-        }
-
-        $memoize = [];
-        ($fn = function (&$arr) use (&$fn, &$encodingAccess, &$memoize) {
-            ksort($arr, SORT_STRING); // this line is really not performant...
-            foreach ($arr as $k => $v) {
-                $arr[$memoize[$k] ?? $memoize[$k] = chr(bindec($k))] = $v;
-                unset($arr[$k]);
-            }
-            foreach ($arr as $k => $v) {
-                if (\strlen(key($v[0])) == 8) { // prevent infinite recursion
-                    $fn($v[0]);
-                }
-            }
-        })($encodingAccess[0]);
-
-        gc_enable();
-        gc_collect_cycles();
-        return $encodingAccess[0];
+        
+        return $headers;
     }
-
-    public static function huffman_decode($input) {
-        $lookup = self::$huffman_lookup;
-        $len = \strlen($input);
-        $out = str_repeat("\0", $len / 5 * 8 + 1); // max length
-
-        for ($off = $i = 0; $i < $len; $i++) {
-            list($lookup, $chr) = $lookup[$input[$i]];
-
-            if ($chr != null) {
-                $out[$off++] = $chr;
-                if (\strlen($chr) !== 2) {
-                    continue;
-                } else {
-                    $out[$off++] = $chr[1];
-                    continue;
-                }
-            }
-            if ($chr === "") {
-                return null;
-            }
-        }
-
-        return substr($out, 0, $off);
-    }
-
-    private static function huffman_codes_init() {
-        $lookup = [];
-
-        for ($chr = 0; $chr <= 0xFF; $chr++) {
-            $bits = self::HUFFMAN_CODE[$chr];
-            $len = self::HUFFMAN_CODE_LENGTHS[$chr];
-            for ($bit = 0; $bit < 8; $bit++) {
-                $bytes = floor(($len + $bit - 1) / 8);
-                for ($byte = $bytes; $byte >= 0; $byte--) {
-                    $lookup[$bit][chr($chr)][] = chr($byte ? $bits >> ($len - ($bytes - $byte + 1) * 8 + $bit) : ($bits << ((0x30 - $len - $bit) % 8)));
-                }
-            }
-        }
-
-        return $lookup;
-    }
-
-    private static function huffman_lens_init() {
-        $lens = [];
-
-        for ($chr = 0; $chr <= 0xFF; $chr++) {
-            $lens[chr($chr)] = self::HUFFMAN_CODE_LENGTHS[$chr];
-        }
-
-        return $lens;
-    }
-
-    public static function huffman_encode($input) {
-        $codes = self::$huffman_codes;
-        $lens = self::$huffman_lens;
-
-        $len = \strlen($input);
-        $out = \str_repeat("\0", $len * 5 + 1); // max length
-
-        for ($bitcount = $i = 0; $i < $len; $i++) {
-            $chr = $input[$i];
-            $byte = $bitcount >> 3;
-            foreach ($codes[$bitcount % 8][$chr] as $bits) {
-                $out[$byte] = $out[$byte] | $bits;
-                $byte++;
-            }
-            $bitcount += $lens[$chr];
-        }
-
-        $bytes = $bitcount / 8;
-        $e = (int)\ceil($bytes);
-        if ($e != $bytes) {
-            $out[$e - 1] = $out[$e - 1] | \chr(0xFF >> $bitcount % 8);
-        }
-        return \substr($out, 0, $e);
-    }
-
-    /** @see RFC 7541 Appendix A */
-    const LAST_INDEX = 61;
-    const TABLE = [ // starts at 1
-        [":authority", ""],
-        [":method", "GET"],
-        [":method", "POST"],
-        [":path", "/"],
-        [":path", "/index.html"],
-        [":scheme", "http"],
-        [":scheme", "https"],
-        [":status", "200"],
-        [":status", "204"],
-        [":status", "206"],
-        [":status", "304"],
-        [":status", "400"],
-        [":status", "404"],
-        [":status", "500"],
-        ["accept-charset", ""],
-        ["accept-encoding", "gzip, deflate"],
-        ["accept-language", ""],
-        ["accept-ranges", ""],
-        ["accept", ""],
-        ["access-control-allow-origin", ""],
-        ["age", ""],
-        ["allow", ""],
-        ["authorization", ""],
-        ["cache-control", ""],
-        ["content-disposition", ""],
-        ["content-encoding", ""],
-        ["content-language", ""],
-        ["content-length", ""],
-        ["content-location", ""],
-        ["content-range", ""],
-        ["content-type", ""],
-        ["cookie", ""],
-        ["date", ""],
-        ["etag", ""],
-        ["expect", ""],
-        ["expires", ""],
-        ["from", ""],
-        ["host", ""],
-        ["if-match", ""],
-        ["if-modified-since", ""],
-        ["if-none-match", ""],
-        ["if-range", ""],
-        ["if-unmodified-since", ""],
-        ["last-modified", ""],
-        ["link", ""],
-        ["location", ""],
-        ["max-forwards", ""],
-        ["proxy-authentication", ""],
-        ["proxy-authorization", ""],
-        ["range", ""],
-        ["referer", ""],
-        ["refresh", ""],
-        ["retry-after", ""],
-        ["server", ""],
-        ["set-cookie", ""],
-        ["strict-transport-security", ""],
-        ["transfer-encoding", ""],
-        ["user-agent", ""],
-        ["vary", ""],
-        ["via", ""],
-        ["www-authenticate", ""]
-    ];
-
-    private static function decode_dynamic_integer(&$input, &$off) {
-        $c = \ord($input[$off++]);
-        $int = $c & 0x7f;
-        $i = 0;
-        while ($c & 0x80) {
-            if (!isset($input[$off])) {
-                return -0x80;
-            }
-            $c = \ord($input[$off++]);
-            $int += ($c & 0x7f) << (++$i * 7);
-        }
-        return $int;
-    }
-
-    // removal of old entries as per 4.4
-    public function table_resize($maxSize = null) {
-        if (isset($maxSize)) {
+    
+    protected function resizeDynamicTable(int $maxSize = NULL)
+    {
+        if ($maxSize !== NULL) {
             $this->maxSize = $maxSize;
         }
+        
         while ($this->size > $this->maxSize) {
-            list($name, $value) = \array_pop($this->headers);
+            list ($name, $value) = \array_pop($this->headers);
             $this->size -= 32 + \strlen($name) + \strlen($value);
         }
     }
-
-    public function decode($input) {
-        $headers = [];
-        $off = 0;
-        $inputlen = \strlen($input);
-
-        // dynamic $table as per 2.3.2
-        while ($off < $inputlen) {
-            $index = \ord($input[$off++]);
-            if ($index & 0x80) {
-                // range check
-                if ($index <= self::LAST_INDEX + 0x80) {
-                    if ($index === 0x80) {
-                        return null;
-                    }
-                    $headers[] = self::TABLE[$index - 0x81];
-                } else {
-                    if ($index == 0xff) {
-                        $index = self::decode_dynamic_integer($input, $off) + 0xff;
-                    }
-                    $index -= 0x81 + self::LAST_INDEX;
-                    if (!isset($this->headers[$index])) {
-                        return null;
-                    }
-                    $headers[] = $this->headers[$index];
-                }
-            } elseif (($index & 0x60) != 0x20) { // (($index & 0x40) || !($index & 0x20)): bit 4: never index is ignored
-                $dynamic = (bool)($index & 0x40);
-                if ($index & ($dynamic ? 0x3f : 0x0f)) { // separate length
-                    if ($dynamic) {
-                        if ($index == 0x7f) {
-                            $index = self::decode_dynamic_integer($input, $off) + 0x3f;
-                        } else {
-                            $index &= 0x3f;
-                        }
-                    } else {
-                        $index &= 0x0f;
-                        if ($index == 0x0f) {
-                            $index = self::decode_dynamic_integer($input, $off) + 0x0f;
-                        }
-                    }
-                    if ($index <= self::LAST_INDEX) {
-                        $header = self::TABLE[$index - 1];
-                    } else {
-                        $header = $this->headers[$index - 1 - self::LAST_INDEX];
-                    }
-                } else {
-                    $len = \ord($input[$off++]);
-                    $huffman = $len & 0x80;
-                    $len &= 0x7f;
-                    if ($len == 0x7f) {
-                        $len = self::decode_dynamic_integer($input, $off) + 0x7f;
-                    }
-                    if ($inputlen - $off < $len || $len <= 0) {
-                        return null;
-                    }
-                    if ($huffman) {
-                        $header = [self::huffman_decode(\substr($input, $off, $len))];
-                    } else {
-                        $header = [\substr($input, $off, $len)];
-                    }
-                    $off += $len;
-                }
-                if ($off == $inputlen) {
-                    return null;
-                }
-                $len = \ord($input[$off++]);
-                $huffman = $len & 0x80;
-                $len &= 0x7f;
-                if ($len == 0x7f) {
-                    $len = self::decode_dynamic_integer($input, $off) + 0x7f;
-                }
-                if ($inputlen - $off < $len || $len < 0) {
-                    return null;
-                }
-                if ($huffman) {
-                    $header[1] = self::huffman_decode(\substr($input, $off, $len));
-                } else {
-                    $header[1] = \substr($input, $off, $len);
-                }
-                $off += $len;
-                if ($dynamic) {
-                    \array_unshift($this->headers, $header);
-                    $this->size += 32 + \strlen($header[0]) + \strlen($header[1]);
-                    if ($this->maxSize < $this->size) {
-                        $this->table_resize();
-                    }
-                }
-                $headers[] = $header;
-            } else { //if ($index & 0x20) {
-                if ($index == 0x3f) {
-                    $index = self::decode_dynamic_integer($input, $off) + 0x40;
-                }
-                if ($index > 4096) { // initial limit … may be adjusted??
-                    return null;
-                } else {
-                    $this->table_resize($index);
-                }
-            }
-        }
-
-        return $headers;
-    }
-
-    private static function encode_dynamic_integer($int) {
-        $out = "";
+    
+    /**
+     * Encode an integer value according to HPACK Integer Representation.
+     * 
+     * @param int $int
+     * @return string
+     */
+    protected function encodeInt(int $int): string
+    {
+        $result = '';
         $i = 0;
+        
         while (($int >> $i) > 0x80) {
-            $out .= \chr(0x80 | (($int >> $i) & 0x7f));
+            $result .= chr(0x80 | (($int >> $i) & 0x7F));
             $i += 7;
         }
-        return $out . chr($int >> $i);
+        
+        return $result . chr($int >> $i);
     }
+    
+    /**
+     * Decode an HPACK-encoded integer.
+     * 
+     * @param string $encoded
+     * @param int $offset
+     * @return int
+     */
+    protected function decodeInt(string $encoded, int & $offset): int
+    {
+        $byte = ord($encoded[$offset++]);
+        $int = $byte & 0x7F;
+        $i = 0;
+        
+        while ($byte & 0x80) {
+            if (!isset($encoded[$offset])) {
+                return -0x80;
+            }
+            
+            $byte = ord($encoded[$offset++]);
+            $int += ($byte & 0x7F) << (++$i * 7);
+        }
+        
+        return $int;
+    }
+    
+    /**
+     * Decode an HPACK String Literal.
+     * 
+     * Huffman-encoded string literals are supported.
+     * 
+     * @param string $encoded
+     * @param int $encodedLength
+     * @param int $offset
+     * @return string
+     * 
+     * @throws \RuntimeException
+     */
+    protected function decodeString(string $encoded, int $encodedLength, int & $offset): string
+    {
+        $len = ord($encoded[$offset++]);
+        $huffman = ($len & 0x80) ? true : false;
+        $len &= 0x7F;
+        
+        if ($len == 0x7F) {
+            $len = $this->decodeInt($encoded, $offset) + 0x7F;
+        }
+        
+        if (($encodedLength - $offset) < $len || $len <= 0) {
+            throw new \RuntimeException('Failed to read encoded string');
+        }
+        
+        try {
+            if ($huffman) {
+                return $this->decodeHuffmanString(substr($encoded, $offset, $len));
+            }
+            
+            return substr($encoded, $offset, $len);
+        } finally {
+            $offset += $len;
+        }
+    }
+        
+    /**
+     * Contains encoded symbols (characters), keys are the Huffman codes.
+     * 
+     * @var array
+     */
+    private static $symbols = [];
+    
+    /**
+     * Keeps track of all codes accessible via sorted index.
+     * 
+     * @var array
+     */
+    private static $codes = [];
+    
+    /**
+     * Contains the number of codes by code length (bit count).
+     * 
+     * @var array
+     */
+    private static $codeLengths = [];
 
-    public static function encode($headers) {
-        // @TODO implementation is deliberately primitive... [doesn't use any dynamic table...]
-        $output = [];
+    /**
+     * Contains the first (and according to canonical Huffman encoding lowest) code for each code length.
+     * 
+     * @var array
+     */
+    private static $startCodes = [];
 
-        foreach ($headers as $name => $values) {
-            foreach ((array) $values as $value) {
-                foreach (self::TABLE as $index => list($header_name)) {
-                    if ($name == $header_name) {
-                        break;
+    /**
+     * Holds a sequence of increments that determine the number of bits to be read to reach the next code length.
+     * 
+     * @var array
+     */
+    private static $steps = [];
+
+    /**
+     * Total number of increments (steps) needed in order to read the longest Huffman code.
+     * 
+     * @var int
+     */
+    private static $stepCount = 0;
+    
+    /**
+     * Prepare Huffman decoder by sorting codes and precomputing some helper arrays.
+     */
+    protected function initializeHuffmanCode()
+    {
+        $sorter = new \SplPriorityQueue();
+        
+        // Sort codes by length and create symbol table.
+        foreach (self::HUFFMAN_CODE as $i => $code) {
+            self::$symbols[$code] = ($i > 255) ? NULL : chr($i);
+            
+            $sorter->insert([
+                $code,
+                self::HUFFMAN_CODE_LENGTHS[$i]
+            ], -1 * self::HUFFMAN_CODE_LENGTHS[$i]);
+        }
+        
+        // Compute code length distribution and keep track of first code for each length.
+        $i = 0;
+        
+        foreach ($sorter as list ($code, $len)) {
+            if (isset(self::$codeLengths[$len])) {
+                self::$codeLengths[$len]++;
+            } else {
+                self::$codeLengths[$len] = 1;
+            }
+            
+            if (!isset(self::$startCodes[$len])) {
+                self::$startCodes[$len] = $i;
+            }
+            
+            self::$codes[$i++] = $code;
+        }
+        
+        // Compute number of additional bits to be read when switching to next code length.
+        $lens = array_keys(self::$codeLengths);
+        self::$stepCount = count($lens);
+        
+        foreach ($lens as $i => $step) {
+            self::$steps[] = $step - ($i ? $lens[$i - 1] : 0);
+        }
+    }
+    
+    /**
+     * Decode a canonical Huffman-encoded string.
+     * 
+     * @param string $encoded Encoded string.
+     * @return string Decoded string.
+     * 
+     * @throws \RuntimeException When the string contains invalid padding or a code could not found.
+     */
+    protected function decodeHuffmanString(string $encoded): string
+    {
+        if (empty(self::$symbols)) {
+            $this->initializeHuffmanCode();
+        }
+        
+        $decoded = '';
+        $buffer = NULL;
+        
+        $byteOffset = 0;
+        $bitOffset = 7;
+        
+        while (true) {
+            $code = 0;
+            $codeLen = 0;
+            
+            // Increment in steps to avoid checking codes with a length that is not used by Huffman codes.
+            for ($step = 0; $step < self::$stepCount; $step++) {
+                for ($i = 0; $i < self::$steps[$step]; $i++) {
+                    if ($buffer === NULL) {
+                        if ($byteOffset == strlen($encoded)) {
+                            if ($code === 0 || $this->isHuffmanPaddingCode($code)) {
+                                return $decoded;
+                            }
+                            
+                            throw new \RuntimeException('Cannot read beyond end of Huffman-encoded string');
+                        }
+                        
+                        $buffer = ord($encoded[$byteOffset]);
+                    }
+                    
+                    // Read next bit and and append it as LSB (least significant bit) to the code.
+                    $code = ($code << 1) | (($buffer >> $bitOffset--) & 1);
+                    
+                    if ($bitOffset == -1) {
+                        $byteOffset++;
+                        $bitOffset = 7;
+                        $buffer = NULL;
                     }
                 }
-                if ($name == $header_name) {
-                    if (++$index < 0x10) {
-                        $output[] = \chr($index);
-                    } else {
-                        $output[] = "\x0f" . \chr($index - 0x0f);
+                
+                $codeLen += self::$steps[$step];
+                
+                // Macth code against all codes with the same length.
+                for ($i = 0; $i < self::$codeLengths[$codeLen]; $i++) {
+                    if (self::$codes[self::$startCodes[$codeLen] + $i] == $code) {
+                        $decoded .= self::$symbols[$code];
+                        
+                        continue 3;
                     }
-                } elseif (\strlen($name) < 0x7f) {
-                    $output[] = "\0" . \chr(\strlen($name)) . $name;
-                } else {
-                    $output[] = "\0\x7f" . self::encode_dynamic_integer(\strlen($name) - 0x7f) . $name;
-                }
-                if (\strlen($value) < 0x7f) {
-                    $output[] = \chr(\strlen($value)) . $value;
-                } else {
-                    $output[] = "\x7f" . self::encode_dynamic_integer(\strlen($value) - 0x7f) . $value;
                 }
             }
+            
+            if ($this->isHuffmanPaddingCode($code)) {
+                return $decoded;
+            }
+            
+            break;
         }
-
-        return implode($output);
+        
+        throw new \RuntimeException('Invalid Huffman code detected');
     }
-}
+    
+    /**
+     * Check if the given code is allowed as final (padding) byte of a Huffman-encoded HPACK string.
+     * 
+     * @param int $code
+     * @return bool
+     */
+    protected function isHuffmanPaddingCode(int $code): bool
+    {
+        switch ($code) {
+            case 0b1:
+            case 0b11:
+            case 0b111:
+            case 0b1111:
+            case 0b11111:
+            case 0b111111:
+            case 0b1111111:
+                return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Size of the static table.
+     * 
+     * @var int
+     */
+    const STATIC_TABLE_SIZE = 61;
 
-HPack::init();
+    /**
+     * Static table, indexing starts at 1!
+     * 
+     * @var array
+     */
+    const STATIC_TABLE = [
+        1 => [
+            ':authority',
+            ''
+        ],
+        [
+            ':method',
+            'GET'
+        ],
+        [
+            ':method',
+            'POST'
+        ],
+        [
+            ':path',
+            '/'
+        ],
+        [
+            ':path',
+            '/index.html'
+        ],
+        [
+            ':scheme',
+            'http'
+        ],
+        [
+            ':scheme',
+            'https'
+        ],
+        [
+            ':status',
+            '200'
+        ],
+        [
+            ':status',
+            '204'
+        ],
+        [
+            ':status',
+            '206'
+        ],
+        [
+            ':status',
+            '304'
+        ],
+        [
+            ':status',
+            '400'
+        ],
+        [
+            ':status',
+            '404'
+        ],
+        [
+            ':status',
+            '500'
+        ],
+        [
+            'accept-charset',
+            ''
+        ],
+        [
+            'accept-encoding',
+            'gzip, deflate'
+        ],
+        [
+            'accept-language',
+            ''
+        ],
+        [
+            'accept-ranges',
+            ''
+        ],
+        [
+            'accept',
+            ''
+        ],
+        [
+            'access-control-allow-origin',
+            ''
+        ],
+        [
+            'age',
+            ''
+        ],
+        [
+            'allow',
+            ''
+        ],
+        [
+            'authorization',
+            ''
+        ],
+        [
+            'cache-control',
+            ''
+        ],
+        [
+            'content-disposition',
+            ''
+        ],
+        [
+            'content-encoding',
+            ''
+        ],
+        [
+            'content-language',
+            ''
+        ],
+        [
+            'content-length',
+            ''
+        ],
+        [
+            'content-location',
+            ''
+        ],
+        [
+            'content-range',
+            ''
+        ],
+        [
+            'content-type',
+            ''
+        ],
+        [
+            'cookie',
+            ''
+        ],
+        [
+            'date',
+            ''
+        ],
+        [
+            'etag',
+            ''
+        ],
+        [
+            'expect',
+            ''
+        ],
+        [
+            'expires',
+            ''
+        ],
+        [
+            'from',
+            ''
+        ],
+        [
+            'host',
+            ''
+        ],
+        [
+            'if-match',
+            ''
+        ],
+        [
+            'if-modified-since',
+            ''
+        ],
+        [
+            'if-none-match',
+            ''
+        ],
+        [
+            'if-range',
+            ''
+        ],
+        [
+            'if-unmodified-since',
+            ''
+        ],
+        [
+            'last-modified',
+            ''
+        ],
+        [
+            'link',
+            ''
+        ],
+        [
+            'location',
+            ''
+        ],
+        [
+            'max-forwards',
+            ''
+        ],
+        [
+            'proxy-authentication',
+            ''
+        ],
+        [
+            'proxy-authorization',
+            ''
+        ],
+        [
+            'range',
+            ''
+        ],
+        [
+            'referer',
+            ''
+        ],
+        [
+            'refresh',
+            ''
+        ],
+        [
+            'retry-after',
+            ''
+        ],
+        [
+            'server',
+            ''
+        ],
+        [
+            'set-cookie',
+            ''
+        ],
+        [
+            'strict-transport-security',
+            ''
+        ],
+        [
+            'transfer-encoding',
+            ''
+        ],
+        [
+            'user-agent',
+            ''
+        ],
+        [
+            'vary',
+            ''
+        ],
+        [
+            'via',
+            ''
+        ],
+        [
+            'www-authenticate',
+            ''
+        ]
+    ];
+
+    /**
+     * Lookup table being used to find indexes within the static table without using a loop.
+     * 
+     * @var array
+     */
+    const STATIC_TABLE_LOOKUP = [
+        ':authority' => 1,
+        ':method' => 2,
+        ':path' => 4,
+        ':scheme' => 6,
+        ':status' => 8,
+        'accept-charset' => 15,
+        'accept-encoding' => 16,
+        'accept-language' => 17,
+        'accept-ranges' => 18,
+        'accept' => 19,
+        'access-control-allow-origin' => 20,
+        'age' => 21,
+        'allow' => 22,
+        'authorization' => 23,
+        'cache-control' => 24,
+        'content-disposition' => 25,
+        'content-encoding' => 26,
+        'content-language' => 27,
+        'content-length' => 28,
+        'content-location' => 29,
+        'content-range' => 30,
+        'content-type' => 31,
+        'cookie' => 32,
+        'date' => 33,
+        'etag' => 34,
+        'expect' => 35,
+        'expires' => 36,
+        'from' => 37,
+        'host' => 38,
+        'if-match' => 39,
+        'if-modified-since' => 40,
+        'if-none-match' => 41,
+        'if-range' => 42,
+        'if-unmodified-since' => 43,
+        'last-modified' => 44,
+        'link' => 45,
+        'location' => 46,
+        'max-forwards' => 47,
+        'proxy-authentication' => 48,
+        'proxy-authorization' => 49,
+        'range' => 50,
+        'referer' => 51,
+        'retry-after' => 53,
+        'server' => 54,
+        'set-cookie' => 55,
+        'strict-transport-security' => 56,
+        'transfer-encoding' => 57,
+        'user-agent' => 58,
+        'vary' => 59,
+        'via' => 60,
+        'www-authenticate' => 61,
+        ':authority:' => 1,
+        ':method:GET' => 2,
+        ':method:POST' => 3,
+        ':path:/' => 4,
+        ':path:/index.html' => 5,
+        ':scheme:http' => 6,
+        ':scheme:https' => 7,
+        ':status:200' => 8,
+        ':status:204' => 9,
+        ':status:206' => 10,
+        ':status:304' => 11,
+        ':status:400' => 12,
+        ':status:404' => 13,
+        ':status:500' => 14,
+        'accept-charset:' => 15,
+        'accept-encoding:gzip, deflate' => 16,
+        'accept-language:' => 17,
+        'accept-ranges:' => 18,
+        'accept:' => 19,
+        'access-control-allow-origin:' => 20,
+        'age:' => 21,
+        'allow:' => 22,
+        'authorization:' => 23,
+        'cache-control:' => 24,
+        'content-disposition:' => 25,
+        'content-encoding:' => 26,
+        'content-language:' => 27,
+        'content-length:' => 28,
+        'content-location:' => 29,
+        'content-range:' => 30,
+        'content-type:' => 31,
+        'cookie:' => 32,
+        'date:' => 33,
+        'etag:' => 34,
+        'expect:' => 35,
+        'expires:' => 36,
+        'from:' => 37,
+        'host:' => 38,
+        'if-match:' => 39,
+        'if-modified-since:' => 40,
+        'if-none-match:' => 41,
+        'if-range:' => 42,
+        'if-unmodified-since:' => 43,
+        'last-modified:' => 44,
+        'link:' => 45,
+        'location:' => 46,
+        'max-forwards:' => 47,
+        'proxy-authentication:' => 48,
+        'proxy-authorization:' => 49,
+        'range:' => 50,
+        'referer:' => 51,
+        'refresh:' => 52,
+        'retry-after:' => 53,
+        'server:' => 54,
+        'set-cookie:' => 55,
+        'strict-transport-security:' => 56,
+        'transfer-encoding:' => 57,
+        'user-agent:' => 58,
+        'vary:' => 59,
+        'via:' => 60,
+        'www-authenticate:' => 61
+    ];
+
+    /**
+     * Huffman codes from HPACK specification.
+     * 
+     * @var array
+     */
+    const HUFFMAN_CODE = [
+        0x1FF8,
+        0x7FFFD8,
+        0xFFFFFE2,
+        0xFFFFFE3,
+        0xFFFFFE4,
+        0xFFFFFE5,
+        0xFFFFFE6,
+        0xFFFFFE7,
+        0xFFFFFE8,
+        0xFFFFEA,
+        0x3FFFFFFC,
+        0xFFFFFE9,
+        0xFFFFFEA,
+        0x3FFFFFFD,
+        0xFFFFFEB,
+        0xFFFFFEC,
+        0xFFFFFED,
+        0xFFFFFEE,
+        0xFFFFFEF,
+        0xFFFFFF0,
+        0xFFFFFF1,
+        0xFFFFFF2,
+        0x3FFFFFFE,
+        0xFFFFFF3,
+        0xFFFFFF4,
+        0xFFFFFF5,
+        0xFFFFFF6,
+        0xFFFFFF7,
+        0xFFFFFF8,
+        0xFFFFFF9,
+        0xFFFFFFA,
+        0xFFFFFFB,
+        0x14,
+        0x3F8,
+        0x3F9,
+        0xFFA,
+        0x1FF9,
+        0x15,
+        0xF8,
+        0x7FA,
+        0x3FA,
+        0x3FB,
+        0xF9,
+        0x7FB,
+        0xFA,
+        0x16,
+        0x17,
+        0x18,
+        0x0,
+        0x1,
+        0x2,
+        0x19,
+        0x1A,
+        0x1B,
+        0x1C,
+        0x1D,
+        0x1E,
+        0x1F,
+        0x5C,
+        0xFB,
+        0x7FFC,
+        0x20,
+        0xFFB,
+        0x3FC,
+        0x1FFA,
+        0x21,
+        0x5D,
+        0x5E,
+        0x5F,
+        0x60,
+        0x61,
+        0x62,
+        0x63,
+        0x64,
+        0x65,
+        0x66,
+        0x67,
+        0x68,
+        0x69,
+        0x6A,
+        0x6B,
+        0x6C,
+        0x6D,
+        0x6E,
+        0x6F,
+        0x70,
+        0x71,
+        0x72,
+        0xFC,
+        0x73,
+        0xFD,
+        0x1FFB,
+        0x7FFF0,
+        0x1FFC,
+        0x3FFC,
+        0x22,
+        0x7FFD,
+        0x3,
+        0x23,
+        0x4,
+        0x24,
+        0x5,
+        0x25,
+        0x26,
+        0x27,
+        0x6,
+        0x74,
+        0x75,
+        0x28,
+        0x29,
+        0x2A,
+        0x7,
+        0x2B,
+        0x76,
+        0x2C,
+        0x8,
+        0x9,
+        0x2D,
+        0x77,
+        0x78,
+        0x79,
+        0x7A,
+        0x7B,
+        0x7FFE,
+        0x7FC,
+        0x3FFD,
+        0x1FFD,
+        0xFFFFFFC,
+        0xFFFE6,
+        0x3FFFD2,
+        0xFFFE7,
+        0xFFFE8,
+        0x3FFFD3,
+        0x3FFFD4,
+        0x3FFFD5,
+        0x7FFFD9,
+        0x3FFFD6,
+        0x7FFFDA,
+        0x7FFFDB,
+        0x7FFFDC,
+        0x7FFFDD,
+        0x7FFFDE,
+        0xFFFFEB,
+        0x7FFFDF,
+        0xFFFFEC,
+        0xFFFFED,
+        0x3FFFD7,
+        0x7FFFE0,
+        0xFFFFEE,
+        0x7FFFE1,
+        0x7FFFE2,
+        0x7FFFE3,
+        0x7FFFE4,
+        0x1FFFDC,
+        0x3FFFD8,
+        0x7FFFE5,
+        0x3FFFD9,
+        0x7FFFE6,
+        0x7FFFE7,
+        0xFFFFEF,
+        0x3FFFDA,
+        0x1FFFDD,
+        0xFFFE9,
+        0x3FFFDB,
+        0x3FFFDC,
+        0x7FFFE8,
+        0x7FFFE9,
+        0x1FFFDE,
+        0x7FFFEA,
+        0x3FFFDD,
+        0x3FFFDE,
+        0xFFFFF0,
+        0x1FFFDF,
+        0x3FFFDF,
+        0x7FFFEB,
+        0x7FFFEC,
+        0x1FFFE0,
+        0x1FFFE1,
+        0x3FFFE0,
+        0x1FFFE2,
+        0x7FFFED,
+        0x3FFFE1,
+        0x7FFFEE,
+        0x7FFFEF,
+        0xFFFEA,
+        0x3FFFE2,
+        0x3FFFE3,
+        0x3FFFE4,
+        0x7FFFF0,
+        0x3FFFE5,
+        0x3FFFE6,
+        0x7FFFF1,
+        0x3FFFFE0,
+        0x3FFFFE1,
+        0xFFFEB,
+        0x7FFF1,
+        0x3FFFE7,
+        0x7FFFF2,
+        0x3FFFE8,
+        0x1FFFFEC,
+        0x3FFFFE2,
+        0x3FFFFE3,
+        0x3FFFFE4,
+        0x7FFFFDE,
+        0x7FFFFDF,
+        0x3FFFFE5,
+        0xFFFFF1,
+        0x1FFFFED,
+        0x7FFF2,
+        0x1FFFE3,
+        0x3FFFFE6,
+        0x7FFFFE0,
+        0x7FFFFE1,
+        0x3FFFFE7,
+        0x7FFFFE2,
+        0xFFFFF2,
+        0x1FFFE4,
+        0x1FFFE5,
+        0x3FFFFE8,
+        0x3FFFFE9,
+        0xFFFFFFD,
+        0x7FFFFE3,
+        0x7FFFFE4,
+        0x7FFFFE5,
+        0xFFFEC,
+        0xFFFFF3,
+        0xFFFED,
+        0x1FFFE6,
+        0x3FFFE9,
+        0x1FFFE7,
+        0x1FFFE8,
+        0x7FFFF3,
+        0x3FFFEA,
+        0x3FFFEB,
+        0x1FFFFEE,
+        0x1FFFFEF,
+        0xFFFFF4,
+        0xFFFFF5,
+        0x3FFFFEA,
+        0x7FFFF4,
+        0x3FFFFEB,
+        0x7FFFFE6,
+        0x3FFFFEC,
+        0x3FFFFED,
+        0x7FFFFE7,
+        0x7FFFFE8,
+        0x7FFFFE9,
+        0x7FFFFEA,
+        0x7FFFFEB,
+        0xFFFFFFE,
+        0x7FFFFEC,
+        0x7FFFFED,
+        0x7FFFFEE,
+        0x7FFFFEF,
+        0x7FFFFF0,
+        0x3FFFFEE,
+        0x3FFFFFFF
+    ];
+
+    /**
+     * Huffman codes lengths according to HPACK specification.
+     * 
+     * @var array
+     */
+    const HUFFMAN_CODE_LENGTHS = [
+        13,
+        23,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        24,
+        30,
+        28,
+        28,
+        30,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        30,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        28,
+        6,
+        10,
+        10,
+        12,
+        13,
+        6,
+        8,
+        11,
+        10,
+        10,
+        8,
+        11,
+        8,
+        6,
+        6,
+        6,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        7,
+        8,
+        15,
+        6,
+        12,
+        10,
+        13,
+        6,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        8,
+        7,
+        8,
+        13,
+        19,
+        13,
+        14,
+        6,
+        15,
+        5,
+        6,
+        5,
+        6,
+        5,
+        6,
+        6,
+        6,
+        5,
+        7,
+        7,
+        6,
+        6,
+        6,
+        5,
+        6,
+        7,
+        6,
+        5,
+        5,
+        6,
+        7,
+        7,
+        7,
+        7,
+        7,
+        15,
+        11,
+        14,
+        13,
+        28,
+        20,
+        22,
+        20,
+        20,
+        22,
+        22,
+        22,
+        23,
+        22,
+        23,
+        23,
+        23,
+        23,
+        23,
+        24,
+        23,
+        24,
+        24,
+        22,
+        23,
+        24,
+        23,
+        23,
+        23,
+        23,
+        21,
+        22,
+        23,
+        22,
+        23,
+        23,
+        24,
+        22,
+        21,
+        20,
+        22,
+        22,
+        23,
+        23,
+        21,
+        23,
+        22,
+        22,
+        24,
+        21,
+        22,
+        23,
+        23,
+        21,
+        21,
+        22,
+        21,
+        23,
+        22,
+        23,
+        23,
+        20,
+        22,
+        22,
+        22,
+        23,
+        22,
+        22,
+        23,
+        26,
+        26,
+        20,
+        19,
+        22,
+        23,
+        22,
+        25,
+        26,
+        26,
+        26,
+        27,
+        27,
+        26,
+        24,
+        25,
+        19,
+        21,
+        26,
+        27,
+        27,
+        26,
+        27,
+        24,
+        21,
+        21,
+        26,
+        26,
+        28,
+        27,
+        27,
+        27,
+        20,
+        24,
+        20,
+        21,
+        22,
+        21,
+        21,
+        23,
+        22,
+        22,
+        25,
+        25,
+        24,
+        24,
+        26,
+        23,
+        26,
+        27,
+        26,
+        26,
+        27,
+        27,
+        27,
+        27,
+        27,
+        28,
+        27,
+        27,
+        27,
+        27,
+        27,
+        26,
+        30
+    ];
+}

@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-class MyPackTest extends \PHPUnit_Framework_TestCase
+class HPackTest extends \PHPUnit_Framework_TestCase
 {
     public function provideEncoderData()
     {
@@ -41,17 +41,17 @@ class MyPackTest extends \PHPUnit_Framework_TestCase
      */
     public function testEncoderWithKnownOutcome(array $headers, string $result)
     {
-        $encoder = new MyPack();
+        $encoder = new HPack();
         $encoded = $encoder->encode($headers);
         
         $this->assertEquals($result, $this->convertToHexString($encoded));
-        $this->assertEquals($headers, (new MyPack())->decode($encoded));
+        $this->assertEquals($headers, (new HPack())->decode($encoded));
     }
     
     public function testEncoder()
     {
-        $encoder = new MyPack();
-        $decoder = new MyPack();
+        $encoder = new HPack();
+        $decoder = new HPack();
         
         $headers = [
             [
@@ -79,7 +79,7 @@ class MyPackTest extends \PHPUnit_Framework_TestCase
     
     public function testDecoder()
     {
-        $pack = new MyPack();
+        $pack = new HPack();
         
         $headers = [
             [
@@ -154,7 +154,7 @@ class MyPackTest extends \PHPUnit_Framework_TestCase
             ]
         ];
         
-        $decoder = new MyPack();
+        $decoder = new HPack();
         $this->assertEquals($headers, $decoder->decode($this->getHexString('8286 8441 8cf1 e3c2 e5f2 3a6b a0ab 90f4 ff')));
     }
 

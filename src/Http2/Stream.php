@@ -467,7 +467,7 @@ class Stream
     
     protected function handleMessage(string $buffer, Http2InputStream $body)
     {
-        $headers = (array) $this->hpack->decode($buffer);
+        $headers = $this->hpack->decode($buffer);
         
         if (empty($headers)) {
             throw new Http2StreamException('Invalid HTTP headers received', Frame::COMPRESSION_ERROR);
@@ -583,6 +583,7 @@ class Stream
             'Content-Length',
             'Content-Encoding',
             'Keep-Alive',
+            'Host',
             'Transfer-Encoding',
             'Upgrade',
             'TE'
@@ -592,7 +593,18 @@ class Stream
             $message = $message->withoutHeader($name);
         }
         
-        $headers = HPack::encode(array_merge($headers, array_change_key_case($message->getHeaders(), CASE_LOWER)));
+        $headerList = [];
+        
+        foreach (array_merge($headers, array_change_key_case($message->getHeaders(), CASE_LOWER)) as $k => $h) {
+            foreach ($h as $v) {
+                $headerList[] = [
+                    $k,
+                    $v
+                ];
+            }
+        }
+        
+        $headers = $this->hpack->encode($headerList);
         
         if (strlen($headers) > self::MAX_HEADER_SIZE) {
             $parts = str_split($headers, self::MAX_HEADER_SIZE);
