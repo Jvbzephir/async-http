@@ -98,7 +98,7 @@ class MyPack
             if (strlen($v) < 0x7F) {
                 $result .= chr(strlen($v)) . $v;
             } else {
-                $result .= $this->encodeInt(strlen($v)) . $v;
+                $result .= $this->encodeInt(strlen($v) - 0x7F) . $v;
             }
         }
         
