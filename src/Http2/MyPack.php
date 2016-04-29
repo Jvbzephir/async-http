@@ -237,14 +237,18 @@ class MyPack
             foreach (self::HUFFMAN_CODE as $i => $code) {
                 $symbols->insert([
                     $i,
-                    sprintf('%0' . self::HUFFMAN_CODE_LENGTHS[$i] . 'b', $code)
+                    sprintf('%0' . self::HUFFMAN_CODE_LENGTHS[$i] . 'b', $code),
+                    self::HUFFMAN_CODE_LENGTHS[$i]
                 ], -1 * self::HUFFMAN_CODE_LENGTHS[$i]);
             }
             
             while (!$symbols->isEmpty()) {
-                list ($key, $code) = $symbols->extract();
+                list ($key, $code, $len) = $symbols->extract();
                 
-                $table[chr($key)] = $code;
+                $table[chr($key)] = [
+                    $len,
+                    $code
+                ];
             }
         }
         
@@ -254,8 +258,12 @@ class MyPack
         for ($len = strlen($encoded), $i = 0; $i < $len; $i++) {
             $binary .= sprintf('%08b', ord($encoded[$i]));
             
-            while (strlen($binary) > 4) {
-                foreach ($table as $k => $v) {
+            while (($blen = strlen($binary)) > 4) {
+                foreach ($table as $k => list ($l, $v)) {
+                    if ($blen < $l) {
+                        break;
+                    }
+                    
                     if (strpos($binary, $v) === 0) {
                         $result .= $k;
                         $binary = substr($binary, strlen($v));
