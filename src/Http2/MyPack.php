@@ -67,10 +67,11 @@ class MyPack
             $index = self::STATIC_TABLE_LOOKUP[$k . ':' . $v] ?? NULL;
             
             if ($index !== NULL) {
+                // Indexed Header Field
                 if ($index < 0x7F) {
                     $result .= chr($index | 0x80);
                 } else {
-                    $result .= ($this->encodeInt($index) | "\x80");
+                    $result .= "\xFF" . $this->encodeInt($index - 0x7F);
                 }
                 
                 continue;
@@ -79,15 +80,19 @@ class MyPack
             $index = self::STATIC_TABLE_LOOKUP[$k] ?? NULL;
             
             if ($index !== NULL) {
-                if ($index < 0x7F) {
+                // Literal Header Field without Indexing — Indexed Name
+                if ($index < 0x0F) {
                     $result .= chr($index);
                 } else {
-                    $result .= $this->encodeInt($index);
+                    $result .= "\0x0F" . $this->encodeInt($index - 0x0F);
                 }
-            } elseif (strlen($k) < 0x7F) {
-                $result .= "\x00" . chr(strlen($k)) . $k;
             } else {
-                $result .= "\x00" . $this->encodeInt(strlen($k)) . $k;
+                // Literal Header Field without Indexing — New Name
+                if (strlen($k) < 0x7F) {
+                    $result .= "\x00" . chr(strlen($k)) . $k;
+                } else {
+                    $result .= "\x00\x7F" . $this->encodeInt(strlen($k) - 0x7F) . $k;
+                }
             }
             
             if (strlen($v) < 0x7F) {
