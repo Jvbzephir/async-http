@@ -212,7 +212,7 @@ class MyPack
         
         try {
             if ($huffman) {
-                return $this->decompress(substr($encoded, $offset, $len));
+                return $this->decodeHuffmanString(substr($encoded, $offset, $len));
             }
             
             return substr($encoded, $offset, $len);
@@ -221,62 +221,119 @@ class MyPack
         }
     }
     
-    /**
-     * Minimalistic Huffman decoder (very inefficietn due to nested loops and usage of strpos()).
-     * 
-     * @param string $encoded
-     */
-    protected function decompress(string $encoded)
+    protected function decodeHuffmanString(string $encoded): string
     {
-        static $table;
+        static $symbols = [];
+        static $codes = [];
+        static $lens = [];
+        static $starts = [];
+        static $steps = [];
+        static $stepCount = 0;
         
-        if ($table === NULL) {
-            $table = [];
-            $symbols = new \SplPriorityQueue();
+        if (empty($symbols)) {
+            $sorter = new \SplPriorityQueue();
+            $lastStep = 0;
+            $i = 0;
             
             foreach (self::HUFFMAN_CODE as $i => $code) {
-                $symbols->insert([
-                    $i,
-                    sprintf('%0' . self::HUFFMAN_CODE_LENGTHS[$i] . 'b', $code),
-                    self::HUFFMAN_CODE_LENGTHS[$i]
-                ], -1 * self::HUFFMAN_CODE_LENGTHS[$i]);
+                $len = self::HUFFMAN_CODE_LENGTHS[$i];
+                $symbols[$code] = ($i > 255) ? NULL : chr($i);
+                
+                $sorter->insert([
+                    $code,
+                    $len
+                ], -1 * $len);
             }
             
-            while (!$symbols->isEmpty()) {
-                list ($key, $code, $len) = $symbols->extract();
+            while (!$sorter->isEmpty()) {
+                list ($code, $len) = $sorter->extract();
                 
-                $table[chr($key)] = [
-                    $len,
-                    $code
-                ];
+                if (isset($lens[$len])) {
+                    $lens[$len]++;
+                } else {
+                    $lens[$len] = 1;
+                }
+                
+                if (!isset($starts[$len])) {
+                    $starts[$len] = $i;
+                }
+                
+                $codes[$i++] = $code;
+            }
+            
+            foreach (array_keys($lens) as $step) {
+                $steps[] = $step - $lastStep;
+                $lastStep = $step;
+                $stepCount++;
             }
         }
         
-        $binary = '';
-        $result = '';
+        $decoded = '';
+        $byte = NULL;
         
-        for ($len = strlen($encoded), $i = 0; $i < $len; $i++) {
-            $binary .= sprintf('%08b', ord($encoded[$i]));
+        $len = strlen($encoded);
+        $byteOffset = 0;
+        $bitOffset = 7;
+        
+        while (true) {
+            $code = 0;
+            $codeLen = 0;
             
-            while (($blen = strlen($binary)) > 4) {
-                foreach ($table as $k => list ($l, $v)) {
-                    if ($blen < $l) {
-                        break;
+            for ($step = 0; $step < $stepCount; $step++) {
+                for ($n = 0; $n < $steps[$step]; $n++) {
+                    if ($byte === NULL) {
+                        if ($byteOffset == $len) {
+                            if ($this->isHuffmanPaddingCode($code)) {
+                                return $decoded;
+                            }
+                            
+                            throw new \RuntimeException('Cannot read beyond end of Huffman-encoded string');
+                        }
+                        
+                        $byte = ord($encoded[$byteOffset]);
                     }
                     
-                    if (strpos($binary, $v) === 0) {
-                        $result .= $k;
-                        $binary = substr($binary, strlen($v));
-                        
-                        continue 2;
+                    $code = ($code << 1) | (($byte >> $bitOffset--) & 1);
+                    $codeLen++;
+                    
+                    if ($bitOffset < 0) {
+                        $byteOffset++;
+                        $bitOffset = 7;
+                        $byte = NULL;
                     }
                 }
                 
-                break;
+                for ($index = 0; $index < $lens[$codeLen]; $index++) {
+                    if ($codes[$starts[$codeLen] + $index] == $code) {
+                        $decoded .= $symbols[$code];
+                        
+                        continue 3;
+                    }
+                }
             }
+            
+            if ($this->isHuffmanPaddingCode($code)) {
+                return $decoded;
+            }
+            
+            throw new \RuntimeException('Invalid Huffman code detected');
+        }
+    }
+    
+    protected function isHuffmanPaddingCode(int $code): bool
+    {
+        switch ($code) {
+            case 0b1:
+            case 0b11:
+            case 0b111:
+            case 0b1111:
+            case 0b11111:
+            case 0b111111:
+            case 0b1111111:
+                return true;
         }
         
-        return $result;
+        return false;
     }
     
     const STATIC_TABLE_SIZE = 61;
