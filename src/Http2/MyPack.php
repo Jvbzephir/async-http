@@ -11,21 +11,54 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+/**
+ * HPACK implementation.
+ * 
+ * @author Martin Schröder
+ */
 class MyPack
 {
     const SIZE_LIMIT = 4096;
     
+    /**
+     * Size of the dynmic table.
+     * 
+     * @var int
+     */
     protected $size = 0;
     
+    /**
+     * Max dynmic table size.
+     * 
+     * @var int
+     */
     protected $maxSize = 4096;
     
+    /**
+     * Dynamic table.
+     * 
+     * @var array
+     */
     protected $table = [];
     
+    /**
+     * Get the current size of the dynamic table.
+     * 
+     * @return int
+     */
     public function getDynamicTableSize(): int
     {
         return count($this->table);
     }
     
+    /**
+     * Encode the given HTTP headers using HPACK header compression.
+     * 
+     * Eeach header must be an array, element 0 must be the lowercased header name, element 1 holds the value.
+     * 
+     * @param array $headers
+     * @return string
+     */
     public function encode(array $headers): string
     {
         $result = '';
@@ -67,6 +100,16 @@ class MyPack
         return $result;
     }
     
+    /**
+     * Decode the given HPACK-encoded HTTP headers.
+     * 
+     * Returns an array of headers, each header is an array, element 0 is the name of the header and element 1 the value.
+     * 
+     * @param string $encoded
+     * @return array
+     * 
+     * @throws \RuntimeException
+     */
     public function decode(string $encoded): array
     {
         $headers = [];
@@ -143,7 +186,7 @@ class MyPack
                     $this->size += 32 + strlen($header[0]) + strlen($header[1]);
                     
                     if ($this->maxSize < $this->size) {
-                        var_dump('DYNAMIC TABLE RESIZE');
+                        $this->resizeDynamicTable();
                     }
                 }
                 
@@ -153,19 +196,37 @@ class MyPack
             // Dynamic Table Size Update
             if ($index == 0x3F) {
                 $index = $this->decodeInt($encoded, $offset) + 0x40;
+                
+                if ($index > self::SIZE_LIMIT) {
+                    throw new \RuntimeException(sprintf('Attempting to resize dynamic table to %u, limit is %u', $index, self::SIZE_LIMIT));
+                }
+                
+                $this->resizeDynamicTable($index);
             }
-            
-            if ($index > self::SIZE_LIMIT) {
-                throw new \RuntimeException(sprintf('Attempting to resize dynamic table to %u, limit is %u', $index, self::SIZE_LIMIT));
-            }
-            
-            var_dump('TABLE RESIZE');
         }
         
         return $headers;
     }
     
-    protected function encodeInt(int $int)
+    protected function resizeDynamicTable(int $maxSize = NULL)
+    {
+        if ($maxSize !== NULL) {
+            $this->maxSize = $maxSize;
+        }
+        
+        while ($this->size > $this->maxSize) {
+            list ($name, $value) = \array_pop($this->headers);
+            $this->size -= 32 + \strlen($name) + \strlen($value);
+        }
+    }
+    
+    /**
+     * Encode an integer value according to HPACK Integer Representation.
+     * 
+     * @param int $int
+     * @return string
+     */
+    protected function encodeInt(int $int): string
     {
         $result = '';
         $i = 0;
@@ -178,7 +239,14 @@ class MyPack
         return $result . chr($int >> $i);
     }
     
-    protected function decodeInt(string $encoded, int & $offset)
+    /**
+     * Decode an HPACK-encoded integer.
+     * 
+     * @param string $encoded
+     * @param int $offset
+     * @return int
+     */
+    protected function decodeInt(string $encoded, int & $offset): int
     {
         $byte = ord($encoded[$offset++]);
         $int = $byte & 0x7F;
@@ -196,7 +264,19 @@ class MyPack
         return $int;
     }
     
-    protected function decodeString(string $encoded, int $encodedLength, int & $offset)
+    /**
+     * Decode an HPACK String Literal.
+     * 
+     * Huffman-encoded string literals are supported.
+     * 
+     * @param string $encoded
+     * @param int $encodedLength
+     * @param int $offset
+     * @return string
+     * 
+     * @throws \RuntimeException
+     */
+    protected function decodeString(string $encoded, int $encodedLength, int & $offset): string
     {
         $len = ord($encoded[$offset++]);
         $huffman = ($len & 0x80) ? true : false;
@@ -274,9 +354,7 @@ class MyPack
         }
         
         // Compute code length distribution and keep track of first code for each length.
-        while (!$sorter->isEmpty()) {
-            list ($code, $len) = $sorter->extract();
-            
+        foreach ($sorter as list ($code, $len)) {
             if (isset(self::$codeLengths[$len])) {
                 self::$codeLengths[$len]++;
             } else {
@@ -321,6 +399,7 @@ class MyPack
             $code = 0;
             $codeLen = 0;
             
+            // Increment in steps to avoid checking codes with a length that is not used by Huffman codes.
             for ($step = 0; $step < self::$stepCount; $step++) {
                 for ($n = 0; $n < self::$steps[$step]; $n++) {
                     if ($buffer === '') {
@@ -335,6 +414,7 @@ class MyPack
                         $buffer = ord($encoded[$byteOffset]);
                     }
                     
+                    // Read next bit and and append it as LSB (least significant bit) to the code.
                     $code = ($code << 1) | (($buffer >> $bitOffset--) & 1);
                     
                     if ($bitOffset == -1) {
@@ -346,6 +426,7 @@ class MyPack
                 
                 $codeLen += self::$steps[$step];
                 
+                // Range checks are sufficient due to canonical Huffman encoding using a continuous sequence of codes for each length.
                 if ($code > self::$startCodes[$codeLen] && ($code - self::$startCodes[$codeLen]) < self::$codeLengths[$codeLen]) {
                     $decoded .= self::$symbols[$code];
                     
@@ -385,8 +466,18 @@ class MyPack
         return false;
     }
     
+    /**
+     * Size of the static table.
+     * 
+     * @var int
+     */
     const STATIC_TABLE_SIZE = 61;
-    
+
+    /**
+     * Static table, indexing starts at 1!
+     * 
+     * @var array
+     */
     const STATIC_TABLE = [
         1 => [
             ':authority',
@@ -634,6 +725,11 @@ class MyPack
         ]
     ];
 
+    /**
+     * Lookup table being used to find indexes within the static table without using a loop.
+     * 
+     * @var array
+     */
     const STATIC_TABLE_LOOKUP = [
         ':authority' => 1,
         ':method' => 2,
@@ -749,6 +845,11 @@ class MyPack
         'www-authenticate:' => 61
     ];
 
+    /**
+     * Huffman codes from HPACK specification.
+     * 
+     * @var array
+     */
     const HUFFMAN_CODE = [
         0x1FF8,
         0x7FFFD8,
@@ -1009,6 +1110,11 @@ class MyPack
         0x3FFFFFFF
     ];
 
+    /**
+     * Huffman codes lengths according to HPACK specification.
+     * 
+     * @var array
+     */
     const HUFFMAN_CODE_LENGTHS = [
         13,
         23,
