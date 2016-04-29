@@ -406,7 +406,7 @@ class MyPack
         }
         
         $decoded = '';
-        $buffer = '';
+        $buffer = NULL;
         
         $byteOffset = 0;
         $bitOffset = 7;
@@ -418,7 +418,7 @@ class MyPack
             // Increment in steps to avoid checking codes with a length that is not used by Huffman codes.
             for ($step = 0; $step < self::$stepCount; $step++) {
                 for ($i = 0; $i < self::$steps[$step]; $i++) {
-                    if ($buffer === '') {
+                    if ($buffer === NULL) {
                         if ($byteOffset == strlen($encoded)) {
                             if ($this->isHuffmanPaddingCode($code)) {
                                 return $decoded;
@@ -436,7 +436,7 @@ class MyPack
                     if ($bitOffset == -1) {
                         $byteOffset++;
                         $bitOffset = 7;
-                        $buffer = '';
+                        $buffer = NULL;
                     }
                 }
                 
