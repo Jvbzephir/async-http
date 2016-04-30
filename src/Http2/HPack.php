@@ -405,6 +405,7 @@ class HPack
             $this->initializeHuffmanCode();
         }
         
+        $len = strlen($encoded);
         $decoded = '';
         $buffer = NULL;
         
@@ -419,7 +420,7 @@ class HPack
             for ($step = 0; $step < self::$stepCount; $step++) {
                 for ($i = 0; $i < self::$steps[$step]; $i++) {
                     if ($buffer === NULL) {
-                        if ($byteOffset == strlen($encoded)) {
+                        if ($byteOffset == $len) {
                             if ($code === 0 || $this->isHuffmanPaddingCode($code)) {
                                 return $decoded;
                             }
