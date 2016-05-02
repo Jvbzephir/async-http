@@ -305,90 +305,56 @@ class HPack
             $offset += $len;
         }
     }
-        
-    /**
-     * Contains encoded symbols (characters), keys are the Huffman codes.
-     * 
-     * @var array
-     */
-    private static $symbols = [];
     
     /**
-     * Keeps track of all codes accessible via sorted index.
+     * Max code value grouped by code length.
      * 
      * @var array
      */
-    private static $codes = [];
+    private static $offset = [];
     
     /**
-     * Contains the number of codes by code length (bit count).
+     * Symbols (characters) grouped by code length.
+     * 
+     * Index is <code>MAX{code[L]} - code[L][i]</code>.
      * 
      * @var array
      */
-    private static $codeLengths = [];
-
-    /**
-     * Contains the first (and according to canonical Huffman encoding lowest) code for each code length.
-     * 
-     * @var array
-     */
-    private static $startCodes = [];
-
-    /**
-     * Holds a sequence of increments that determine the number of bits to be read to reach the next code length.
-     * 
-     * @var array
-     */
-    private static $steps = [];
-
-    /**
-     * Total number of increments (steps) needed in order to read the longest Huffman code.
-     * 
-     * @var int
-     */
-    private static $stepCount = 0;
+    private static $symbol = [];
     
     /**
      * Prepare Huffman decoder by sorting codes and precomputing some helper arrays.
      */
     protected function initializeHuffmanCode()
     {
+        // Populate all offsets with a value less than 0 to have the decoder skip unused code lengths.
+        for ($max = array_reduce(self::HUFFMAN_CODE_LENGTHS, 'max', 0), $i = 1; $i <= $max; $i++) {
+            self::$offset[$i] = -1;
+        }
+        
         $sorter = new \SplPriorityQueue();
         
-        // Sort codes by length and create symbol table.
+        // Sort codes in descending order and assemble symbols.
         foreach (self::HUFFMAN_CODE as $i => $code) {
-            self::$symbols[$code] = ($i > 255) ? NULL : chr($i);
-            
             $sorter->insert([
                 $code,
-                self::HUFFMAN_CODE_LENGTHS[$i]
-            ], -1 * self::HUFFMAN_CODE_LENGTHS[$i]);
+                self::HUFFMAN_CODE_LENGTHS[$i],
+                ($i > 255) ? '' : chr($i)
+            ], $code);
         }
         
-        // Compute code length distribution and keep track of first code for each length.
-        $i = 0;
-        
-        foreach ($sorter as list ($code, $len)) {
-            if (isset(self::$codeLengths[$len])) {
-                self::$codeLengths[$len]++;
-            } else {
-                self::$codeLengths[$len] = 1;
+        // Overwrite code offset with highest code and populate symbol lookup table.
+        // Symbol index for a specific length is OFFSET{code[L]} - code[i].
+        foreach ($sorter as list ($code, $len, $char)) {
+            if (self::$offset[$len] == -1) {
+                self::$offset[$len] = $code;
             }
             
-            if (!isset(self::$startCodes[$len])) {
-                self::$startCodes[$len] = $i;
-            }
-            
-            self::$codes[$i++] = $code;
+            self::$symbol[$len][] = $char;
         }
         
-        // Compute number of additional bits to be read when switching to next code length.
-        $lens = array_keys(self::$codeLengths);
-        self::$stepCount = count($lens);
-        
-        foreach ($lens as $i => $step) {
-            self::$steps[] = $step - ($i ? $lens[$i - 1] : 0);
-        }
+        // Ensure decoder loop terminates after max code length is reached.
+        self::$offset[$max + 1] = PHP_INT_MAX;
     }
     
     /**
@@ -401,14 +367,14 @@ class HPack
      */
     protected function decodeHuffmanString(string $encoded): string
     {
-        if (empty(self::$symbols)) {
+        if (empty(self::$offset)) {
             $this->initializeHuffmanCode();
         }
         
-        $len = strlen($encoded);
         $decoded = '';
         $buffer = NULL;
-        
+
+        $len = strlen($encoded);        
         $byteOffset = 0;
         $bitOffset = 7;
         
@@ -416,41 +382,34 @@ class HPack
             $code = 0;
             $codeLen = 0;
             
-            // Increment in steps to avoid checking codes with a length that is not used by Huffman codes.
-            for ($step = 0; $step < self::$stepCount; $step++) {
-                for ($i = 0; $i < self::$steps[$step]; $i++) {
-                    if ($buffer === NULL) {
-                        if ($byteOffset == $len) {
-                            if ($code === 0 || $this->isHuffmanPaddingCode($code)) {
-                                return $decoded;
-                            }
-                            
-                            throw new \RuntimeException('Cannot read beyond end of Huffman-encoded string');
+            do {
+                if ($buffer === NULL) {
+                    if ($byteOffset == $len) {
+                        if ($code === 0 || $this->isHuffmanPaddingCode($code)) {
+                            return $decoded;
                         }
                         
-                        $buffer = ord($encoded[$byteOffset]);
+                        throw new \RuntimeException('Cannot read beyond end of Huffman-encoded string');
                     }
                     
-                    // Read next bit and and append it as LSB (least significant bit) to the code.
-                    $code = ($code << 1) | (($buffer >> $bitOffset--) & 1);
-                    
-                    if ($bitOffset == -1) {
-                        $byteOffset++;
-                        $bitOffset = 7;
-                        $buffer = NULL;
-                    }
+                    $buffer = ord($encoded[$byteOffset++]);
                 }
                 
-                $codeLen += self::$steps[$step];
+                // Read next bit and and append it as LSB (least significant bit) to the code.
+                $code = ($code << 1) | (($buffer >> $bitOffset--) & 1);
                 
-                // Macth code against all codes with the same length.
-                for ($i = 0; $i < self::$codeLengths[$codeLen]; $i++) {
-                    if (self::$codes[self::$startCodes[$codeLen] + $i] == $code) {
-                        $decoded .= self::$symbols[$code];
-                        
-                        continue 3;
-                    }
+                if ($bitOffset == -1) {
+                    $bitOffset = 7;
+                    $buffer = NULL;
                 }
+            } while ($code > self::$offset[++$codeLen]);
+            
+            $char = self::$symbol[$codeLen][self::$offset[$codeLen] - $code] ?? NULL;
+            
+            if ($char !== NULL) {
+                $decoded .= $char;
+                
+                continue;
             }
             
             if ($this->isHuffmanPaddingCode($code)) {
