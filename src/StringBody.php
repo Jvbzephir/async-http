@@ -50,6 +50,14 @@ class StringBody implements HttpBodyInterface
     /**
      * {@inheritdoc}
      */
+    public function isCached(): bool
+    {
+        return true;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function prepareMessage(HttpMessage $message): HttpMessage
     {
         return $message;

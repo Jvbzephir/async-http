@@ -273,6 +273,14 @@ class Http1Body implements HttpBodyInterface
     /**
      * {@inheritdoc}
      */
+    public function isCached(): bool
+    {
+        return false;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function prepareMessage(HttpMessage $message): HttpMessage
     {
         return $message;

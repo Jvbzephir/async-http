@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Stream\CachedInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 
@@ -41,6 +42,14 @@ class StreamBody implements HttpBodyInterface
     /**
      * {@inheritdoc}
      */
+    public function isCached(): bool
+    {
+        return $this->stream instanceof CachedInputStream;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function prepareMessage(HttpMessage $message): HttpMessage
     {
         return $message;
@@ -63,6 +72,10 @@ class StreamBody implements HttpBodyInterface
     {
         yield NULL;
         
+        if ($this->stream instanceof CachedInputStream && $this->stream->eof()) {
+            $this->stream->rewind();
+        }
+        
         return $this->stream;
     }
     
@@ -71,6 +84,10 @@ class StreamBody implements HttpBodyInterface
      */
     public function getContents(): \Generator
     {
+        if ($this->stream instanceof CachedInputStream && $this->stream->eof()) {
+            $this->stream->rewind();
+        }
+        
         return yield from Stream::readContents($this->stream);
     }
 }

@@ -21,6 +21,16 @@ use KoolKode\Async\Stream\InputStreamInterface;
 interface HttpBodyInterface
 {
     /**
+     * Check if the contents / input stream can be accessed multiple times (replayed).
+     * 
+     * This is needed when an HTTP client transmits the body and the server answers with a redirect
+     * that requires another HTTP request with the same body.
+     * 
+     * @return bool
+     */
+    public function isCached(): bool;
+    
+    /**
      * Prepare HTTP message for the body payload (add / remove HTTP headers etc.).
      * 
      * @param HttpMessage $message
