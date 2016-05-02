@@ -11,6 +11,9 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Util\HuffmanCode;
+use KoolKode\Util\HuffmanDecoder;
+
 /**
  * HPACK implementation.
  * 
@@ -18,6 +21,11 @@ namespace KoolKode\Async\Http\Http2;
  */
 class HPack
 {
+    /**
+     * Hard size limit for dynamic table.
+     * 
+     * @var integer
+     */
     const SIZE_LIMIT = 4096;
     
     /**
@@ -40,6 +48,23 @@ class HPack
      * @var array
      */
     protected $table = [];
+    
+    /**
+     * Huffman decoder used with HPACK-compressed strings.
+     * 
+     * @var HuffmanDecoder
+     */
+    protected $huffmanDecoder;
+    
+    /**
+     * Create a new HPACK encoder / decoder.
+     * 
+     * @param HuffmanDecoder $decoder
+     */
+    public function __construct(HuffmanDecoder $decoder = NULL)
+    {
+        $this->huffmanDecoder = $decoder ?? self::createHuffmanDecoder();
+    }
     
     /**
      * Get the current size of the dynamic table.
@@ -213,6 +238,11 @@ class HPack
         return $headers;
     }
     
+    /**
+     * Resize HPACK dynamic table.
+     * 
+     * @param int $maxSize
+     */
     protected function resizeDynamicTable(int $maxSize = NULL)
     {
         if ($maxSize !== NULL) {
@@ -297,7 +327,7 @@ class HPack
         
         try {
             if ($huffman) {
-                return $this->decodeHuffmanString(substr($encoded, $offset, $len));
+                return $this->huffmanDecoder->decode(substr($encoded, $offset, $len));
             }
             
             return substr($encoded, $offset, $len);
@@ -307,141 +337,39 @@ class HPack
     }
     
     /**
-     * Max code value grouped by code length.
+     * Create Huffman code used by HPACK.
      * 
-     * @var array
+     * @return HuffmanCode
      */
-    private static $offset = [];
-    
-    /**
-     * Symbols (characters) grouped by code length.
-     * 
-     * Index is <code>MAX{code[L]} - code[L][i]</code>.
-     * 
-     * @var array
-     */
-    private static $symbol = [];
-    
-    /**
-     * Prepare Huffman decoder by sorting codes and precomputing some helper arrays.
-     */
-    protected function initializeHuffmanCode()
+    public static function createHuffmanCode(): HuffmanCode
     {
-        // Populate all offsets with a value less than 0 to have the decoder skip unused code lengths.
-        for ($max = array_reduce(self::HUFFMAN_CODE_LENGTHS, 'max', 0), $i = 1; $i <= $max; $i++) {
-            self::$offset[$i] = -1;
-        }
+        static $huffman;
         
-        $sorter = new \SplPriorityQueue();
-        
-        // Sort codes in descending order and assemble symbols.
-        foreach (self::HUFFMAN_CODE as $i => $code) {
-            $sorter->insert([
-                $code,
-                self::HUFFMAN_CODE_LENGTHS[$i],
-                ($i > 255) ? '' : chr($i)
-            ], $code);
-        }
-        
-        // Overwrite code offset with highest code and populate symbol lookup table.
-        // Symbol index for a specific length is OFFSET{code[L]} - code[i].
-        foreach ($sorter as list ($code, $len, $char)) {
-            if (self::$offset[$len] == -1) {
-                self::$offset[$len] = $code;
-            }
+        if ($huffman === NULL) {
+            $huffman = new HuffmanCode();
             
-            self::$symbol[$len][] = $char;
+            foreach (self::HUFFMAN_CODE as $i => $code) {
+                $huffman->addCode(($i > 255) ? '' : chr($i), $code, self::HUFFMAN_CODE_LENGTHS[$i]);
+            }
         }
         
-        // Ensure decoder loop terminates after max code length is reached.
-        self::$offset[$max + 1] = PHP_INT_MAX;
+        return $huffman;
     }
     
     /**
-     * Decode a canonical Huffman-encoded string.
+     * Create a canonical Huffman decoder for HPACK-encoded strings.
      * 
-     * @param string $encoded Encoded string.
-     * @return string Decoded string.
-     * 
-     * @throws \RuntimeException When the string contains invalid padding or a code could not found.
+     * @return HuffmanDecoder
      */
-    protected function decodeHuffmanString(string $encoded): string
+    public static function createHuffmanDecoder(): HuffmanDecoder
     {
-        if (empty(self::$offset)) {
-            $this->initializeHuffmanCode();
+        static $decoder;
+        
+        if ($decoder === NULL) {
+            $decoder = new HuffmanDecoder(self::createHuffmanCode(), true);
         }
         
-        $decoded = '';
-        $buffer = NULL;
-
-        $len = strlen($encoded);        
-        $byteOffset = 0;
-        $bitOffset = 7;
-        
-        while (true) {
-            $code = 0;
-            $codeLen = 0;
-            
-            do {
-                if ($buffer === NULL) {
-                    if ($byteOffset == $len) {
-                        if ($code === 0 || $this->isHuffmanPaddingCode($code)) {
-                            return $decoded;
-                        }
-                        
-                        throw new \RuntimeException('Cannot read beyond end of Huffman-encoded string');
-                    }
-                    
-                    $buffer = ord($encoded[$byteOffset++]);
-                }
-                
-                // Read next bit and and append it as LSB (least significant bit) to the code.
-                $code = ($code << 1) | (($buffer >> $bitOffset--) & 1);
-                
-                if ($bitOffset == -1) {
-                    $bitOffset = 7;
-                    $buffer = NULL;
-                }
-            } while ($code > self::$offset[++$codeLen]);
-            
-            $char = self::$symbol[$codeLen][self::$offset[$codeLen] - $code] ?? NULL;
-            
-            if ($char !== NULL) {
-                $decoded .= $char;
-                
-                continue;
-            }
-            
-            if ($this->isHuffmanPaddingCode($code)) {
-                return $decoded;
-            }
-            
-            break;
-        }
-        
-        throw new \RuntimeException('Invalid Huffman code detected');
-    }
-    
-    /**
-     * Check if the given code is allowed as final (padding) byte of a Huffman-encoded HPACK string.
-     * 
-     * @param int $code
-     * @return bool
-     */
-    protected function isHuffmanPaddingCode(int $code): bool
-    {
-        switch ($code) {
-            case 0b1:
-            case 0b11:
-            case 0b111:
-            case 0b1111:
-            case 0b11111:
-            case 0b111111:
-            case 0b1111111:
-                return true;
-        }
-        
-        return false;
+        return $decoder;
     }
     
     /**
