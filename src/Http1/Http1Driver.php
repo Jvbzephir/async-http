@@ -273,7 +273,10 @@ class Http1Driver implements HttpDriverInterface
             $response = $response->withoutHeader($name);
         }
         
-        $chunked = (!$head && $response->getProtocolVersion() !== '1.0');
+        $body = $response->getBody();
+        $size = yield from $body->getSize();
+        
+        $chunked = ($size === NULL && !$head && $response->getProtocolVersion() !== '1.0');
         
         $response = $response->withHeader('Date', gmdate(Http::DATE_FORMAT_RFC1123, time()));
         $response = $response->withHeader('Connection', 'close');
@@ -301,20 +304,23 @@ class Http1Driver implements HttpDriverInterface
             } else {
                 $message .= "Transfer-Encoding: chunked\r\n";
             }
+        } elseif ($size !== NULL) {
+            $body = yield from $body->getInputStream();
+            $message .= sprintf("Content-Length: %u\r\n", $size);
         } else {
             $in = yield from $response->getBody()->getInputStream();
             $body = yield from Stream::temp();
-            $length = 0;
+            $size = 0;
             
             try {
                 while (!$in->eof()) {
-                    $length += yield from $body->write(yield from $in->read());
+                    $size += yield from $body->write(yield from $in->read());
                 }
             } finally {
                 $in->close();
             }
             
-            $message .= sprintf("Content-Length: %u\r\n", $length);
+            $message .= sprintf("Content-Length: %u\r\n", $size);
             
             $body->rewind();
         }

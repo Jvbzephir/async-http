@@ -151,24 +151,36 @@ class Http1Connector implements HttpConnectorInterface
      */
     protected function sendRequest(BufferedDuplexStreamInterface $stream, HttpRequest $request): \Generator
     {
-        $body = yield from $request->getBody()->getInputStream();
+        $body = $request->getBody();
+        $size = yield from $body->getSize();
+        $in = yield from $body->getInputStream();
         
         try {
-            $chunk = $body->eof() ? '' : yield from $body->read();
+            $chunk = $in->eof() ? '' : yield from $in->read();
             $chunked = false;
             
             if ($chunk === '') {
-                $tmp = new StringInputStream();
+                $in->close();
+                
+                $in = new StringInputStream();
                 $request = $request->withHeader('Content-Length', '0');
+            } elseif ($size !== NULL) {
+                $request = $request->withHeader('Content-Length', (string) $size);
             } elseif (!$this->chunkedRequests || $request->getProtocolVersion() === '1.0') {
                 $tmp = yield from Stream::temp();
                 $size = yield from $tmp->write($chunk);
+                $chunk = '';
                 
-                while (!$body->eof()) {
-                    $size += yield from $tmp->write(yield from $body->read());
+                try {
+                    while (!$in->eof()) {
+                        $size += yield from $tmp->write(yield from $in->read());
+                    }
+                } finally {
+                    $in->close();
                 }
                 
-                $tmp->rewind();
+                $in = $tmp->rewind();
+                
                 $request = $request->withHeader('Content-Length', (string) $size);
             } else {
                 $request = $request->withHeader('Transfer-Encoding', 'chunked');
@@ -190,20 +202,20 @@ class Http1Connector implements HttpConnectorInterface
             if ($chunked) {
                 yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                 
-                while (!$body->eof()) {
-                    $chunk = yield from $body->read();
+                while (!$in->eof()) {
+                    $chunk = yield from $in->read();
                     
                     yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                 }
                 
                 yield from $stream->write("0\r\n\r\n");
             } else {
-                try {
-                    while (!$tmp->eof()) {
-                        yield from $stream->write(yield from $tmp->read());
-                    }
-                } finally {
-                    $tmp->close();
+                if ($chunk !== '') {
+                    yield from $stream->write($chunk);
+                }
+                
+                while (!$in->eof()) {
+                    yield from $stream->write(yield from $in->read());
                 }
             }
             
@@ -215,7 +227,7 @@ class Http1Connector implements HttpConnectorInterface
                 ]);
             }
         } finally {
-            $body->close();
+            $in->close();
         }
     }
     
