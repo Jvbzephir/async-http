@@ -13,6 +13,7 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Util\HuffmanCode;
 use KoolKode\Util\HuffmanDecoder;
+use KoolKode\Util\HuffmanEncoder;
 
 /**
  * HPACK implementation.
@@ -50,6 +51,13 @@ class HPack
     protected $table = [];
     
     /**
+     * Huffman encoder being used to send compressed headers.
+     * 
+     * @var HuffmanEncoder
+     */
+    protected $huffmanEncoder;
+    
+    /**
      * Huffman decoder used with HPACK-compressed strings.
      * 
      * @var HuffmanDecoder
@@ -61,9 +69,10 @@ class HPack
      * 
      * @param HuffmanDecoder $decoder
      */
-    public function __construct(HuffmanDecoder $decoder = NULL)
+    public function __construct(HuffmanEncoder $encoder = NULL, HuffmanDecoder $decoder = NULL)
     {
         $this->huffmanDecoder = $decoder ?? self::createHuffmanDecoder();
+        $this->huffmanEncoder = $encoder ?? self::createHuffmanEncoder();
     }
     
     /**
@@ -120,14 +129,19 @@ class HPack
                 }
             }
             
-            if (strlen($v) < 0x7F) {
-                $result .= chr(strlen($v)) . $v;
-            } else {
-                $result .= "\x7F" . $this->encodeInt(strlen($v) - 0x7F) . $v;
-            }
+            $result .= $this->encodeString($v);
         }
         
         return $result;
+    }
+    
+    protected function encodeString(string $input): string
+    {
+        if (strlen($input) < 0x7F) {
+            return chr(strlen($input)) . $input;
+        }
+        
+        return "\x7F" . $this->encodeInt(strlen($input) - 0x7F) . $input;
     }
     
     /**
@@ -370,6 +384,22 @@ class HPack
         }
         
         return $decoder;
+    }
+    
+    /**
+     * Create a Huffman encoder to be used for headers.
+     * 
+     * @return HuffmanEncoder
+     */
+    public static function createHuffmanEncoder(): HuffmanEncoder
+    {
+        static $encoder;
+        
+        if ($encoder === NULL) {
+            $encoder = new HuffmanEncoder(self::createHuffmanCode());
+        }
+        
+        return $encoder;
     }
     
     /**

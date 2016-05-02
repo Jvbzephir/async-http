@@ -328,7 +328,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         }
         
         $response = $response->withProtocolVersion('2.0');
-    
+        
         try {
             yield from $event->stream->sendResponse($response, $event->started);
         } catch (StreamException $e) {
