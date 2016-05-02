@@ -21,6 +21,14 @@ use KoolKode\Async\Stream\InputStreamInterface;
 interface HttpBodyInterface
 {
     /**
+     * Prepare HTTP message for the body payload (add / remove HTTP headers etc.).
+     * 
+     * @param HttpMessage $message
+     * @return HttpMessage
+     */
+    public function prepareMessage(HttpMessage $message): HttpMessage;
+    
+    /**
      * Get the size of the request body.
      * 
      * This method must return NULL when body size is unknown!

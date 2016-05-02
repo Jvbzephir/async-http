@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\FileBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
@@ -21,11 +22,13 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\BufferedDuplexStream;
 use KoolKode\Async\Stream\BufferedDuplexStreamInterface;
 use KoolKode\Async\Stream\DuplexStreamInterface;
+use KoolKode\Async\Stream\ResourceStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\Stream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
+use function KoolKode\Async\currentExecutor;
 
 /**
  * HTTP/1 server endpoint.
@@ -275,9 +278,11 @@ class Http1Driver implements HttpDriverInterface
         
         $body = $response->getBody();
         $size = yield from $body->getSize();
+        $resource = ($socket instanceof ResourceStreamInterface) ? $socket->getResource() : NULL;
         
         $chunked = ($size === NULL && !$head && $response->getProtocolVersion() !== '1.0');
         
+        $response = $response->getBody()->prepareMessage($response);
         $response = $response->withHeader('Date', gmdate(Http::DATE_FORMAT_RFC1123, time()));
         $response = $response->withHeader('Connection', 'close');
         
@@ -296,7 +301,7 @@ class Http1Driver implements HttpDriverInterface
         }
         
         if ($chunked) {
-            $in = yield from $response->getBody()->getInputStream();
+            $in = yield from $body->getInputStream();
             $chunk = $in->eof() ? '' : yield from $in->read();
             
             if ($chunk === '') {
@@ -305,10 +310,13 @@ class Http1Driver implements HttpDriverInterface
                 $message .= "Transfer-Encoding: chunked\r\n";
             }
         } elseif ($size !== NULL) {
-            $body = yield from $body->getInputStream();
+            if (!$body instanceof FileBody || $resource === NULL) {
+                $body = yield from $body->getInputStream();
+            }
+            
             $message .= sprintf("Content-Length: %u\r\n", $size);
         } else {
-            $in = yield from $response->getBody()->getInputStream();
+            $in = yield from $body->getInputStream();
             $body = yield from Stream::temp();
             $size = 0;
             
@@ -345,14 +353,18 @@ class Http1Driver implements HttpDriverInterface
                     $in->close();
                 }
             } else {
-                try {
-                    if (!$head) {
-                        while (!$body->eof()) {
-                            yield from $socket->write(yield from $body->read());
+                if ($body instanceof FileBody && $resource !== NULL) {
+                    yield from (yield currentExecutor())->getFilesystem()->sendfile($body->getFile(), $resource);
+                } else {
+                    try {
+                        if (!$head) {
+                            while (!$body->eof()) {
+                                yield from $socket->write(yield from $body->read());
+                            }
                         }
+                    } finally  {
+                        $body->close();
                     }
-                } finally  {
-                    $body->close();
                 }
             }
             

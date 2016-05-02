@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\ResourceStreamInterface;
 use KoolKode\Async\Stream\StreamClosedException;
 
 /**
@@ -19,7 +20,7 @@ use KoolKode\Async\Stream\StreamClosedException;
  * 
  * @author Martin Schröder
  */
-class LimitInputStream implements InputStreamInterface
+class LimitInputStream implements InputStreamInterface, ResourceStreamInterface
 {
     /**
      * Wrapped input stream.
@@ -65,6 +66,14 @@ class LimitInputStream implements InputStreamInterface
         $this->stream = $stream;
         $this->limit = $limit;
         $this->cascadeClose = $cascadeClose;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getResource()
+    {
+        return ($this->stream instanceof ResourceStreamInterface) ? $this->stream->getResource() : NULL;
     }
 
     /**

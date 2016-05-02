@@ -11,6 +11,7 @@
 
 use KoolKode\Async\ExecutorFactory;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
+use KoolKode\Async\Http\FileBody;
 use KoolKode\Async\Http\Http2\Http2Driver;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
@@ -52,6 +53,10 @@ $executor->runCallback(function () use ($executor) {
     $http->addDriver(new Http2Driver($logger));
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
+        if ($request->hasQueryParam('source')) {
+            return $response->withBody(new FileBody(__FILE__));
+        }
+        
         return $response->withBody(new StringBody('KoolKode Async HTTP :)'));
     };
     

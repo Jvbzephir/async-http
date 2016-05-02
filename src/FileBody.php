@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\Stream;
+use KoolKode\Util\Filesystem;
 
 use function KoolKode\Async\currentExecutor;
 use function KoolKode\Async\fileOpenRead;
@@ -38,6 +39,18 @@ class FileBody implements HttpBodyInterface
     public function __construct(string $file)
     {
         $this->file = $file;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function prepareMessage(HttpMessage $message): HttpMessage
+    {
+        if (!$message->hasHeader('Content-Type')) {
+            $message = $message->withHeader('Content-Type', Filesystem::guessMimeTypeFromFilename($this->file));
+        }
+        
+        return $message;
     }
 
     /**

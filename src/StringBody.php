@@ -50,6 +50,14 @@ class StringBody implements HttpBodyInterface
     /**
      * {@inheritdoc}
      */
+    public function prepareMessage(HttpMessage $message): HttpMessage
+    {
+        return $message;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function getSize(): \Generator
     {
         yield NULL;
