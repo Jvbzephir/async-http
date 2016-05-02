@@ -44,6 +44,13 @@ class HPack
     protected $maxSize = 4096;
     
     /**
+     * Enable header compression?
+     * 
+     * @var bool
+     */
+    protected $compression = true;
+    
+    /**
      * Dynamic table.
      * 
      * @var array
@@ -86,6 +93,16 @@ class HPack
     }
     
     /**
+     * Enable / disable header compression of outgoing headers.
+     * 
+     * @param bool $compression
+     */
+    public function setCompression(bool $compression)
+    {
+        $this->compression = $compression;
+    }
+    
+    /**
      * Encode the given HTTP headers using HPACK header compression.
      * 
      * Eeach header must be an array, element 0 must be the lowercased header name, element 1 holds the value.
@@ -122,11 +139,7 @@ class HPack
                 }
             } else {
                 // Literal Header Field without Indexing — New Name
-                if (strlen($k) < 0x7F) {
-                    $result .= "\x00" . chr(strlen($k)) . $k;
-                } else {
-                    $result .= "\x00\x7F" . $this->encodeInt(strlen($k) - 0x7F) . $k;
-                }
+                $result .= "\x00" . $this->encodeString($k);
             }
             
             $result .= $this->encodeString($v);
@@ -135,8 +148,43 @@ class HPack
         return $result;
     }
     
+    /**
+     * Encode an integer value according to HPACK Integer Representation.
+     *
+     * @param int $int
+     * @return string
+     */
+    protected function encodeInt(int $int): string
+    {
+        $result = '';
+        $i = 0;
+        
+        while (($int >> $i) > 0x80) {
+            $result .= chr(0x80 | (($int >> $i) & 0x7F));
+            $i += 7;
+        }
+        
+        return $result . chr($int >> $i);
+    }
+    
+    /**
+     * Encode a string literal.
+     * 
+     * @param string $input
+     * @return string
+     */
     protected function encodeString(string $input): string
     {
+        if ($this->compression) {
+            $input = $this->huffmanEncoder->encode($input);
+            
+            if (strlen($input) < 0x7F) {
+                return chr(strlen($input) | 0x80) . $input;
+            }
+            
+            return "\xFF" . $this->encodeInt(strlen($input) - 0x7F) . $input;
+        }
+        
         if (strlen($input) < 0x7F) {
             return chr(strlen($input)) . $input;
         }
@@ -267,25 +315,6 @@ class HPack
             list ($name, $value) = \array_pop($this->headers);
             $this->size -= 32 + \strlen($name) + \strlen($value);
         }
-    }
-    
-    /**
-     * Encode an integer value according to HPACK Integer Representation.
-     * 
-     * @param int $int
-     * @return string
-     */
-    protected function encodeInt(int $int): string
-    {
-        $result = '';
-        $i = 0;
-        
-        while (($int >> $i) > 0x80) {
-            $result .= chr(0x80 | (($int >> $i) & 0x7F));
-            $i += 7;
-        }
-        
-        return $result . chr($int >> $i);
     }
     
     /**

@@ -57,6 +57,9 @@ $executor->runCallback(function () use ($executor) {
             return $response->withBody(new FileBody(__FILE__));
         }
         
+        $response = $response->withHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        $response = $response->withHeader('Test2', json_encode($request->getHeaders()));
+        
         return $response->withBody(new StringBody('KoolKode Async HTTP :)'));
     };
     

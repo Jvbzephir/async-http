@@ -42,6 +42,7 @@ class HPackTest extends \PHPUnit_Framework_TestCase
     public function testEncoderWithKnownOutcome(array $headers, string $result)
     {
         $encoder = new HPack();
+        $encoder->setCompression(false);
         $encoded = $encoder->encode($headers);
         
         $this->assertEquals($result, $this->convertToHexString($encoded));
