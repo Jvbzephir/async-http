@@ -17,8 +17,16 @@ use KoolKode\Util\HuffmanCode;
 
 class HPackContext
 {
+    const ENCODING_LITERAL = 0;
+    
+    const ENCODING_INDEXED = 1;
+    
+    const ENCODING_NEVER_INDEXED = 2;
+    
     protected $compressionEnabled;
 
+    protected $encodings = [];
+    
     protected $huffmanCode;
     
     protected $huffmanEncoder;
@@ -51,6 +59,25 @@ class HPackContext
         $this->compressionEnabled = $compressionEnabled;
     }
 
+    public function getEncodingType(string $name): int
+    {
+        return $this->encodings[$name] ?? self::ENCODING_LITERAL;
+    }
+    
+    public function setEncodingType(string $name, int $encoding)
+    {
+        switch ($encoding) {
+            case self::ENCODING_INDEXED:
+            case self::ENCODING_LITERAL:
+            case self::ENCODING_NEVER_INDEXED:
+                break;
+            default:
+                throw new \InvalidArgumentException(sprintf('Invalid header encoding type: "%s"', $encoding));
+        }
+        
+        $this->encodings[$name] = $encoding;
+    }
+    
     public function getHuffmanEncoder(): HuffmanEncoder
     {
         if ($this->huffmanEncoder === NULL) {

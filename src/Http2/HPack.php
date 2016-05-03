@@ -26,25 +26,53 @@ class HPack
     const SIZE_LIMIT = 4096;
     
     /**
-     * Size of the dynmic table.
+     * Use dynamic table indexing in encoder.
+     * 
+     * @var bool
+     */
+    protected $useIndexing = true;
+    
+    /**
+     * Max size of the dynamic table used by decoder.
      * 
      * @var int
      */
-    protected $size = 0;
+    protected $decoderTableMaxSize = 4096;
     
     /**
-     * Max dynmic table size.
-     * 
+     * Size of the dynmic table used by decoder.
+     *
      * @var int
      */
-    protected $maxSize = 4096;
+    protected $decoderTableSize = 0;
     
     /**
-     * Dynamic table.
+     * Dynamic table being used by decoder.
      * 
      * @var array
      */
-    protected $table = [];
+    protected $decoderTable = [];
+    
+    /**
+     * Size of the dynmic table used by encoder.
+     * 
+     * @var int
+     */
+    protected $encoderTableSize = 0;
+    
+    /**
+     * Max size of the dynamic table used by encoder.
+     * 
+     * @var int
+     */
+    protected $encoderTableMaxSize = 4096;
+    
+    /**
+     * Dynamic table being used by encoder.
+     * 
+     * @var array
+     */
+    protected $encoderTable = [];
     
     /**
      * HPACK context.
@@ -64,13 +92,23 @@ class HPack
     }
     
     /**
+     * Enable / disable usage of dynamic table in encoder.
+     * 
+     * @param bool $useIndexing
+     */
+    public function setUseIndexing(bool $useIndexing)
+    {
+        $this->useIndexing = $useIndexing;
+    }
+    
+    /**
      * Get the current size of the dynamic table.
      * 
      * @return int
      */
-    public function getDynamicTableSize(): int
+    public function getDecoderTableSize(): int
     {
-        return count($this->table);
+        return count($this->decoderTable);
     }
     
     /**
@@ -100,17 +138,57 @@ class HPack
             }
             
             $index = self::STATIC_TABLE_LOOKUP[$k] ?? NULL;
+            $encoding = $this->context->getEncodingType($k);
             
-            if ($index !== NULL) {
-                // Literal Header Field without Indexing — Indexed Name
-                if ($index < 0x10) {
-                    $result .= chr($index);
+            if ($this->useIndexing && $encoding === HPackContext::ENCODING_INDEXED) {
+                foreach ($this->encoderTable as $i => $header) {
+                    if ($header[0] === $k && $header[1] === $v) {
+                        $i += self::STATIC_TABLE_SIZE + 1;
+                        
+                        // Indexed Header Field
+                        if ($i < 0x7F) {
+                            $result .= chr($i | 0x80);
+                        } else {
+                            $result .= "\xFF" . $this->encodeInt($i - 0x7F);
+                        }
+                        
+                        continue 2;
+                    }
+                }
+                
+                array_unshift($this->encoderTable, [
+                    $k,
+                    $v
+                ]);
+                
+                $this->encoderTableSize += 32 + strlen($k) + strlen($v);
+                
+                while ($this->encoderTableSize > $this->decoderTableMaxSize) {
+                    list ($name, $value) = array_pop($this->encoderTable);
+                    $this->encoderTableSize -= 32 + strlen($name) + strlen($value);
+                }
+                
+                if ($index !== NULL) {
+                    // Literal Header Field with Incremental Indexing — Indexed Name
+                    if ($index < 0x40) {
+                        $result .= chr($index | 0x40);
+                    } else {
+                        $result .= "\x7F" . $this->encodeInt($index - 0x40);
+                    }
                 } else {
-                    $result .= "\x0F" . $this->encodeInt($index - 0x0F);
+                    // Literal Header Field with Incremental Indexing — New Name
+                    $result .= "\x40" . $this->encodeString($k);
+                }
+            } elseif ($index !== NULL) {
+                // Literal Header Field without Indexing / never indexed — Indexed Name
+                if ($index < 0x10) {
+                    $result .= chr($index | ($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? 0x10 : 0x00);
+                } else {
+                    $result .= (($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? "\x1F" : "\x0F") . $this->encodeInt($index - 0x0F);
                 }
             } else {
-                // Literal Header Field without Indexing — New Name
-                $result .= "\x00" . $this->encodeString($k);
+                // Literal Header Field without Indexing / never indexed — New Name
+                $result .= (($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? "\x10" : "\x00") . $this->encodeString($k);
             }
             
             $result .= $this->encodeString($v);
@@ -197,11 +275,11 @@ class HPack
                     
                     $index -= 0x81 + self::STATIC_TABLE_SIZE;
                     
-                    if (!isset($this->table[$index])) {
+                    if (!isset($this->decoderTable[$index])) {
                         throw new \RuntimeException(sprintf('Missing index %X in dynamic table', $index));
                     }
                     
-                    $headers[] = $this->table[$index];
+                    $headers[] = $this->decoderTable[$index];
                 }
                 
                 continue;
@@ -229,7 +307,7 @@ class HPack
                     if ($index <= self::STATIC_TABLE_SIZE) {
                         $name = self::STATIC_TABLE[$index][0];
                     } else {
-                        $name = $this->table[$index - self::STATIC_TABLE_SIZE];
+                        $name = $this->decoderTable[$index - self::STATIC_TABLE_SIZE];
                     }
                 } else {
                     $name = $this->decodeString($encoded, $encodedLength, $offset);
@@ -245,10 +323,10 @@ class HPack
                 ];
                 
                 if ($dynamic) {
-                    array_unshift($this->table, $header);
-                    $this->size += 32 + strlen($header[0]) + strlen($header[1]);
+                    array_unshift($this->decoderTable, $header);
+                    $this->decoderTableSize += 32 + strlen($header[0]) + strlen($header[1]);
                     
-                    if ($this->maxSize < $this->size) {
+                    if ($this->decoderTableMaxSize < $this->decoderTableSize) {
                         $this->resizeDynamicTable();
                     }
                 }
@@ -279,12 +357,12 @@ class HPack
     protected function resizeDynamicTable(int $maxSize = NULL)
     {
         if ($maxSize !== NULL) {
-            $this->maxSize = $maxSize;
+            $this->decoderTableMaxSize = $maxSize;
         }
         
-        while ($this->size > $this->maxSize) {
-            list ($name, $value) = \array_pop($this->headers);
-            $this->size -= 32 + \strlen($name) + \strlen($value);
+        while ($this->decoderTableSize > $this->decoderTableMaxSize) {
+            list ($k, $v) = array_pop($this->decoderTable);
+            $this->decoderTableSize -= 32 + strlen($k) + strlen($v);
         }
     }
     

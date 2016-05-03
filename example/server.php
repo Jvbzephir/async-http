@@ -19,6 +19,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Log\Logger;
 use Psr\Log\LogLevel;
+use KoolKode\Async\Http\Http2\HPackContext;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -50,7 +51,11 @@ $executor->runCallback(function () use ($executor) {
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
     
-    $http->addDriver(new Http2Driver($logger));
+    $http2 = new Http2Driver($logger);
+    $http2->getHPackContext()->setEncodingType('test-data', HPackContext::ENCODING_INDEXED);
+    $http2->getHPackContext()->setEncodingType('test-token', HPackContext::ENCODING_NEVER_INDEXED);
+    
+    $http->addDriver($http2);
     
     $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
         if ($request->hasQueryParam('source')) {
@@ -58,7 +63,8 @@ $executor->runCallback(function () use ($executor) {
         }
         
         $response = $response->withHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        $response = $response->withHeader('Test2', json_encode($request->getHeaders()));
+        $response = $response->withHeader('Test-Token', bin2hex(random_bytes(16)));
+        $response = $response->withHeader('Test-Data', json_encode($request->getHeaders()));
         
         return $response->withBody(new StringBody('KoolKode Async HTTP :)'));
     };
