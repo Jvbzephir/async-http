@@ -37,11 +37,6 @@ use function KoolKode\Async\eventEmitter;
  */
 class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
 {
-    public function __construct(LoggerInterface $logger = NULL)
-    {
-        $this->logger = $logger;
-    }
-    
     protected $httpFactory;
     
     protected $sslOptions = [
@@ -51,6 +46,8 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     
     protected $upgradeEnabled = true;
     
+    protected $context;
+    
     protected $logger;
     
     /**
@@ -59,6 +56,12 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
      * @var array
      */
     protected $conns = [];
+    
+    public function __construct(LoggerInterface $logger = NULL, HPackContext $context = NULL)
+    {
+        $this->logger = $logger;
+        $this->context = $context ?? new HPackContext();
+    }
     
     public function setLogger(LoggerInterface $logger = NULL)
     {
@@ -94,6 +97,16 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     }
     
     /**
+     * Get the HPACK header context.
+     * 
+     * @return HPackContext
+     */
+    public function getHPackContext(): HPackContext
+    {
+        return $this->context;
+    }
+    
+    /**
      * {@inheritdoc}
      */
     public function handleConnection(HttpEndpoint $endpoint, DuplexStreamInterface $socket, callable $action): \Generator
@@ -101,7 +114,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         try {
             // Bail out if no connection preface is received.
             try {
-                $this->conns[] = $conn = yield from Connection::connectServer($socket, $this->logger);
+                $this->conns[] = $conn = yield from Connection::connectServer($socket, $this->context, $this->logger);
             } catch (ConnectionException $e) {
                 return;
             }
@@ -202,7 +215,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             
             yield from $socket->write($message);
             
-            $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
+            $conn = new Connection(Connection::MODE_SERVER, $socket, $this->context, yield eventEmitter(), $this->logger);
             
             $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE));
             
@@ -258,7 +271,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
                 return;
             }
             
-            $conn = new Connection(Connection::MODE_SERVER, $socket, yield eventEmitter(), $this->logger);
+            $conn = new Connection(Connection::MODE_SERVER, $socket, $this->context, yield eventEmitter(), $this->logger);
             
             $conn->getEvents()->observe(MessageReceivedEvent::class, function (MessageReceivedEvent $event) use ($endpoint, $action) {
                 yield from $this->handleMessage($event, $endpoint, $action);

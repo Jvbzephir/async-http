@@ -146,12 +146,13 @@ class Connection
      * 
      * @param int $mode Client or server mode.
      * @param DuplexStreamInterface $socket
+     * @param HPackContext $context
      * @param EventEmitter $events
      * @param LoggerInterface $logger
      * 
      * @throws \InvalidArgumentException When an invalid connection mode has been specified.
      */
-    public function __construct(int $mode, DuplexStreamInterface $socket, EventEmitter $events, LoggerInterface $logger = NULL)
+    public function __construct(int $mode, DuplexStreamInterface $socket, HPackContext $context, EventEmitter $events, LoggerInterface $logger = NULL)
     {
         $this->socket = $socket;
         $this->events = $events;
@@ -166,7 +167,7 @@ class Connection
                 throw new \InvalidArgumentException('Unknown HTTP/2 connection mode: %s', $mode);
         }
         
-        $this->hpack = new HPack();
+        $this->hpack = new HPack($context);
     }
     
     /**
@@ -187,12 +188,13 @@ class Connection
      * Coroutine that creates an HTTP/2 client connection and sends the preface and initial settings frame.
      * 
      * @param DuplexStreamInterface $socket
+     * @param HPackContext $context
      * @param LoggerInterface $logger
      * @return Connection
      */
-    public static function connectClient(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
+    public static function connectClient(DuplexStreamInterface $socket, HPackContext $context, LoggerInterface $logger = NULL): \Generator
     {
-        $conn = new static(self::MODE_CLIENT, $socket, yield eventEmitter(), $logger);
+        $conn = new static(self::MODE_CLIENT, $socket, $context, yield eventEmitter(), $logger);
     
         yield from $socket->write(self::PREFACE);
         yield from $conn->writeFrame(new Frame(Frame::SETTINGS, pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)), 500);
@@ -207,12 +209,13 @@ class Connection
      * Coroutine that creates an HTTP/2 server connection, validates the preface is sent by the client and processes initial settings exchange.
      * 
      * @param DuplexStreamInterface $socket
+     * @param HPackContext $context
      * @param LoggerInterface $logger
      * @return Connection
      * 
      * @throws ConnectionException When the client did not send an HTTP/2 connection preface.
      */
-    public static function connectServer(DuplexStreamInterface $socket, LoggerInterface $logger = NULL): \Generator
+    public static function connectServer(DuplexStreamInterface $socket, HPackContext $context, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE), true);
         
@@ -220,7 +223,7 @@ class Connection
             throw new ConnectionException('Client did not send valid HTTP/2 connection preface');
         }
         
-        $conn = new static(self::MODE_SERVER, $socket, yield eventEmitter(), $logger);
+        $conn = new static(self::MODE_SERVER, $socket, $context, yield eventEmitter(), $logger);
         
         yield from $conn->handleServerHandshake();
         

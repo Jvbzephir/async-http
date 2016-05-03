@@ -41,12 +41,11 @@ class HPackTest extends \PHPUnit_Framework_TestCase
      */
     public function testEncoderWithKnownOutcome(array $headers, string $result)
     {
-        $encoder = new HPack();
-        $encoder->setCompression(false);
-        $encoded = $encoder->encode($headers);
+        $hpack = new HPack(new HPackContext(false));
+        $encoded = $hpack->encode($headers);
         
         $this->assertEquals($result, $this->convertToHexString($encoded));
-        $this->assertEquals($headers, (new HPack())->decode($encoded));
+        $this->assertEquals($headers, $hpack->decode($encoded));
     }
     
     public function testEncoder()

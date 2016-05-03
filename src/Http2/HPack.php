@@ -11,10 +11,6 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Util\HuffmanCode;
-use KoolKode\Util\HuffmanDecoder;
-use KoolKode\Util\HuffmanEncoder;
-
 /**
  * HPACK implementation.
  * 
@@ -44,13 +40,6 @@ class HPack
     protected $maxSize = 4096;
     
     /**
-     * Enable header compression?
-     * 
-     * @var bool
-     */
-    protected $compression = true;
-    
-    /**
      * Dynamic table.
      * 
      * @var array
@@ -58,28 +47,20 @@ class HPack
     protected $table = [];
     
     /**
-     * Huffman encoder being used to send compressed headers.
+     * HPACK context.
      * 
-     * @var HuffmanEncoder
+     * @var HPackContext
      */
-    protected $huffmanEncoder;
-    
-    /**
-     * Huffman decoder used with HPACK-compressed strings.
-     * 
-     * @var HuffmanDecoder
-     */
-    protected $huffmanDecoder;
+    protected $context;
     
     /**
      * Create a new HPACK encoder / decoder.
      * 
      * @param HuffmanDecoder $decoder
      */
-    public function __construct(HuffmanEncoder $encoder = NULL, HuffmanDecoder $decoder = NULL)
+    public function __construct(HPackContext $context = NULL)
     {
-        $this->huffmanDecoder = $decoder ?? self::createHuffmanDecoder();
-        $this->huffmanEncoder = $encoder ?? self::createHuffmanEncoder();
+        $this->context = $context ?? HPackContext::getDefaultContext();
     }
     
     /**
@@ -90,16 +71,6 @@ class HPack
     public function getDynamicTableSize(): int
     {
         return count($this->table);
-    }
-    
-    /**
-     * Enable / disable header compression of outgoing headers.
-     * 
-     * @param bool $compression
-     */
-    public function setCompression(bool $compression)
-    {
-        $this->compression = $compression;
     }
     
     /**
@@ -175,8 +146,8 @@ class HPack
      */
     protected function encodeString(string $input): string
     {
-        if ($this->compression) {
-            $input = $this->huffmanEncoder->encode($input);
+        if ($this->context->isCompressionEnabled()) {
+            $input = $this->context->getHuffmanEncoder()->encode($input);
             
             if (strlen($input) < 0x7F) {
                 return chr(strlen($input) | 0x80) . $input;
@@ -370,65 +341,13 @@ class HPack
         
         try {
             if ($huffman) {
-                return $this->huffmanDecoder->decode(substr($encoded, $offset, $len));
+                return $this->context->getHuffmanDecoder()->decode(substr($encoded, $offset, $len));
             }
             
             return substr($encoded, $offset, $len);
         } finally {
             $offset += $len;
         }
-    }
-    
-    /**
-     * Create Huffman code used by HPACK.
-     * 
-     * @return HuffmanCode
-     */
-    public static function createHuffmanCode(): HuffmanCode
-    {
-        static $huffman;
-        
-        if ($huffman === NULL) {
-            $huffman = new HuffmanCode();
-            
-            foreach (self::HUFFMAN_CODE as $i => $code) {
-                $huffman->addCode(($i > 255) ? '' : chr($i), $code, self::HUFFMAN_CODE_LENGTHS[$i]);
-            }
-        }
-        
-        return $huffman;
-    }
-    
-    /**
-     * Create a canonical Huffman decoder for HPACK-encoded strings.
-     * 
-     * @return HuffmanDecoder
-     */
-    public static function createHuffmanDecoder(): HuffmanDecoder
-    {
-        static $decoder;
-        
-        if ($decoder === NULL) {
-            $decoder = new HuffmanDecoder(self::createHuffmanCode(), true);
-        }
-        
-        return $decoder;
-    }
-    
-    /**
-     * Create a Huffman encoder to be used for headers.
-     * 
-     * @return HuffmanEncoder
-     */
-    public static function createHuffmanEncoder(): HuffmanEncoder
-    {
-        static $encoder;
-        
-        if ($encoder === NULL) {
-            $encoder = new HuffmanEncoder(self::createHuffmanCode());
-        }
-        
-        return $encoder;
     }
     
     /**

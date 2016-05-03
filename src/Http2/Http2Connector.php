@@ -31,11 +31,14 @@ class Http2Connector implements HttpConnectorInterface
 {
     protected $logger;
     
+    protected $context;
+    
     protected $tasks = [];
     
-    public function __construct(LoggerInterface $logger = NULL)
+    public function __construct(LoggerInterface $logger = NULL, HPackContext $context = NULL)
     {
         $this->logger = $logger;
+        $this->context = $context ?? new HPackContext();
     }
     
     /**
@@ -46,6 +49,11 @@ class Http2Connector implements HttpConnectorInterface
     public static function isAvailable(): bool
     {
         return Socket::isAlpnSupported();
+    }
+    
+    public function getHPackContext(): HPackContext
+    {
+        return $this->context;
     }
     
     /**
@@ -134,7 +142,7 @@ class Http2Connector implements HttpConnectorInterface
                 }
             }
             
-            $conn = yield from Connection::connectClient($socket, $this->logger);
+            $conn = yield from Connection::connectClient($socket, $this->context, $this->logger);
             
             $handler = yield runTask($this->handleConnectionFrames($conn), sprintf('HTTP/2 Frame Handler: "%s:%u"', $host, $port));
             $handler->setAutoShutdown(true);
