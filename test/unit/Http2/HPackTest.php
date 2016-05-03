@@ -100,18 +100,18 @@ class HPackTest extends \PHPUnit_Framework_TestCase
             ]
         ];
         
-        $this->assertEquals(0, $pack->getDynamicTableSize());
+        $this->assertEquals(0, $pack->getDecoderTableSize());
         $this->assertEquals($headers, $pack->decode($this->getHexString('8286 8441 0f77 7777 2e65 7861 6d70 6c65 2e63 6f6d')));
-        $this->assertEquals(1, $pack->getDynamicTableSize());
+        $this->assertEquals(1, $pack->getDecoderTableSize());
         
         $headers[] = [
             'cache-control',
             'no-cache'
         ];
         
-        $this->assertEquals(1, $pack->getDynamicTableSize());
+        $this->assertEquals(1, $pack->getDecoderTableSize());
         $this->assertEquals($headers, $pack->decode($this->getHexString('8286 84be 5808 6e6f 2d63 6163 6865')));
-        $this->assertEquals(2, $pack->getDynamicTableSize());
+        $this->assertEquals(2, $pack->getDecoderTableSize());
         
         $headers[1] = [
             ':scheme',
@@ -128,9 +128,9 @@ class HPackTest extends \PHPUnit_Framework_TestCase
             'custom-value'
         ];
         
-        $this->assertEquals(2, $pack->getDynamicTableSize());
+        $this->assertEquals(2, $pack->getDecoderTableSize());
         $this->assertEquals($headers, $pack->decode($this->getHexString('8287 85bf 400a 6375 7374 6f6d 2d6b 6579 0c63 7573 746f 6d2d 7661 6c75 65')));
-        $this->assertEquals(3, $pack->getDynamicTableSize());
+        $this->assertEquals(3, $pack->getDecoderTableSize());
     }
 
     public function testDecodeHuffman()

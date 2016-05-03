@@ -182,7 +182,7 @@ class HPack
             } elseif ($index !== NULL) {
                 // Literal Header Field without Indexing / never indexed — Indexed Name
                 if ($index < 0x10) {
-                    $result .= chr($index | ($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? 0x10 : 0x00);
+                    $result .= chr($index | (($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? 0x10 : 0x00));
                 } else {
                     $result .= (($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? "\x1F" : "\x0F") . $this->encodeInt($index - 0x0F);
                 }
