@@ -500,8 +500,10 @@ class Connection
      */
     public function openStream(): \Generator
     {
+        $events = yield eventEmitter();
+        
         try {
-            return $this->streams[$this->streamCounter] = new Stream($this->streamCounter, $this, yield eventEmitter(), $this->logger);
+            return $this->streams[$this->streamCounter] = new Stream($this->streamCounter, $this, $events, $this->logger);
         } finally {
             $this->streamCounter += 2;
         }
