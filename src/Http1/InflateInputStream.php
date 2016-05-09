@@ -129,6 +129,22 @@ class InflateInputStream implements InputStreamInterface
     }
 
     /**
+     * Check if support for streaming decompression is available.
+     * 
+     * @return bool
+     */
+    public static function isAvailable(): bool
+    {
+        static $available;
+        
+        if ($available === NULL) {
+            $available = function_exists('inflate_init');
+        }
+        
+        return $available;
+    }
+    
+    /**
      * Coroutine that creates an inflate input stream from the given stream.
      * 
      * @param InputStreamInterface $stream Stream that supplies compressed data.

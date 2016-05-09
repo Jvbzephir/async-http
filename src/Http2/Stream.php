@@ -553,7 +553,7 @@ class Stream
             ]
         ];
         
-        if (function_exists('inflate_init')) {
+        if (InflateInputStream::isAvailable()) {
             $headers['accept-encoding'] = [
                 'gzip, deflate'
             ];

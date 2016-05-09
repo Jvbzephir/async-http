@@ -20,6 +20,15 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
 {
     use AsyncTrait;
     
+    protected function setUp()
+    {
+        parent::setUp();
+        
+        if (!InflateInputStream::isAvailable()) {
+            return $this->markTestSkipped('zlib streaming decompression not available');
+        }
+    }
+    
     public function provideCompressionData()
     {
         yield ['', InflateInputStream::RAW, 'gzdeflate'];

@@ -94,13 +94,6 @@ class Http1Body implements HttpBodyInterface
     protected $cascadeClose = true;
     
     /**
-     * Is zlib-based streaming compression available?
-     * 
-     * @var bool
-     */
-    protected static $compressionSupported;
-    
-    /**
      * Create a body that can decode contents received by the given socket.
      * 
      * @param InputStreamInterface $socket
@@ -176,27 +169,13 @@ class Http1Body implements HttpBodyInterface
     }
     
     /**
-     * Check if streaming compression is available.
-     * 
-     * @return bool
-     */
-    public static function isCompressionSupported(): bool
-    {
-        if (self::$compressionSupported === NULL) {
-            self::$compressionSupported = function_exists('inflate_init');
-        }
-        
-        return self::$compressionSupported;
-    }
-    
-    /**
      * Get available compression encoding names.
      * 
      * @return array
      */
     public static function getAvailableCompressionEncodings(): array
     {
-        if (!self::isCompressionSupported()) {
+        if (!InflateInputStream::isAvailable()) {
             return [];
         }
         
