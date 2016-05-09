@@ -11,14 +11,14 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Async\Event\StoredEvent;
+use KoolKode\Async\Event\Event;
 
 /**
  * Is triggered whenever a DATA frame has been received by an HTTP/2 stream.
  * 
  * @author Martin Schröder
  */
-class DataReceivedEvent extends StoredEvent
+class DataReceivedEvent extends Event
 {
     /**
      * Received data (without header and padding).

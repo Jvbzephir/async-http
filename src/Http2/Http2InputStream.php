@@ -158,8 +158,7 @@ class Http2InputStream implements InputStreamInterface
                 $timeout = min($timeout, $this->timeout);
             }
             
-            $event = yield from $this->events->await(DataReceivedEvent::class, $timeout);
-            $event->consume();
+            yield from $this->events->await(DataReceivedEvent::class, $timeout);
         }
         
         $chunk = substr($this->buffer, 0, $length);
