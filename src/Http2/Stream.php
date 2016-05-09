@@ -16,6 +16,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Stream\InputStreamInterface;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\currentTask;
@@ -533,8 +534,10 @@ class Stream
             ]
         ];
         
-        yield from $this->sendHeaders($request, $headers);
-        yield from $this->sendBody($request);
+        $in = yield from $request->getBody()->getInputStream();
+        
+        yield from $this->sendHeaders($request, $headers, !$in->eof());
+        yield from $this->sendBody($request, $in);
         
         if ($this->logger) {
             $this->logger->debug('<< {method} {path} HTTP/{version}', [
@@ -560,8 +563,10 @@ class Stream
                 ]
             ];
             
-            yield from $this->sendHeaders($response, $headers);
-            yield from $this->sendBody($response);
+            $in = yield from $response->getBody()->getInputStream();
+            
+            yield from $this->sendHeaders($response, $headers, !$in->eof());
+            yield from $this->sendBody($response, $in);
             
             if ($this->logger) {
                 $this->logger->debug('<< HTTP/{version} {status} {reason} << {duration} ms', [
@@ -576,26 +581,28 @@ class Stream
         }
     }
     
-    protected function sendHeaders(HttpMessage $message, array $headers): \Generator
+    protected function sendHeaders(HttpMessage $message, array $headers, bool $hasBody = true): \Generator
     {
         static $remove = [
-            'Connection',
-            'Content-Length',
-            'Content-Encoding',
-            'Keep-Alive',
-            'Host',
-            'Transfer-Encoding',
-            'Upgrade',
-            'TE'
+            'connection',
+            'content-length',
+            'content-encoding',
+            'host',
+            'keep-alive',
+            'host',
+            'transfer-encoding',
+            'upgrade',
+            'te'
         ];
         
+        $headerList = [];
+        $headers = array_merge(array_change_key_case($message->getHeaders(), CASE_LOWER), $headers);
+        
         foreach ($remove as $name) {
-            $message = $message->withoutHeader($name);
+            unset($headers[$name]);
         }
         
-        $headerList = [];
-        
-        foreach (array_merge(array_change_key_case($message->getHeaders(), CASE_LOWER), $headers) as $k => $h) {
+        foreach ($headers as $k => $h) {
             foreach ($h as $v) {
                 $headerList[] = [
                     $k,
@@ -605,6 +612,7 @@ class Stream
         }
         
         $headers = $this->hpack->encode($headerList);
+        $flags = Frame::END_HEADERS | ($hasBody ? Frame::NOFLAG : Frame::END_STREAM);
         
         if (strlen($headers) > self::MAX_HEADER_SIZE) {
             $parts = str_split($headers, self::MAX_HEADER_SIZE);
@@ -616,19 +624,17 @@ class Stream
                 $frames[] = new Frame(Frame::CONTINUATION, $parts[$i]);
             }
         
-            $frames[] = new Frame(Frame::CONTINUATION, $parts[count($parts) - 1], Frame::END_HEADERS);
+            $frames[] = new Frame(Frame::CONTINUATION, $parts[count($parts) - 1], $flags);
             
             // Send all frames in one batch to ensure no concurrent writes to the socket take place.
             yield from $this->writeFrame(...$frames);
         } else {
-            yield from $this->writeFrame(new Frame(Frame::HEADERS, $headers, Frame::END_HEADERS));
+            yield from $this->writeFrame(new Frame(Frame::HEADERS, $headers, $flags));
         }
     }
     
-    protected function sendBody(HttpMessage $message): \Generator
+    protected function sendBody(HttpMessage $message, InputStreamInterface $in): \Generator
     {
-        $in = yield from $message->getBody()->getInputStream();
-        
         try {
             $eof = $in->eof();
             
@@ -638,12 +644,10 @@ class Stream
                 
                 if ($len < 1) {
                     if ($this->window < 1) {
-                        $event = yield from $this->events->await(WindowUpdatedEvent::class);
+                        yield from $this->events->await(WindowUpdatedEvent::class);
                     } else {
-                        $event = yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
+                        yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
                     }
-                    
-                    $event->consume();
                     
                     continue;
                 }
