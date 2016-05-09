@@ -595,7 +595,7 @@ class Stream
         
         $headerList = [];
         
-        foreach (array_merge($headers, array_change_key_case($message->getHeaders(), CASE_LOWER)) as $k => $h) {
+        foreach (array_merge(array_change_key_case($message->getHeaders(), CASE_LOWER), $headers) as $k => $h) {
             foreach ($h as $v) {
                 $headerList[] = [
                     $k,
