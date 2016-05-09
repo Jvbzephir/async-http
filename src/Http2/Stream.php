@@ -16,6 +16,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Http1\InflateInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use Psr\Log\LoggerInterface;
 
@@ -331,7 +332,7 @@ class Stream
                         }
                         
                         try {
-                            $this->handleMessage($this->headers, $this->body);
+                            yield from $this->handleMessage($this->headers, $this->body);
                         } finally {
                             $this->headers = '';
                         }
@@ -381,7 +382,7 @@ class Stream
                         }
                         
                         try {
-                            $this->handleMessage($this->headers, $this->body);
+                            yield from $this->handleMessage($this->headers, $this->body);
                         } finally {
                             $this->headers = '';
                         }
@@ -476,6 +477,24 @@ class Stream
         
         $event = new MessageReceivedEvent($this, $headers, $this->body, $this->started);
         
+        if ($event->getHeaderValue(':status') !== '') {
+            $encoding = strtolower($event->getHeaderValue('content-encoding'));
+            
+            switch ($encoding) {
+                case '':
+                    // Uncompressed response body...
+                    break;
+                case 'gzip':
+                    $event->body = yield from InflateInputStream::open($event->body, InflateInputStream::GZIP);
+                    break;
+                case 'deflate':
+                    $event->body = yield from InflateInputStream::open($event->body, InflateInputStream::DEFLATE);
+                    break;
+                default:
+                    throw new \RuntimeException(sprintf('Unsupported content encoding: "%s"', $encoding));
+            }
+        }
+        
         $this->events->emit($event);
         $this->conn->getEvents()->emit($event);
     }
@@ -533,6 +552,12 @@ class Stream
                 $path
             ]
         ];
+        
+        if (function_exists('inflate_init')) {
+            $headers['accept-encoding'] = [
+                'gzip, deflate'
+            ];
+        }
         
         $in = yield from $request->getBody()->getInputStream();
         

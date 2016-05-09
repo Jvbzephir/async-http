@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\StoredEvent;
+use KoolKode\Async\Stream\InputStreamInterface;
 
 /**
  * Is triggered whenever all HTTP headers of a request or response have been received by an HTTP/2 stream.
@@ -35,9 +36,9 @@ class MessageReceivedEvent extends StoredEvent
     public $headers;
     
     /**
-     * HTTP/2 input stream that can be used to read the HTTP message body as stream.
+     * Input stream that is used to read the HTTP body.
      * 
-     * @var Http2InputStream
+     * @var InputStreamInterface
      */
     public $body;
     
@@ -53,10 +54,10 @@ class MessageReceivedEvent extends StoredEvent
      * 
      * @param Stream $stream HTTP/2 stream.
      * @param array $headers Received HTTP headers.
-     * @param Http2InputStream $body Message body stream.
+     * @param InputStreamInterface $body Message body stream.
      * @param float $started Microtime (as float) of the incoming HTTP request.
      */
-    public function __construct(Stream $stream, array $headers, Http2InputStream $body, float $started = NULL)
+    public function __construct(Stream $stream, array $headers, InputStreamInterface $body, float $started = NULL)
     {
         $this->stream = $stream;
         $this->headers = $headers;
