@@ -12,11 +12,13 @@
 namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\ExecutorInterface;
+use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Http1\DeflateInputStream;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
@@ -453,9 +455,35 @@ class ConnectionHandler
             }
         }
         
+        $compression = NULL;
+        $compressionMethod = NULL;
+        
+        if (DeflateInputStream::isAvailable()) {
+            foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
+                switch ($encoding->getName()) {
+                    case 'gzip':
+                        $compression = 'gzip';
+                        $compressionMethod = DeflateInputStream::GZIP;
+                        break 2;
+                    case 'deflate':
+                        $compression = 'deflate';
+                        $compressionMethod = DeflateInputStream::DEFLATE;
+                        break 2;
+                }
+            }
+        }
+        
+        if ($compression !== NULL) {
+            $message .= sprintf("Content-Encoding: %s\r\n", $compression);
+        }
+        
         yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, $message . "\r\n"));
         
         $body = yield from $response->getBody()->getInputStream();
+        
+        if ($compression !== NULL) {
+            $body = yield from DeflateInputStream::open($body, $compressionMethod);
+        }
         
         try {
             while (!$body->eof()) {

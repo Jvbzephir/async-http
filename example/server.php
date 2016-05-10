@@ -69,10 +69,10 @@ $executor->runCallback(function () use ($executor) {
         return $response->withBody(new StringBody('KoolKode Async HTTP :)'));
     };
     
-//     $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
+    $fcgi = new FcgiEndpoint(4000, '0.0.0.0', $logger);
     
     $executor->runNewTask($http->run($action), $http->getTitle());
-//     $executor->runNewTask($fcgi->run($action), $fcgi->getTitle());
+    $executor->runNewTask($fcgi->run($action), $fcgi->getTitle());
 });
 
 $executor->run();
