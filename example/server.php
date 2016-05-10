@@ -17,9 +17,9 @@ use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StringBody;
+use KoolKode\Async\Http\Http2\HPackContext;
 use KoolKode\Async\Log\Logger;
 use Psr\Log\LogLevel;
-use KoolKode\Async\Http\Http2\HPackContext;
 
 error_reporting(-1);
 ini_set('display_errors', false);

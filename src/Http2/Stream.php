@@ -643,12 +643,17 @@ class Stream
             'te'
         ];
         
-        $headerList = [];
-        $headers = array_merge(array_change_key_case($message->getHeaders(), CASE_LOWER), $headers);
+        foreach (array_change_key_case($message->getHeaders(), CASE_LOWER) as $k => $v) {
+            if (!isset($headers[$k])) {
+                $headers[$k] = $v;
+            }
+        }
         
         foreach ($remove as $name) {
             unset($headers[$name]);
         }
+        
+        $headerList = [];
         
         foreach ($headers as $k => $h) {
             foreach ($h as $v) {
