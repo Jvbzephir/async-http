@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\FileBody;
+use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
@@ -25,6 +26,7 @@ use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\ResourceStreamInterface;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Stream\Stream;
+use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
@@ -140,7 +142,7 @@ class Http1Driver implements HttpDriverInterface
                 $response = yield from $handler->upgradeConnection($socket, $request, $response, $endpoint, $action);
                 
                 if ($response instanceof HttpResponse) {
-                    return yield from $this->sendResponse($socket, $response, false, $started);
+                    return yield from $this->sendResponse($socket, $request, $response, false, $started);
                 }
                 
                 return;
@@ -158,7 +160,7 @@ class Http1Driver implements HttpDriverInterface
             
             $response = new HttpResponse($e->getCode());
             
-            yield from $this->sendResponse($socket, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
+            yield from $this->sendResponse($socket, $request, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
@@ -205,7 +207,7 @@ class Http1Driver implements HttpDriverInterface
                 throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
             }
             
-            return yield from $this->sendResponse($socket, $response, $request->getMethod() == 'HEAD', $started);
+            return yield from $this->sendResponse($socket, $request, $response, $request->getMethod() == 'HEAD', $started);
         } finally {
             $socket->close();
         }
@@ -255,10 +257,11 @@ class Http1Driver implements HttpDriverInterface
      * Serialize HTTP response and transmit data over the wire.
      * 
      * @param DuplexStreamInterface $socket
+     * @param HttpRequest $request
      * @param HttpResponse $response
      * @return Generator
      */
-    protected function sendResponse(DuplexStreamInterface $socket, HttpResponse $response, bool $head = false, float $started = NULL): \Generator
+    protected function sendResponse(DuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, bool $head = false, float $started = NULL): \Generator
     {
         if ($started === NULL) {
             $started = microtime(true);
@@ -300,11 +303,38 @@ class Http1Driver implements HttpDriverInterface
             }
         }
         
-        if ($chunked) {
+        $compression = NULL;
+        $compressionMethod = NULL;
+        
+        if (DeflateInputStream::isAvailable()) {
+            foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
+                switch ($encoding->getName()) {
+                    case 'gzip':
+                        $compression = 'gzip';
+                        $compressionMethod = DeflateInputStream::GZIP;
+                        break 2;
+                    case 'deflate':
+                        $compression = 'deflate';
+                        $compressionMethod = DeflateInputStream::DEFLATE;
+                        break 2;
+                }
+            }
+        }
+        
+        if ($chunked || $compression !== NULL) {
             $in = yield from $body->getInputStream();
+            
+            if ($compression !== NULL) {
+                $in = yield from DeflateInputStream::open($in, $compressionMethod);
+                $message .= sprintf("Content-Encoding: %s\r\n", $compression);
+            }
+            
             $chunk = $in->eof() ? '' : yield from $in->read();
             
             if ($chunk === '') {
+                $in->close();
+                
+                $in = new StringInputStream('');
                 $message .= "Content-Length: 0\r\n";
             } else {
                 $message .= "Transfer-Encoding: chunked\r\n";
@@ -336,7 +366,7 @@ class Http1Driver implements HttpDriverInterface
         try {
             yield from $socket->write($message . "\r\n");
             
-            if ($chunked) {
+            if ($chunked || $compression !== NULL) {
                 try {
                     if ($chunk !== '') {
                         yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
