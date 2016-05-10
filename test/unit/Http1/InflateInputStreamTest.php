@@ -51,7 +51,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider provideCompressionData
      */
-    public function testCanDecodeCompressedData(string $data, int $format, callable $encoder)
+    public function testCanDecompressData(string $data, int $format, callable $encoder)
     {
         $executor = $this->createExecutor();
         
@@ -102,7 +102,7 @@ class InflateInputStreamTest extends \PHPUnit_Framework_TestCase
         $executor->run();
     }
     
-    public function testRemainingBufferCanBeReadWhenFinished()
+    public function testCannotReadBeyondEndOfStream()
     {
         $executor = $this->createExecutor();
         

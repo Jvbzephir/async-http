@@ -16,11 +16,11 @@ use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
 
 /**
- * Applies data decompression on top of another input stream.
+ * Applies data compression on top of another input stream.
  * 
  * @author Martin Schröder
  */
-class InflateInputStream implements InputStreamInterface
+class DeflateInputStream implements InputStreamInterface
 {
     /**
      * ZLIB raw format, compatible with data produced by gzdeflate().
@@ -44,7 +44,7 @@ class InflateInputStream implements InputStreamInterface
     const GZIP = ZLIB_ENCODING_GZIP;
 
     /**
-     * Wrapped input stream that supplies compressed data.
+     * Wrapped input stream that supplies data to be compressed.
      * 
      * @var InputStreamInterface
      */
@@ -58,7 +58,7 @@ class InflateInputStream implements InputStreamInterface
     protected $buffer = '';
 
     /**
-     * Decompression context.
+     * Compression context.
      * 
      * @var resource
      */
@@ -86,16 +86,17 @@ class InflateInputStream implements InputStreamInterface
     protected static $errorHandler;
 
     /**
-     * Decompress data as it is being read from the given input stream.
+     * Compress data as it is being read from the given input stream.
      * 
      * @param StreamInterface $stream Stream that supplies compressed data.
      * @param string $chunk First chunk of data.
      * @param int $encoding Expected compression encoding, use class constants of this class!
      * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
+     * @param array $options Compression options passed to deflate_init().
      * 
      * @throws \InvalidArgumentException When an invalid compression encoding is specified.
      */
-    public function __construct(InputStreamInterface $stream, string $chunk, $encoding = self::DEFLATE, bool $cascadeClose = true)
+    public function __construct(InputStreamInterface $stream, string $chunk, $encoding = self::DEFLATE, bool $cascadeClose = true, array $options = [])
     {
         switch ($encoding) {
             case self::RAW:
@@ -104,15 +105,21 @@ class InflateInputStream implements InputStreamInterface
                 // OK
                 break;
             default:
-                throw new \InvalidArgumentException(sprintf('Invalid decompression ecncoding specified: %s', $encoding));
+                throw new \InvalidArgumentException(sprintf('Invalid compression ecncoding specified: %s', $encoding));
         }
         
         $this->stream = $stream;
         $this->cascadeClose = $cascadeClose;
-        $this->context = $this->invokeWithErrorHandler('inflate_init', $encoding);
-        
-        $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, $this->stream->eof() ? ZLIB_FINISH : ZLIB_NO_FLUSH);
         $this->finished = $this->stream->eof();
+        
+        $this->context = $this->invokeWithErrorHandler('deflate_init', $encoding, [
+            'level' => $options['level'] ?? 1,
+            'memory' => $options['memory'] ?? 8,
+            'window' => $options['memory'] ?? 15,
+            'strategy' => $options['strategy'] ?? ZLIB_DEFAULT_STRATEGY
+        ]);
+        
+        $this->buffer = $this->invokeWithErrorHandler('deflate_add', $this->context, $chunk, $this->finished ? ZLIB_FINISH : ZLIB_NO_FLUSH);
     }
     
     /**
@@ -129,7 +136,7 @@ class InflateInputStream implements InputStreamInterface
     }
 
     /**
-     * Check if support for streaming decompression is available.
+     * Check if support for streaming compression is available.
      * 
      * @return bool
      */
@@ -138,21 +145,22 @@ class InflateInputStream implements InputStreamInterface
         static $available;
         
         if ($available === NULL) {
-            $available = function_exists('inflate_init');
+            $available = function_exists('deflate_init');
         }
         
         return $available;
     }
     
     /**
-     * Coroutine that creates an inflate input stream from the given stream.
+     * Coroutine that creates a deflate input stream from the given stream.
      * 
-     * @param InputStreamInterface $stream Stream that supplies compressed data.
+     * @param InputStreamInterface $stream Stream that supplies data to be compressed.
      * @param int $encoding Expected compression encoding, use class constants of this class!
      * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
-     * @return InflateInputStream
+     * @param array $options Compression options passed to deflate_init().
+     * @return DeflateInputStream
      */
-    public static function open(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true): \Generator
+    public static function open(InputStreamInterface $stream, $encoding = self::DEFLATE, bool $cascadeClose = true, array $options = []): \Generator
     {
         return new static($stream, yield from Stream::readBuffer($stream, 8192), $encoding, $cascadeClose);
     }
@@ -186,7 +194,7 @@ class InflateInputStream implements InputStreamInterface
             return true;
         }
         
-        return $this->buffer === '' && $this->finished;
+        return ($this->finished && $this->buffer === '');
     }
 
     /**
@@ -203,17 +211,17 @@ class InflateInputStream implements InputStreamInterface
         }
         
         while ($this->buffer === '') {
-            $chunk = yield from $this->stream->read(max($length, 8192), $timeout);
+            $chunk = yield from $this->stream->read(8192, $timeout);
             
             if ($this->stream->eof()) {
                 $this->finished = true;
-                $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, ZLIB_FINISH);
+                $this->buffer = $this->invokeWithErrorHandler('deflate_add', $this->context, $chunk, ZLIB_FINISH);
                 $this->context = NULL;
                 
                 break;
             }
             
-            $this->buffer = $this->invokeWithErrorHandler('inflate_add', $this->context, $chunk, ZLIB_NO_FLUSH);
+            $this->buffer = $this->invokeWithErrorHandler('deflate_add', $this->context, $chunk, ZLIB_NO_FLUSH);
         }
         
         $chunk = substr($this->buffer, 0, $length);
