@@ -18,7 +18,7 @@ use KoolKode\Util\MediaType;
  * 
  * @author Martin Schröder
  */
-class ContentType
+class ContentType implements AttributesInterface
 {
     use AttributesTrait;
     
@@ -38,5 +38,10 @@ class ContentType
     public function getMediaType(): MediaType
     {
         return $this->mediaType;
+    }
+    
+    public function getScore(): int
+    {
+        return $this->mediaType->getScore();
     }
 }

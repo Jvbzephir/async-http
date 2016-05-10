@@ -22,38 +22,19 @@ use KoolKode\Util\MediaType;
  * 
  * @author Martin Schröder
  */
-class AcceptHeader implements \Countable, \IteratorAggregate
+class AcceptHeader extends AbstractListHeader
 {
-    use AttributesTrait;
-    
-    protected $types;
-
     public function __construct(array $types = [])
     {
-        $this->types = $types;
+        $this->entries = $types;
     }
-
-    public function __toString(): string
-    {
-        return implode(', ', $this->types);
-    }
-
-    public function count()
-    {
-        return count($this->types);
-    }
-
-    public function getIterator()
-    {
-        return new \ArrayIterator($this->types);
-    }
-
+    
     public static function fromMessage(HttpMessage $message): AcceptHeader
     {
         $accept = $message->getHeaderLine('Accept');
         $types = [];
         
-        foreach (static::splitValues($accept) as $str) {
+        foreach (Attributes::splitValues($accept) as $str) {
             if (false === ($index = strpos($str, ';'))) {
                 $type = new ContentType(new MediaType($str), [
                     'q' => 1.0
@@ -61,7 +42,7 @@ class AcceptHeader implements \Countable, \IteratorAggregate
             } else {
                 $type = new ContentType(new MediaType(substr($str, 0, $index)), array_merge([
                     'q' => 1.0
-                ], static::parseAttributes(substr($str, $index + 1))));
+                ], Attributes::parseAttributes(substr($str, $index + 1))));
             }
             
             if (static::insertBasedOnQuality($type, $types)) {
@@ -76,62 +57,6 @@ class AcceptHeader implements \Countable, \IteratorAggregate
 
     public function getContentTypes(): array
     {
-        return $this->types;
-    }
-
-    protected static function insertBasedOnQuality(ContentType $type, array & $types): bool
-    {
-        $q = (float) min(1, max(0, (float) $type->getAttribute('q', 1)));
-        
-        for ($size = count($types), $i = 0; $i < $size; $i++) {
-            $tmp = (float) $types[$i]->getAttribute('q', 1.0);
-            
-            if ($q > $tmp) {
-                array_splice($types, $i, 0, [
-                    $type
-                ]);
-                
-                return true;
-            }
-            
-            if ($q == $tmp) {
-                return static::insertBasedOnScore($type, $types, $i);
-            }
-        }
-        
-        return false;
-    }
-
-    protected static function insertBasedOnScore(ContentType $type, array & $types, int $i): bool
-    {
-        $s = $type->getMediaType()->getScore();
-        $tmp = $types[$i]->getMediaType()->getScore();
-        
-        if ($s > $tmp) {
-            array_splice($types, $i, 0, [
-                $type
-            ]);
-            
-            return true;
-        }
-        
-        if ($s == $tmp) {
-            return static::insertBasedOnAttributeCount($type, $types, $i);
-        }
-        
-        return false;
-    }
-
-    protected static function insertBasedOnAttributeCount(ContentType $type, array & $types, int $i): bool
-    {
-        if (count($type->getAttributes()) > count($types[$i]->getAttributes())) {
-            array_splice($types, $i, 0, [
-                $type
-            ]);
-            
-            return true;
-        }
-        
-        return false;
+        return $this->entries;
     }
 }

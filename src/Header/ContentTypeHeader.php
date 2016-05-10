@@ -20,7 +20,7 @@ use KoolKode\Util\MediaType;
  * 
  * @author Martin Schröder
  */
-class ContentTypeHeader
+class ContentTypeHeader implements AttributesInterface
 {
     use AttributesTrait;
     
@@ -48,7 +48,7 @@ class ContentTypeHeader
         $attr = [];
         
         if (false !== ($index = strpos($type, ';'))) {
-            $attr = static::parseAttributes(substr($type, $index + 1));
+            $attr = Attributes::parseAttributes(substr($type, $index + 1));
             $type = rtrim(substr($type, 0, $index));
         }
         
@@ -58,5 +58,10 @@ class ContentTypeHeader
     public function getMediaType(): MediaType
     {
         return $this->mediaType;
+    }
+    
+    public function getScore(): int
+    {
+        return $this->mediaType->getScore();
     }
 }
