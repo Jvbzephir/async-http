@@ -39,7 +39,7 @@ class ContentTypeHeader implements AttributesInterface
 
     public function __toString(): string
     {
-        return $this->mediaType . static::buildAttributeString($this->attributes);
+        return $this->mediaType . Attributes::buildAttributeString($this->attributes);
     }
 
     public static function fromMessage(HttpMessage $message): ContentTypeHeader

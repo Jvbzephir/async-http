@@ -20,6 +20,8 @@ use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
+use KoolKode\Async\Http\Header\AcceptEncodingHeader;
+use KoolKode\Async\Http\Header\AcceptEncoding;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
@@ -118,78 +120,81 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
     
     public function testCTH()
     {
-        $executor = $this->createExecutor();
+        $message = new HttpResponse();
+        $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
         
-        $executor->runCallback(function () {
-            $message = new HttpResponse();
-            $message = $message->withHeader('Content-Type', 'text/plain;charset="utf-8"; wrap; max-age="20"');
-            
-            $type = ContentTypeHeader::fromMessage($message);
-            $this->assertEquals('text/plain', (string) $type->getMediaType());
-            $this->assertEquals([
-                'charset' => 'utf-8',
-                'wrap' => true,
-                'max-age' => 20
-            ], $type->getAttributes());
-            
-            $this->assertTrue($type->getAttribute('wrap'));
-            
-            $this->assertFalse($type->hasAttribute('foo'));
-            $this->assertEquals('FOO', $type->getAttribute('foo', 'FOO'));
-        });
+        $type = ContentTypeHeader::fromMessage($message);
+        $this->assertEquals('text/plain', (string) $type->getMediaType());
+        $this->assertEquals([
+            'charset' => 'utf-8',
+            'wrap' => true,
+            'max-age' => 20
+        ], $type->getAttributes());
         
-        $executor->run();
+        $this->assertTrue($type->getAttribute('wrap'));
+        
+        $this->assertFalse($type->hasAttribute('foo'));
+        $this->assertEquals('FOO', $type->getAttribute('foo', 'FOO'));
     }
     
     public function testHeaderParsing()
     {
-        $executor = $this->createExecutor();
+        $message = new HttpResponse();
+        $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
         
-        $executor->runCallback(function () {
-            $message = new HttpResponse();
-            $message = $message->withHeader('Accept', 'text/*;q=0.3, text/html;q=0.4, application/xml, text/html;level=1, text/html;level=2;q=0.4, */*;q=0.3');
-            
-            $accept = AcceptHeader::fromMessage($message);
-            $this->assertCount(6, $accept);
-            
-            $it = $accept->getIterator();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('text/html', (string) $type->getMediaType());
-            $this->assertEquals(1, $type->getAttribute('level'));
-            $it->next();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('application/xml', (string) $type->getMediaType());
-            $it->next();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('text/html', (string) $type->getMediaType());
-            $this->assertEquals(2, $type->getAttribute('level'));
-            $it->next();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('text/html', (string) $type->getMediaType());
-            $it->next();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('text/*', (string) $type->getMediaType());
-            $it->next();
-            
-            $type = $it->current();
-            $this->assertTrue($type instanceof ContentType);
-            $this->assertEquals('*/*', (string) $type->getMediaType());
-            $it->next();
-            
-            $this->assertFalse($it->valid());
-        });
+        $accept = AcceptHeader::fromMessage($message);
+        $this->assertCount(6, $accept);
         
-        $executor->run();
+        $it = $accept->getIterator();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('text/html', (string) $type->getMediaType());
+        $this->assertEquals(1, $type->getAttribute('level'));
+        $it->next();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('application/xml', (string) $type->getMediaType());
+        $it->next();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('text/html', (string) $type->getMediaType());
+        $this->assertEquals(2, $type->getAttribute('level'));
+        $it->next();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('text/html', (string) $type->getMediaType());
+        $it->next();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('text/*', (string) $type->getMediaType());
+        $it->next();
+        
+        $type = $it->current();
+        $this->assertTrue($type instanceof ContentType);
+        $this->assertEquals('*/*', (string) $type->getMediaType());
+        $it->next();
+        
+        $this->assertFalse($it->valid());
+    }
+
+    public function testAcceptEncoding()
+    {
+        $request = new HttpRequest(Uri::parse('http://test.me/'));
+        $request = $request->withHeader('Accept-Encoding', 'gzip; q=.5, deflate');
+        
+        $encodings = array_map(function (AcceptEncoding $encoding) {
+            return $encoding->getName();
+        }, AcceptEncodingHeader::fromMessage($request)->getEncodings());
+        
+        $this->assertEquals([
+            'deflate',
+            'gzip'
+        ], $encodings);
     }
     
     public function provideChunkedSetting()

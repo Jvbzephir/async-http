@@ -32,7 +32,7 @@ class ContentType implements AttributesInterface
 
     public function __toString(): string
     {
-        return $this->mediaType . static::buildAttributeString($this->attributes);
+        return $this->mediaType . Attributes::buildAttributeString($this->attributes);
     }
     
     public function getMediaType(): MediaType

@@ -72,7 +72,7 @@ abstract class Attributes
                 continue;
             }
             
-            $parts[] = strtr($part, $quoted);
+            $parts[] = trim(strtr($part, $quoted));
         }
         
         return $parts;
