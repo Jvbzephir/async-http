@@ -12,10 +12,12 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
+use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Http1\DeflateInputStream;
 use KoolKode\Async\Http\Http1\InflateInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use Psr\Log\LoggerInterface;
@@ -575,7 +577,7 @@ class Stream
         return yield from $this->events->await(MessageReceivedEvent::class);
     }
 
-    public function sendResponse(HttpResponse $response, float $started = NULL): \Generator
+    public function sendResponse(HttpRequest $request, HttpResponse $response, float $started = NULL): \Generator
     {
         if ($started === NULL) {
             $started = microtime(true);
@@ -589,6 +591,28 @@ class Stream
             ];
             
             $in = yield from $response->getBody()->getInputStream();
+            
+            $response = $response->withoutHeader('Content-Encoding');
+            
+            if (!$in->eof() && DeflateInputStream::isAvailable()) {
+                foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
+                    switch ($encoding->getName()) {
+                        case 'gzip':
+                            $type = DeflateInputStream::GZIP;
+                            break;
+                        case 'deflate':
+                            $type = DeflateInputStream::DEFLATE;
+                            break;
+                        default:
+                            continue 2;
+                    }
+                    
+                    $in = yield from DeflateInputStream::open($in, $type);
+                    $response = $response->withHeader('Content-Encoding', $encoding->getName());
+                    
+                    break;
+                }
+            }
             
             yield from $this->sendHeaders($response, $headers, !$in->eof());
             yield from $this->sendBody($response, $in);
@@ -611,7 +635,6 @@ class Stream
         static $remove = [
             'connection',
             'content-length',
-            'content-encoding',
             'host',
             'keep-alive',
             'host',
@@ -644,11 +667,11 @@ class Stream
             $frames = [
                 new Frame(Frame::HEADERS, $parts[0])
             ];
-        
+            
             for ($size = count($parts) - 2, $i = 1; $i < $size; $i++) {
                 $frames[] = new Frame(Frame::CONTINUATION, $parts[$i]);
             }
-        
+            
             $frames[] = new Frame(Frame::CONTINUATION, $parts[count($parts) - 1], $flags);
             
             // Send all frames in one batch to ensure no concurrent writes to the socket take place.

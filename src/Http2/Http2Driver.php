@@ -343,7 +343,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
         $response = $response->withProtocolVersion('2.0');
         
         try {
-            yield from $event->stream->sendResponse($response, $event->started);
+            yield from $event->stream->sendResponse($request, $response, $event->started);
         } catch (StreamException $e) {
             if ($this->logger) {
                 $this->logger->debug('Dropped client connection due to socket error: {error} in {file} at line {line}', [
