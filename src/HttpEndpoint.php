@@ -247,6 +247,8 @@ class HttpEndpoint
                 
                 if ($socket !== false) {
                     stream_set_blocking($socket, 0);
+                    stream_set_read_buffer($socket, 0);
+                    stream_set_write_buffer($socket, 0);
                     
                     $stream = new SocketStream($socket);
                     
