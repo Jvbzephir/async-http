@@ -9,6 +9,8 @@
  * file that was distributed with this source code.
  */
 
+// TODO: Implement custom HTTP body to start processing FCGI requests before complete body is buffered.
+
 namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\ExecutorInterface;
@@ -486,9 +488,9 @@ class ConnectionHandler
         }
         
         try {
-            while (!$body->eof()) {
-                yield from $this->writeRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, yield from $body->read()));
-            }
+            yield from Stream::copy($body, $this->stream, 4, 4096, function (string $chunk) use ($requestId) {
+                return pack('CCnnxx', Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, strlen($chunk)) . $chunk;
+            });
         } finally {
             $body->close();
         }
@@ -578,12 +580,6 @@ class ConnectionHandler
             return;
         }
         
-        $header = pack('CCnnxx', $record->version, $record->type, $record->requestId, $len);
-        
-        yield from $this->stream->write($header);
-        
-        if ($len > 0) {
-            yield from $this->stream->write($record->data);
-        }
+        yield from $this->stream->write(pack('CCnnxx', $record->version, $record->type, $record->requestId, $len) . $record->data);
     }
 }
