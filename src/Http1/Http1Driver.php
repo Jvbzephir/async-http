@@ -351,9 +351,7 @@ class Http1Driver implements HttpDriverInterface
             $size = 0;
             
             try {
-                while (!$in->eof()) {
-                    $size += yield from $body->write(yield from $in->read());
-                }
+                $size += yield from Stream::copy($in, $body);
             } finally {
                 $in->close();
             }
@@ -371,11 +369,9 @@ class Http1Driver implements HttpDriverInterface
                     if ($chunk !== '') {
                         yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                         
-                        while (!$in->eof()) {
-                            $chunk = yield from $in->read();
-                            
-                            yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
-                        }
+                        yield from Stream::copy($in, $socket, 4, 4096, function (string $chunk) {
+                            return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
+                        });
                         
                         yield from $socket->write("0\r\n\r\n");
                     }
@@ -388,9 +384,7 @@ class Http1Driver implements HttpDriverInterface
                 } else {
                     try {
                         if (!$head) {
-                            while (!$body->eof()) {
-                                yield from $socket->write(yield from $body->read());
-                            }
+                            yield from Stream::copy($body, $socket);
                         }
                     } finally  {
                         $body->close();

@@ -172,9 +172,7 @@ class Http1Connector implements HttpConnectorInterface
                 $chunk = '';
                 
                 try {
-                    while (!$in->eof()) {
-                        $size += yield from $tmp->write(yield from $in->read());
-                    }
+                    $size += yield from Stream::copy($in, $tmp);
                 } finally {
                     $in->close();
                 }
@@ -202,11 +200,9 @@ class Http1Connector implements HttpConnectorInterface
             if ($chunked) {
                 yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                 
-                while (!$in->eof()) {
-                    $chunk = yield from $in->read();
-                    
-                    yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
-                }
+                yield from Stream::copy($in, $stream, 4, 4096, function (string $chunk) {
+                    return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
+                });
                 
                 yield from $stream->write("0\r\n\r\n");
             } else {
@@ -214,9 +210,7 @@ class Http1Connector implements HttpConnectorInterface
                     yield from $stream->write($chunk);
                 }
                 
-                while (!$in->eof()) {
-                    yield from $stream->write(yield from $in->read());
-                }
+                yield from Stream::copy($in, $stream, 4);
             }
             
             if ($this->logger) {
