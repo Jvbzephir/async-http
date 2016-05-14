@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Async\Channel;
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
@@ -20,8 +21,10 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\DeflateInputStream;
 use KoolKode\Async\Http\Http1\InflateInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\Stream as IO;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\currentTask;
 use function KoolKode\Async\eventEmitter;
 
@@ -689,38 +692,59 @@ class Stream
     protected function sendBody(HttpMessage $message, InputStreamInterface $in): \Generator
     {
         try {
-            $eof = $in->eof();
-            
-            while (!$eof) {
-                $window = min($this->window, $this->conn->getWindow());
-                $len = min(8192, $window);
+            if (!$in->eof()) {
+                $channel = new Channel(8);
                 
-                if ($len < 1) {
-                    if ($this->window < 1) {
-                        yield from $this->events->await(WindowUpdatedEvent::class);
-                    } else {
-                        yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
-                    }
-                    
-                    continue;
-                }
-                
-                // Reduce local flow control window prior to actually reading data...
-                $this->incrementLocalWindow(-1 * $len);
-                
-                $chunk = yield from $in->read($len);
-                $eof = $in->eof();
-                
-                // Increase local flow control window in case response body does not return the desired number of bytes.
-                $delta = $len - strlen($chunk);
-                if ($delta > 0) {
-                    $this->incrementLocalWindow($delta);
-                }
-                
-                yield from $this->writeFrame(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
+                yield awaitAll([
+                    $this->readBodyData($in, $channel),
+                    $this->writeBodyFrames($channel)
+                ]);
             }
         } finally {
             $in->close();
+        }
+    }
+    
+    protected function readBodyData(InputStreamInterface $in, Channel $channel)
+    {
+        $eof = $in->eof();
+        
+        while (!$eof) {
+            $window = min($this->window, $this->conn->getWindow());
+            $len = min(4096, $window);
+            
+            if ($len < 1) {
+                if ($this->window < 1) {
+                    yield from $this->events->await(WindowUpdatedEvent::class);
+                } else {
+                    yield from $this->conn->getEvents()->await(WindowUpdatedEvent::class);
+                }
+                
+                continue;
+            }
+            
+            // Reduce local flow control window prior to actually reading data...
+            $this->incrementLocalWindow(-1 * $len);
+            
+            $chunk = yield from IO::readBuffer($in, $len);
+            $eof = $in->eof();
+            
+            // Increase local flow control window in case response body does not return the desired number of bytes.
+            $delta = $len - strlen($chunk);
+            if ($delta > 0) {
+                $this->incrementLocalWindow($delta);
+            }
+            
+            yield from $channel->send(new Frame(Frame::DATA, $chunk, $eof ? Frame::END_STREAM : Frame::NOFLAG));
+        }
+        
+        $channel->shutdown();
+    }
+    
+    protected function writeBodyFrames(Channel $channel)
+    {
+        while (NULL !== ($frame = yield from $channel->receive(false))) {
+            yield from $this->writeFrame($frame);
         }
     }
 }
