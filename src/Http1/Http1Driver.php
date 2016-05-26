@@ -31,6 +31,7 @@ use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentExecutor;
+use function KoolKode\Async\fileOpenTemp;
 
 /**
  * HTTP/1 server endpoint.
@@ -347,7 +348,7 @@ class Http1Driver implements HttpDriverInterface
             $message .= sprintf("Content-Length: %u\r\n", $size);
         } else {
             $in = yield from $body->getInputStream();
-            $body = yield from Stream::temp();
+            $body = yield fileOpenTemp();
             $size = 0;
             
             try {

@@ -22,6 +22,8 @@ use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
 use Psr\Log\LoggerInterface;
 
+use function KoolKode\Async\fileOpenTemp;
+
 /**
  * HTTP/1 client endpoint.
  * 
@@ -167,7 +169,7 @@ class Http1Connector implements HttpConnectorInterface
             } elseif ($size !== NULL) {
                 $request = $request->withHeader('Content-Length', (string) $size);
             } elseif (!$this->chunkedRequests || $request->getProtocolVersion() === '1.0') {
-                $tmp = yield from Stream::temp();
+                $tmp = yield fileOpenTemp();
                 $size = yield from $tmp->write($chunk);
                 $chunk = '';
                 

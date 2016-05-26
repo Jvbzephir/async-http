@@ -30,6 +30,7 @@ use Psr\Log\LoggerInterface;
 use function KoolKode\Async\awaitAll;
 use function KoolKode\Async\captureError;
 use function KoolKode\Async\currentTask;
+use function KoolKode\Async\fileOpenTemp;
 use function KoolKode\Async\runTask;
 
 /**
@@ -302,7 +303,7 @@ class ConnectionHandler
             'started' => microtime(true),
             'keep-alive' => ($content['flags'] & self::FCGI_KEEP_CONNECTION) ? true : false,
             'params' => [],
-            'stdin' => yield from Stream::temp()
+            'stdin' => yield fileOpenTemp()
         ];
         
         if ($content['role'] != self::FCGI_RESPONDER) {
