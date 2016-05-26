@@ -13,6 +13,8 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Stream\StringInputStream;
 
+use function KoolKode\Async\noop;
+
 /**
  * HTTP message body wrapping a string.
  * 
@@ -68,7 +70,7 @@ class StringBody implements HttpBodyInterface
      */
     public function getSize(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         return strlen($this->contents);
     }
@@ -78,7 +80,7 @@ class StringBody implements HttpBodyInterface
      */
     public function getInputStream(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         return new StringInputStream($this->contents);
     }
@@ -88,7 +90,7 @@ class StringBody implements HttpBodyInterface
      */
     public function getContents(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         return $this->contents;
     }

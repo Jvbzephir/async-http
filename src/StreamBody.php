@@ -15,6 +15,8 @@ use KoolKode\Async\Stream\CachedInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 
+use function KoolKode\Async\noop;
+
 /**
  * HTTP message body based on an input stream.
  * 
@@ -60,7 +62,7 @@ class StreamBody implements HttpBodyInterface
      */
     public function getSize(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         return;
     }
@@ -70,7 +72,7 @@ class StreamBody implements HttpBodyInterface
      */
     public function getInputStream(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         if ($this->stream instanceof CachedInputStream && $this->stream->eof()) {
             $this->stream->rewind();

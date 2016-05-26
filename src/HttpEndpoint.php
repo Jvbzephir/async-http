@@ -313,9 +313,6 @@ class HttpEndpoint
     
     protected function handleConnection(HttpDriverInterface $driver, SocketStream $stream, callable $action)
     {
-        // Ensure all driver code runs in a separate aync task.
-        yield NULL;
-        
         return yield from $driver->handleConnection($this, $stream, $action);
     }
     

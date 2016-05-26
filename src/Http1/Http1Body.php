@@ -20,6 +20,8 @@ use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StringInputStream;
 
+use function KoolKode\Async\noop;
+
 /**
  * HTTP/1 message body decoder implementation.
  * 
@@ -270,7 +272,7 @@ class Http1Body implements HttpBodyInterface
      */
     public function getSize(): \Generator
     {
-        yield NULL;
+        yield noop();
         
         return $this->chunked ? NULL : $this->length;
     }
