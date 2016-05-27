@@ -110,7 +110,7 @@ class HttpClient
         $socket = yield from SocketStream::connect($host, $port, 'tcp', 5, $options);
         
         if ($secure) {
-            yield from $socket->encrypt();
+            yield from $socket->encryptClient();
         }
         
         $context = new HttpConnectorContext($socket);

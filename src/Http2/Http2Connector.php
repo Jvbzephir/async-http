@@ -133,7 +133,7 @@ class Http2Connector implements HttpConnectorInterface
                 
                 try {
                     if ($secure) {
-                        yield from $socket->encrypt();
+                        yield from $socket->encryptClient();
                     }
                 } catch (\Throwable $e) {
                     $socket->close();

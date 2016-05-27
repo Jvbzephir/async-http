@@ -94,7 +94,7 @@ class Http1Connector implements HttpConnectorInterface
             
             try {
                 if ($secure) {
-                    yield from $stream->encrypt();
+                    yield from $stream->encryptClient();
                 }
             } catch (\Throwable $e) {
                 $stream->close();

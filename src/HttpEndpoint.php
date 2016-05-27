@@ -277,7 +277,7 @@ class HttpEndpoint
         try {
             if (isset($this->sslOptions['local_cert'])) {
                 try {
-                    yield from $stream->encrypt(true);
+                    yield from $stream->encryptServer();
                 } catch (StreamException $e) {
                     if ($this->logger) {
                         $this->logger->debug('Dropped client {peer} due to TLS handshake failure: {error}', [
