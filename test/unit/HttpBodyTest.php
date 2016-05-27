@@ -11,6 +11,8 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Header\AcceptEncoding;
+use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Header\AcceptHeader;
 use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Header\ContentTypeHeader;
@@ -20,8 +22,6 @@ use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTrait;
 
 use function KoolKode\Async\runTask;
-use KoolKode\Async\Http\Header\AcceptEncodingHeader;
-use KoolKode\Async\Http\Header\AcceptEncoding;
 
 class HttpBodyTest extends \PHPUnit_Framework_TestCase
 {
