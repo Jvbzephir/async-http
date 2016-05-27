@@ -117,6 +117,10 @@ class HttpEndpoint
         $this->sslOptions['peer_name'] = $peerName ?? gethostbyname(gethostname());
         
         $this->http1Driver = new Http1Driver();
+        
+        if (!empty($_SERVER['TRAVIS'])) {
+            $this->sslOptions['ciphers'] = 'DEFAULT';
+        }
     }
     
     public function getPeerName(): string

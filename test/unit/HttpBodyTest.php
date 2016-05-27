@@ -56,24 +56,18 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
                 $client->addConnector($connector);
             }
             
-            $options = [
-                'ssl' => [
-                    'ciphers' => 'DEFAULT'
-                ]
-            ];
-            
             $request = new HttpRequest('https://http2.golang.org/reqinfo');
             $request2 = new HttpRequest('https://http2.golang.org/reqinfo');
             
             try {
-                $response = yield from $client->send($request, $options);
+                $response = yield from $client->send($request);
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 
                 $body = yield from $response->getBody()->getContents();
                 $this->assertNotFalse(stripos($body, 'Protocol: HTTP/' . $response->getProtocolVersion()));
                 
-                $response = yield from $client->send($request2, $options);
+                $response = yield from $client->send($request2);
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals(Http::CODE_OK, $response->getStatusCode());
                 
@@ -94,15 +88,8 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () {
             $connector = new Http1Connector();
             
-            $context = new HttpConnectorContext();
-            $context->options = [
-                'ssl' => [
-                    'ciphers' => 'DEFAULT'
-                ]
-            ];
-            
             $request = new HttpRequest('https://github.com/koolkode');
-            $response = yield from $connector->send($request, $context);
+            $response = yield from $connector->send($request);
             
             $body = yield from $response->getBody()->getInputStream();
             
@@ -213,7 +200,6 @@ class HttpBodyTest extends \PHPUnit_Framework_TestCase
         $executor->runCallback(function () use ($chunked, $executor) {
             $port = Socket::findUnusedPort();
             $server = new HttpEndpoint($port);
-            $server->setCiphers('ALL');
             
             $worker = yield runTask($server->run(function (HttpRequest $request, HttpResponse $response) {
                 return $response->withBody(new StringBody('RECEIVED: ' . yield from $request->getBody()->getContents()));
