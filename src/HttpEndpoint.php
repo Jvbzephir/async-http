@@ -258,7 +258,7 @@ class HttpEndpoint
                         ]);
                     }
                     
-                    yield runTask($this->handleClient($stream, $action));
+                    yield runTask($this->handleClient($stream, $action), 'HTTP Connection Handler');
                 }
             }
         } finally {
@@ -290,30 +290,23 @@ class HttpEndpoint
                 }
                 
                 // Driver selection is based on negotiated TLS ALPN protocol.
-                $crypto = (array)$stream->getMetadata()['crypto'];
+                $crypto = (array) $stream->getMetadata()['crypto'];
                 
                 if ((isset($crypto['alpn_protocol']))) {
                     foreach ($this->drivers as $driver) {
                         if (in_array($crypto['alpn_protocol'], $driver->getProtocols(), true)) {
-                            yield runTask($this->handleConnection($driver, $stream, $action), 'HTTP Connection Handler');
-                            
-                            return;
+                            return yield from $driver->handleConnection($this, $stream, $action);
                         }
                     }
                 }
             }
             
-            yield runTask($this->handleConnection($this->http1Driver, $stream, $action), 'HTTP Connection Handler');
+            yield from $this->http1Driver->handleConnection($this, $stream, $action);
         } catch (\Throwable $e) {
             $stream->close();
             
             yield captureError($e);
         }
-    }
-    
-    protected function handleConnection(HttpDriverInterface $driver, SocketStream $stream, callable $action)
-    {
-        return yield from $driver->handleConnection($this, $stream, $action);
     }
     
     /**
@@ -365,8 +358,6 @@ class HttpEndpoint
             'ssl' => $sslOptions
         ];
         
-        $context = stream_context_create($context);
-        
-        return $context;
+        return stream_context_create($context);
     }
 }
