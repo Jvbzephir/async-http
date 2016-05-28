@@ -469,6 +469,8 @@ class Stream
             }
         }
         
+        // TODO: Prioritize writes within Connection to allow flushing and byte alignment.
+        
         return yield from $this->socket->write($data, $this->priority + $boost);
     }
     
@@ -670,8 +672,11 @@ class Stream
         $headers = $this->hpack->encode($headerList);
         $flags = Frame::END_HEADERS | ($hasBody ? Frame::NOFLAG : Frame::END_STREAM);
         
-        if (strlen($headers) > self::MAX_HEADER_SIZE) {
-            $parts = str_split($headers, self::MAX_HEADER_SIZE);
+        // Header size: 9 byte general header (optional: +4 bytes for stream dependency, +1 byte for weight).
+        $chunkSize = 4096 - 9;
+        
+        if (strlen($headers) > $chunkSize) {
+            $parts = str_split($headers, $chunkSize);
             $frames = [
                 new Frame(Frame::HEADERS, $parts[0])
             ];
@@ -707,13 +712,16 @@ class Stream
     
     protected function readBodyData(InputStreamInterface $in, Channel $channel)
     {
+        // Header length is 9 bytes (no padding used).
+        $chunkSize = 4096 - 9;
+        
         $eof = $in->eof();
         
         while (!$eof) {
             $window = min($this->window, $this->conn->getWindow());
-            $len = min(4096, $window);
+            $len = min($chunkSize, $window);
             
-            if ($len < 1) {
+            if ($len < $chunkSize) {
                 if ($this->window < 1) {
                     yield from $this->events->await(WindowUpdatedEvent::class);
                 } else {
@@ -726,7 +734,7 @@ class Stream
             // Reduce local flow control window prior to actually reading data...
             $this->incrementLocalWindow(-1 * $len);
             
-            $chunk = yield from IO::readBuffer($in, $len);
+            $chunk = yield from IO::readBuffer($in, $len, true);
             $eof = $in->eof();
             
             // Increase local flow control window in case response body does not return the desired number of bytes.
