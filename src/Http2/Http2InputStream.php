@@ -13,6 +13,7 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\InputStreamInterface;
+use KoolKode\Async\Stream\StreamClosedException;
 
 use function KoolKode\Async\runTask;
 
@@ -157,8 +158,12 @@ class Http2InputStream implements InputStreamInterface
             if ($this->timeout > 0) {
                 $timeout = min($timeout, $this->timeout);
             }
-            
+        
             yield from $this->events->await(DataReceivedEvent::class, $timeout);
+        }
+        
+        if ($this->eof && $this->buffer === '') {
+            throw new StreamClosedException('Cannot read byond EOF of HTTP/2 input stream');
         }
         
         $chunk = substr($this->buffer, 0, $length);
@@ -167,10 +172,18 @@ class Http2InputStream implements InputStreamInterface
         
         if (($this->eof && $this->drained > 0) || ($this->drained > 4096 && strlen($this->buffer) < $this->size)) {
             try {
-                yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), 'HTTP/2 Remote Window Increment', true);
+                yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), 'HTTP/2 Remote Window Increment');
             } finally {
                 $this->drained = 0;
             }
+        }
+        
+        while ($this->buffer === '' && !$this->eof) {
+            if ($this->timeout > 0) {
+                $timeout = min($timeout, $this->timeout);
+            }
+        
+            yield from $this->events->await(DataReceivedEvent::class, $timeout);
         }
         
         return $chunk;
