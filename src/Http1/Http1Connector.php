@@ -158,7 +158,7 @@ class Http1Connector implements HttpConnectorInterface
         $in = yield from $body->getInputStream();
         
         try {
-            $chunk = $in->eof() ? '' : yield from $in->read();
+            $chunk = $in->eof() ? '' : yield from Stream::readBuffer($in, 4088);
             $chunked = false;
             
             if ($chunk === '') {
@@ -198,22 +198,30 @@ class Http1Connector implements HttpConnectorInterface
             }
             
             yield from $stream->write($message . "\r\n");
+            $stream->flush();
             
             if ($chunked) {
                 yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                 
-                yield from Stream::copy($in, $stream, 4, 4096, function (string $chunk) {
+                yield from Stream::copy($in, $stream, 4, 4088, function (string $chunk) {
                     return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
                 });
                 
                 yield from $stream->write("0\r\n\r\n");
             } else {
                 if ($chunk !== '') {
+                    if (!$in->eof()) {
+                        // Ensure first chunk is 4K bytes.
+                        $chunk .= yield from Stream::readBuffer($in, 8);
+                    }
+                    
                     yield from $stream->write($chunk);
                 }
                 
-                yield from Stream::copy($in, $stream, 4);
+                yield from Stream::copy($in, $stream, 4, 4096);
             }
+            
+            $stream->flush();
             
             if ($this->logger) {
                 $this->logger->debug('<< {method} {target} HTTP/{version}', [
