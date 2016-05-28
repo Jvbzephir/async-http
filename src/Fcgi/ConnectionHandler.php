@@ -489,7 +489,7 @@ class ConnectionHandler
         }
         
         try {
-            yield from Stream::copy($body, $this->stream, 4, 4096, function (string $chunk) use ($requestId) {
+            yield from Stream::copy($body, $this->stream, 4, 4088, function (string $chunk) use ($requestId) {
                 return pack('CCnnxx', Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, strlen($chunk)) . $chunk;
             });
         } finally {
@@ -582,5 +582,7 @@ class ConnectionHandler
         }
         
         yield from $this->stream->write(pack('CCnnxx', $record->version, $record->type, $record->requestId, $len) . $record->data);
+        
+        $this->stream->flush();
     }
 }
