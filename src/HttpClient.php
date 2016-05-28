@@ -153,6 +153,9 @@ class HttpClient
         }
         
         return array_replace_recursive($contextOptions, [
+            'socket' => [
+                'tcp_nodelay' => true
+            ],
             'ssl' => $ssl
         ]);
     }

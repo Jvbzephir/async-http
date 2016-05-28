@@ -124,6 +124,9 @@ class Http2Connector implements HttpConnectorInterface
                 }
                 
                 $options = array_replace_recursive($context->options ?? [], [
+                    'socket' => [
+                        'tcp_nodelay' => true
+                    ],
                     'ssl' => [
                         'alpn_protocols' => 'h2'
                     ]
