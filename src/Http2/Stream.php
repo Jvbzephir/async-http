@@ -336,11 +336,7 @@ class Stream
                             $this->changeState(self::HALF_CLOSED_REMOTE);
                         }
                         
-                        try {
-                            yield from $this->handleMessage($this->headers, $this->body);
-                        } finally {
-                            $this->headers = '';
-                        }
+                        yield from $this->handleMessage();
                     }
                     
                     break;
@@ -358,6 +354,11 @@ class Stream
                     if ($frame->flags & Frame::END_STREAM) {
                         $this->changeState(self::HALF_CLOSED_REMOTE);
                     }
+                    
+                    if ($this->headers !== '') {
+                        yield from $this->handleMessage();
+                    }
+                    
                     break;
                 case Frame::GOAWAY:
                     throw new ConnectionException('GOAWAY must be sent to a connection', Frame::PROTOCOL_ERROR);
@@ -380,16 +381,11 @@ class Stream
                     $this->headers = $data;
                     
                     if ($frame->flags & Frame::END_HEADERS) {
-                        $this->body->setEof($frame->flags & Frame::END_STREAM);
-                        
                         if ($frame->flags & Frame::END_STREAM) {
+                            $this->body->setEof(true);
                             $this->changeState(self::HALF_CLOSED_REMOTE);
-                        }
-                        
-                        try {
-                            yield from $this->handleMessage($this->headers, $this->body);
-                        } finally {
-                            $this->headers = '';
+                            
+                            yield from $this->handleMessage();
                         }
                     }
                     
@@ -474,9 +470,13 @@ class Stream
         return yield from $this->socket->write($data, $this->priority + $boost);
     }
     
-    protected function handleMessage(string $buffer, Http2InputStream $body)
+    protected function handleMessage(): \Generator
     {
-        $headers = $this->hpack->decode($buffer);
+        try {
+            $headers = $this->hpack->decode($this->headers);
+        } finally {
+            $this->headers = '';
+        }
         
         if (empty($headers)) {
             throw new Http2StreamException('Invalid HTTP headers received', Frame::COMPRESSION_ERROR);
