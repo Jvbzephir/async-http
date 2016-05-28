@@ -330,7 +330,7 @@ class Http1Driver implements HttpDriverInterface
                 $message .= sprintf("Content-Encoding: %s\r\n", $compression);
             }
             
-            $chunk = $in->eof() ? '' : yield from $in->read();
+            $chunk = $in->eof() ? '' : yield from Stream::readBuffer($in, 4088);
             
             if ($chunk === '') {
                 $in->close();
@@ -364,13 +364,14 @@ class Http1Driver implements HttpDriverInterface
         
         try {
             yield from $socket->write($message . "\r\n");
+            $socket->flush();
             
             if ($chunked || $compression !== NULL) {
                 try {
                     if ($chunk !== '') {
                         yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
                         
-                        yield from Stream::copy($in, $socket, 4, 4096, function (string $chunk) {
+                        yield from Stream::copy($in, $socket, 4, 4088, function (string $chunk) {
                             return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
                         });
                         
@@ -385,13 +386,15 @@ class Http1Driver implements HttpDriverInterface
                 } else {
                     try {
                         if (!$head) {
-                            yield from Stream::copy($body, $socket);
+                            yield from Stream::copy($body, $socket, 4, 4096);
                         }
                     } finally  {
                         $body->close();
                     }
                 }
             }
+            
+            $socket->flush();
             
             if ($this->logger) {
                 $this->logger->debug('<< HTTP/{version} {status} {reason} << {duration} ms', [
