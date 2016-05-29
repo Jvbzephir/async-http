@@ -440,34 +440,22 @@ class Stream
     
     public function writeFrame(Frame ...$frames): \Generator
     {
-        $data = '';
         $boost = 0;
         
         foreach ($frames as $frame) {
-            $data .= $frame->encode($this->id);
-            
-            switch($frame->type) {
+            switch ($frame->type) {
                 case Frame::RST_STREAM:
                     $boost += 256;
+                    break;
                 case Frame::PRIORITY:
                 case Frame::SETTINGS:
                 case Frame::WINDOW_UPDATE:
                     $boost++;
+                    break;
             }
         }
         
-        if ($this->logger) {
-            foreach ($frames as $frame) {
-                $this->logger->debug('OUT <{id}> {frame}', [
-                    'id' => $this->id,
-                    'frame' => (string) $frame
-                ]);
-            }
-        }
-        
-        // TODO: Prioritize writes within Connection to allow flushing and byte alignment.
-        
-        return yield from $this->socket->write($data, $this->priority + $boost);
+        return yield from $this->conn->writeStreamFrames($this->id, $frames, $this->priority + $boost);
     }
     
     protected function handleMessage(): \Generator

@@ -15,10 +15,14 @@ use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
+use KoolKode\Async\Task;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\captureError;
+use function KoolKode\Async\currentTask;
 use function KoolKode\Async\eventEmitter;
+use function KoolKode\Async\suspendTask;
+use function KoolKode\Async\runTask;
 
 /**
  * A transport-layer connection between two endpoints.
@@ -142,6 +146,27 @@ class Connection
     protected $streamCounter = 1;
     
     /**
+     * Buffered write operation to be processed.
+     * 
+     * @var \SplPriorityQueue
+     */
+    protected $writeBuffer;
+    
+    /**
+     * Task being used to sync writes to the socket.
+     * 
+     * @var Task
+     */
+    protected $writer;
+    
+    /**
+     * Stores the type of the last frame that has been sent over the wire.
+     * 
+     * @var int
+     */
+    protected $lastSentFrameType;
+    
+    /**
      * Create a new HTTP/2 connection.
      * 
      * @param int $mode Client or server mode.
@@ -168,6 +193,7 @@ class Connection
         }
         
         $this->hpack = new HPack($context);
+        $this->writeBuffer = new \SplPriorityQueue();
     }
     
     /**
@@ -535,14 +561,84 @@ class Connection
      */
     public function writeFrame(Frame $frame, int $priority = 0): \Generator
     {
-        if ($this->logger) {
-            $this->logger->debug('OUT <{id}> {frame}', [
-                'id' => 0,
-                'frame' => (string) $frame
-            ]);
+        return yield from $this->writeStreamFrame(0, $frame, $priority + 1000000);
+    }
+
+    public function writeStreamFrame(int $stream, Frame $frame, int $priority = 0): \Generator
+    {
+        return yield from $this->writeStreamFrames($stream, [
+            $frame
+        ], $priority);
+    }
+
+    public function writeStreamFrames(int $stream, array $frames, int $priority = 0): \Generator
+    {
+        $this->writeBuffer->insert([
+            $frames,
+            $stream,
+            yield currentTask()
+        ], $priority);
+        
+        if ($this->writer === NULL) {
+            $this->writer = yield runTask($this->writerTask());
         }
         
-        return yield from $this->socket->write($frame->encode(0), $priority + 1000);
+        return yield suspendTask();
+    }
+    
+    protected function writerTask(): \Generator
+    {
+        try {
+            while (! $this->writeBuffer->isEmpty()) {
+                list ($frames, $stream, $task) = $this->writeBuffer->extract();
+                
+                foreach ($frames as $frame) {
+                    if ($this->logger) {
+                        $this->logger->debug('OUT <{id}> {frame}', [
+                            'id' => $stream,
+                            'frame' => (string) $frame
+                        ]);
+                    }
+                    
+                    switch ($frame->type) {
+                        case Frame::HEADERS:
+                        case Frame::PUSH_PROMISE:
+                            $this->socket->flush();
+                            break;
+                        case Frame::DATA:
+                            if ($this->lastSentFrameType !== $frame->type) {
+                                $this->socket->flush();
+                            }
+                            break;
+                        case Frame::CONTINUATION:
+                            switch ($this->lastSentFrameType) {
+                                case Frame::HEADERS:
+                                case Frame::PUSH_PROMISE:
+                                case Frame::CONTINUATION:
+                                    // No flush needed.
+                                    break;
+                                default:
+                                    $this->socket->flush();
+                            }
+                            break;
+                    }
+                    
+                    try {
+                        yield from $this->socket->write($frame->encode($stream));
+                    } catch (\Throwable $e) {
+                        $task->getExecutor()->schedule($task->error($e));
+                        
+                        continue;
+                    }
+                    
+                    $this->lastSentFrameType = $frame->type;
+                }
+                
+                $task->getExecutor()->schedule($task->send(NULL));
+            }
+        } finally {
+            $this->writer = NULL;
+        }
     }
     
     /**
