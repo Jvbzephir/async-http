@@ -148,7 +148,7 @@ class HttpEndpoint
      */
     public function getTitle(): string
     {
-        return sprintf('HTTP endpoint on %s:%u', $this->address, $this->port);
+        return sprintf('HTTP endpoint on %s:%u', $this->socketFactory->getHost(), $this->socketFactory->getPort());
     }
     
     /**
