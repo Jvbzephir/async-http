@@ -722,7 +722,7 @@ class Stream
             // Reduce local flow control window prior to actually reading data...
             $this->incrementLocalWindow(-1 * $len);
             
-            $chunk = yield from IO::readBuffer($in, $len, true);
+            $chunk = yield from IO::readBuffer($in, $len);
             $eof = $in->eof();
             
             // Increase local flow control window in case response body does not return the desired number of bytes.
