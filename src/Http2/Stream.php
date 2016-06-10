@@ -11,7 +11,6 @@
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Async\Channel;
 use KoolKode\Async\Event\EventEmitter;
 use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
@@ -22,6 +21,7 @@ use KoolKode\Async\Http\Http1\DeflateInputStream;
 use KoolKode\Async\Http\Http1\InflateInputStream;
 use KoolKode\Async\Stream\InputStreamInterface;
 use KoolKode\Async\Stream\Stream as IO;
+use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\awaitAll;

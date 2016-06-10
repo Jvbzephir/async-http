@@ -14,11 +14,11 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Stream\Stream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Stream\StringInputStream;
-use KoolKode\Async\Test\AsyncTrait;
+use KoolKode\Async\Util\AsyncTestTrait;
 
 class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
 {
-    use AsyncTrait;
+    use AsyncTestTrait;
     
     protected function chunkEncode(string $data, int $len): string
     {
