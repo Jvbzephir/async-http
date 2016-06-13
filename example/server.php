@@ -57,7 +57,7 @@ $executor->runCallback(function () use ($executor) {
     
     $http->addDriver($http2);
     
-    $action = function (HttpRequest $request, HttpResponse $response) use ($http) {
+    $action = function (HttpRequest $request, HttpResponse $response) {
         if ($request->hasQueryParam('source')) {
             return $response->withBody(new FileBody(__FILE__));
         }
