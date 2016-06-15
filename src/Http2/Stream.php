@@ -587,7 +587,7 @@ class Stream
             
             $response = $response->withoutHeader('Content-Encoding');
             
-            if (!$in->eof() && DeflateInputStream::isAvailable()) {
+            if (!$in->eof() && DeflateInputStream::isAvailable() && $this->conn->getHttpContext()->isCompressible($response)) {
                 foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
                     switch ($encoding->getName()) {
                         case 'gzip':

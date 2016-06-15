@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
@@ -31,12 +32,15 @@ use function KoolKode\Async\fileOpenTemp;
  */
 class Http1Connector implements HttpConnectorInterface
 {
+    protected $context;
+    
     protected $logger;
     
     protected $chunkedRequests = true;
     
-    public function __construct(LoggerInterface $logger = NULL)
+    public function __construct(HttpContext $context = NULL, LoggerInterface $logger = NULL)
     {
+        $this->context = $context ?? new HttpContext();
         $this->logger = $logger;
     }
     
@@ -46,6 +50,14 @@ class Http1Connector implements HttpConnectorInterface
     public function shutdown()
     {
         // TODO: Implement HTTP/1 keep-alive and kill pending connections here...
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getHttpContext(): HttpContext
+    {
+        return $this->context;
     }
     
     /**

@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Fcgi;
 use KoolKode\Async\ExecutorInterface;
 use KoolKode\Async\Http\Header\AcceptEncodingHeader;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
@@ -137,6 +138,13 @@ class ConnectionHandler
     protected $stream;
     
     /**
+     * HTTP context being used.
+     * 
+     * @var HttpContext
+     */
+    protected $context;
+    
+    /**
      * PSR logger isntance or NULL.
      * 
      * @var LoggerInterface
@@ -168,12 +176,15 @@ class ConnectionHandler
      * Create a new FastCGI connection handler using the given stream as transport.
      * 
      * @param DuplexStreamInterface $stream
+     * @param HttpContext $context
      * @param LoggerInterface $logger
      */
-    public function __construct(DuplexStreamInterface $stream, LoggerInterface $logger = NULL)
+    public function __construct(DuplexStreamInterface $stream, HttpContext $context, LoggerInterface $logger = NULL)
     {
         $this->stream = $stream;
+        $this->context = $context;
         $this->logger = $logger;
+        
         $this->workers = new \SplObjectStorage();
     }
     
@@ -461,7 +472,7 @@ class ConnectionHandler
         $compression = NULL;
         $compressionMethod = NULL;
         
-        if (DeflateInputStream::isAvailable()) {
+        if (DeflateInputStream::isAvailable() && $this->context->isCompressible($response)) {
             foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
                 switch ($encoding->getName()) {
                     case 'gzip':

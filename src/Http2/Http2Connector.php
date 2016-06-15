@@ -13,6 +13,7 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpConnectorInterface;
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
@@ -35,10 +36,10 @@ class Http2Connector implements HttpConnectorInterface
     
     protected $tasks = [];
     
-    public function __construct(LoggerInterface $logger = NULL, HPackContext $context = NULL)
+    public function __construct(HttpContext $context = NULL, LoggerInterface $logger = NULL)
     {
+        $this->context = $context ?? new HttpContext();
         $this->logger = $logger;
-        $this->context = $context ?? new HPackContext();
     }
     
     /**
@@ -51,9 +52,17 @@ class Http2Connector implements HttpConnectorInterface
         return Socket::isAlpnSupported();
     }
     
-    public function getHPackContext(): HPackContext
+    /**
+     * {@inheritdoc}
+     */
+    public function getHttpContext(): HttpContext
     {
         return $this->context;
+    }
+    
+    public function getHPackContext(): HPackContext
+    {
+        return $this->context->getHpackContext();
     }
     
     /**

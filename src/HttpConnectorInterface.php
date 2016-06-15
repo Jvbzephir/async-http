@@ -25,10 +25,13 @@ interface HttpConnectorInterface
  
     /**
      * Get ALPN protocol names supported by the driver.
-     *
-     * @return array
      */
     public function getProtocols(): array;
+    
+    /**
+     * Get the HTTP context being used by the connector.
+     */
+    public function getHttpContext(): HttpContext;
     
     /**
      * Get a connector context that can be used to re-use resources.

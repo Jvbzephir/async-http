@@ -143,7 +143,7 @@ class Http1Driver implements HttpDriverInterface
                 $response = yield from $handler->upgradeConnection($socket, $request, $response, $endpoint, $action);
                 
                 if ($response instanceof HttpResponse) {
-                    return yield from $this->sendResponse($socket, $request, $response, false, $started);
+                    return yield from $this->sendResponse($endpoint, $socket, $request, $response, $request->getMethod() == 'HEAD', $started);
                 }
                 
                 return;
@@ -161,7 +161,7 @@ class Http1Driver implements HttpDriverInterface
             
             $response = new HttpResponse($e->getCode());
             
-            yield from $this->sendResponse($socket, $request, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
+            yield from $this->sendResponse($endpoint, $socket, $request, $response, isset($request) && $request->getMethod() == 'HEAD', $started);
             
             $socket->close();
             
@@ -208,7 +208,7 @@ class Http1Driver implements HttpDriverInterface
                 throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
             }
             
-            return yield from $this->sendResponse($socket, $request, $response, $request->getMethod() == 'HEAD', $started);
+            return yield from $this->sendResponse($endpoint, $socket, $request, $response, $request->getMethod() == 'HEAD', $started);
         } finally {
             $socket->close();
         }
@@ -257,12 +257,15 @@ class Http1Driver implements HttpDriverInterface
     /**
      * Serialize HTTP response and transmit data over the wire.
      * 
+     * @param HttpEndpoint $endpoint
      * @param DuplexStreamInterface $socket
      * @param HttpRequest $request
      * @param HttpResponse $response
+     * @param bool $head
+     * @param float $started
      * @return Generator
      */
-    protected function sendResponse(DuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, bool $head = false, float $started = NULL): \Generator
+    protected function sendResponse(HttpEndpoint $endpoint, DuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, bool $head = false, float $started = NULL): \Generator
     {
         if ($started === NULL) {
             $started = microtime(true);
@@ -307,7 +310,7 @@ class Http1Driver implements HttpDriverInterface
         $compression = NULL;
         $compressionMethod = NULL;
         
-        if (DeflateInputStream::isAvailable()) {
+        if (DeflateInputStream::isAvailable() && $endpoint->getHttpContext()->isCompressible($response)) {
             foreach (AcceptEncodingHeader::fromMessage($request)->getEncodings() as $encoding) {
                 switch ($encoding->getName()) {
                     case 'gzip':
@@ -381,8 +384,12 @@ class Http1Driver implements HttpDriverInterface
                     $in->close();
                 }
             } else {
-                if ($body instanceof FileBody && $resource !== NULL && !$request->getUri()->getScheme() === 'https') {
-                    yield from (yield currentExecutor())->getFilesystem()->sendfile($body->getFile(), $resource);
+                if ($body instanceof FileBody) {
+                    if ($resource !== NULL && !$endpoint->isEncrypted()) {
+                        yield from (yield currentExecutor())->getFilesystem()->sendfile($body->getFile(), $resource);
+                    } else {
+                        $body = yield from $body->getInputStream();
+                    }
                 } else {
                     try {
                         if (!$head) {

@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Fcgi;
 
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
@@ -48,6 +49,13 @@ class FcgiEndpoint
     protected $backlogSize = 128;
     
     /**
+     * HTTP context.
+     * 
+     * @var HttpContext
+     */
+    protected $context;
+    
+    /**
      * PSR logger instance or NULL.
      * 
      * @var LoggerInterface
@@ -76,6 +84,14 @@ class FcgiEndpoint
     public function setBacklogSize(int $size)
     {
         $this->backlogSize = $size;
+    }
+    
+    /**
+     * Get the HTTP context being used by the FCGI endpoint.
+     */
+    public function getHttpContext(): HttpContext
+    {
+        return $this->context;
     }
     
     /**
@@ -152,7 +168,7 @@ class FcgiEndpoint
                         ]);
                     }
                     
-                    $handler = new ConnectionHandler($stream, $this->logger);
+                    $handler = new ConnectionHandler($stream, $this->context, $this->logger);
                     
                     yield runTask($handler->run($action), 'FCGI Connection Handler');
                 }

@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Event\EventEmitter;
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Stream\DuplexStreamInterface;
 use KoolKode\Async\Stream\Stream as IO;
 use KoolKode\Async\Stream\StreamException;
@@ -88,6 +89,13 @@ class Connection
      * @var DuplexStreamInterface
      */
     protected $socket;
+    
+    /**
+     * HTTP context.
+     * 
+     * @var HttpContext
+     */
+    protected $context;
     
     /**
      * PSR logger instance.
@@ -171,13 +179,13 @@ class Connection
      * 
      * @param int $mode Client or server mode.
      * @param DuplexStreamInterface $socket
-     * @param HPackContext $context
+     * @param HttpContext $context
      * @param EventEmitter $events
      * @param LoggerInterface $logger
      * 
      * @throws \InvalidArgumentException When an invalid connection mode has been specified.
      */
-    public function __construct(int $mode, DuplexStreamInterface $socket, HPackContext $context, EventEmitter $events, LoggerInterface $logger = NULL)
+    public function __construct(int $mode, DuplexStreamInterface $socket, HttpContext $context, EventEmitter $events, LoggerInterface $logger = NULL)
     {
         $this->socket = $socket;
         $this->events = $events;
@@ -192,7 +200,8 @@ class Connection
                 throw new \InvalidArgumentException('Unknown HTTP/2 connection mode: %s', $mode);
         }
         
-        $this->hpack = new HPack($context);
+        $this->context = $context;
+        $this->hpack = new HPack($context->getHpackContext());
         $this->writeBuffer = new \SplPriorityQueue();
     }
     
@@ -214,11 +223,11 @@ class Connection
      * Coroutine that creates an HTTP/2 client connection and sends the preface and initial settings frame.
      * 
      * @param DuplexStreamInterface $socket
-     * @param HPackContext $context
+     * @param HttpContext $context
      * @param LoggerInterface $logger
      * @return Connection
      */
-    public static function connectClient(DuplexStreamInterface $socket, HPackContext $context, LoggerInterface $logger = NULL): \Generator
+    public static function connectClient(DuplexStreamInterface $socket, HttpContext $context, LoggerInterface $logger = NULL): \Generator
     {
         $conn = new static(self::MODE_CLIENT, $socket, $context, yield eventEmitter(), $logger);
     
@@ -235,13 +244,13 @@ class Connection
      * Coroutine that creates an HTTP/2 server connection, validates the preface is sent by the client and processes initial settings exchange.
      * 
      * @param DuplexStreamInterface $socket
-     * @param HPackContext $context
+     * @param HttpContext $context
      * @param LoggerInterface $logger
      * @return Connection
      * 
      * @throws ConnectionException When the client did not send an HTTP/2 connection preface.
      */
-    public static function connectServer(DuplexStreamInterface $socket, HPackContext $context, LoggerInterface $logger = NULL): \Generator
+    public static function connectServer(DuplexStreamInterface $socket, HttpContext $context, LoggerInterface $logger = NULL): \Generator
     {
         $preface = yield from IO::readBuffer($socket, strlen(self::PREFACE), true);
         
@@ -283,6 +292,11 @@ class Connection
     public function getSocket(): DuplexStreamInterface
     {
         return $this->socket;
+    }
+    
+    public function getHttpContext(): HttpContext
+    {
+        return $this->context;
     }
     
     public function getHPack(): HPack

@@ -59,6 +59,13 @@ class HttpEndpoint
     protected $http1Driver;
     
     /**
+     * HTTP context.
+     * 
+     * @var HttpContext
+     */
+    protected $context;
+    
+    /**
      * Optional logger.
      * 
      * @var LoggerInterface
@@ -75,6 +82,7 @@ class HttpEndpoint
     public function __construct(int $port, string $address = '0.0.0.0', string $peerName = NULL)
     {
         $this->http1Driver = new Http1Driver();
+        $this->context = new HttpContext();
         $this->socketFactory = new SocketServerFactory($address, $port);
         
         if ($peerName !== NULL) {
@@ -139,6 +147,16 @@ class HttpEndpoint
     public function addUpgradeHandler(HttpUpgradeHandlerInterface $handler)
     {
         $this->upgradeHandlers[] = $handler;
+    }
+    
+    /**
+     * Get the HTTP context being used by the endpoint.
+     * 
+     * @return HttpContext
+     */
+    public function getHttpContext(): HttpContext
+    {
+        return $this->context;
     }
     
     /**
