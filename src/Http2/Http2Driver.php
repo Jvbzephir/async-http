@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpContext;
 use KoolKode\Async\Http\HttpDriverInterface;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
@@ -26,7 +27,6 @@ use KoolKode\Async\Stream\StreamException;
 use Psr\Log\LoggerInterface;
 
 use function KoolKode\Async\eventEmitter;
-
 
 // TODO: Implement shutdown of HTTP2 server.
 
@@ -46,8 +46,18 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     
     protected $upgradeEnabled = true;
     
+    /**
+     * HTTP context being used.
+     * 
+     * @var HttpContext
+     */
     protected $context;
     
+    /**
+     * PSR logger instance or NULL.
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
     
     /**
@@ -57,10 +67,10 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
      */
     protected $conns = [];
     
-    public function __construct(LoggerInterface $logger = NULL, HPackContext $context = NULL)
+    public function __construct(HttpContext $context = NULL, LoggerInterface $logger = NULL)
     {
+        $this->context = $context ?? new HttpContext();
         $this->logger = $logger;
-        $this->context = $context ?? new HPackContext();
     }
     
     public function setLogger(LoggerInterface $logger = NULL)
@@ -97,13 +107,23 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     }
     
     /**
-     * Get the HPACK header context.
+     * Get the HTTP context being used.
+     * 
+     * @return HttpContext
+     */
+    public function getHttpContext(): HPackContext
+    {
+        return $this->context;
+    }
+    
+    /**
+     * Get HPACK header compression context.
      * 
      * @return HPackContext
      */
     public function getHPackContext(): HPackContext
     {
-        return $this->context;
+        return $this->context->getHpackContext();
     }
     
     /**
