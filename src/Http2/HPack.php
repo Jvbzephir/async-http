@@ -307,7 +307,7 @@ class HPack
                     if ($index <= self::STATIC_TABLE_SIZE) {
                         $name = self::STATIC_TABLE[$index][0];
                     } else {
-                        $name = $this->decoderTable[$index - self::STATIC_TABLE_SIZE];
+                        $name = $this->decoderTable[$index - self::STATIC_TABLE_SIZE][0];
                     }
                 } else {
                     $name = $this->decodeString($encoded, $encodedLength, $offset);
