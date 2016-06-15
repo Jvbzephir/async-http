@@ -381,7 +381,7 @@ class Http1Driver implements HttpDriverInterface
                     $in->close();
                 }
             } else {
-                if ($body instanceof FileBody && $resource !== NULL) {
+                if ($body instanceof FileBody && $resource !== NULL && !$request->getUri()->getScheme() === 'https') {
                     yield from (yield currentExecutor())->getFilesystem()->sendfile($body->getFile(), $resource);
                 } else {
                     try {
