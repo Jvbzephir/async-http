@@ -74,6 +74,8 @@ class FcgiEndpoint
         $this->port = $port;
         $this->address = (strpos($address, ':') === false) ? $address : '[' . trim($address, '][') . ']';
         $this->logger = $logger;
+        
+        $this->context = new HttpContext();
     }
     
     /**
