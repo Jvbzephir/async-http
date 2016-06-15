@@ -51,7 +51,7 @@ $executor->runCallback(function () use ($executor) {
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
     
-    $http2 = new Http2Driver($logger);
+    $http2 = new Http2Driver($http->getHttpContext(), $logger);
     $http2->getHPackContext()->setEncodingType('test-data', HPackContext::ENCODING_INDEXED);
     $http2->getHPackContext()->setEncodingType('test-token', HPackContext::ENCODING_NEVER_INDEXED);
     
