@@ -110,9 +110,9 @@ class HttpEndpoint
         return $this->socketFactory->isEncrypted();
     }
     
-    public function setCertificate(string $file, bool $allowSelfSigned = false)
+    public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = NULL)
     {
-        $this->socketFactory->setCertificate($file, $allowSelfSigned);
+        $this->socketFactory->setCertificate($file, $allowSelfSigned, $password);
     }
     
     /**
