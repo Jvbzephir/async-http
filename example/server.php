@@ -45,8 +45,8 @@ $executor->runCallback(function () use ($executor) {
         $logger = NULL;
     }
     
-    $http = new HttpEndpoint(8888, '0.0.0.0', 'test.k1');
-    $http->setCertificate(__DIR__ . '/cert.pem', true);
+    $http = new HttpEndpoint(8888, '0.0.0.0', 'localhost');
+    $http->setCertificate(__DIR__ . '/localhost.pem', true);
     
     $http->setLogger($logger);
     $http->getHttp1Driver()->setLogger($logger);
