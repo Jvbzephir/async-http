@@ -28,11 +28,6 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 $executor = (new ExecutorFactory())->createExecutor();
 
-$file = __DIR__ . '/config.local.php';
-if (is_file($file)) {
-    call_user_func(require $file, $executor);
-}
-
 $executor->setErrorHanndler(function (\Throwable $e) {
     fwrite(STDERR, $e . "\n\n");
 });
