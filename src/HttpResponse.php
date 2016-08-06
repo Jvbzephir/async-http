@@ -77,7 +77,7 @@ class HttpResponse extends HttpMessage
         }
         
         if (!preg_match("'^[1-5][0-9]{2}$'", $status)) {
-            throw new \InvalidArgumentException(sprintf('Invalid HTTP status code: %s', is_object($status) ? get_class($status) : gettype($status)));
+            throw new \InvalidArgumentException(sprintf('Invalid HTTP status code: %s', \is_object($status) ? get_class($status) : gettype($status)));
         }
         
         if ($status < 100 || $status > 599) {

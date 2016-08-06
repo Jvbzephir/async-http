@@ -33,7 +33,7 @@ abstract class HttpMessage
         $this->headers = [];
         
         foreach ($headers as $k => $v) {
-            if (is_object($v)) {
+            if (\is_object($v)) {
                 if (!method_exists($v, '__toString')) {
                     continue;
                 }
@@ -105,13 +105,13 @@ abstract class HttpMessage
 
     public function withHeader(string $name, $value): HttpMessage
     {
-        if (is_string($value) || method_exists($value, '__toString')) {
+        if (\is_string($value) || method_exists($value, '__toString')) {
             $value = [
                 (string) $value
             ];
         }
         
-        if (!is_array($value) || !$this->assertArrayofStrings($value)) {
+        if (!\is_array($value) || !$this->assertArrayofStrings($value)) {
             throw new \InvalidArgumentException('Invalid HTTP header value');
         }
         
@@ -134,13 +134,13 @@ abstract class HttpMessage
 
     public function withAddedHeader(string $name, $value): HttpMessage
     {
-        if (is_string($value) || method_exists($value, '__toString')) {
+        if (\is_string($value) || method_exists($value, '__toString')) {
             $value = [
                 (string) $value
             ];
         }
         
-        if (!is_array($value) || !$this->assertArrayofStrings($value)) {
+        if (!\is_array($value) || !$this->assertArrayofStrings($value)) {
             throw new \InvalidArgumentException('Invalid HTTP header value');
         }
         
@@ -221,7 +221,7 @@ abstract class HttpMessage
     protected function assertArrayOfStrings(array $strings): bool
     {
         foreach ($strings as $string) {
-            if (!is_string($string) && !method_exists($string, '__toString')) {
+            if (!\is_string($string) && !method_exists($string, '__toString')) {
                 return false;
             }
         }
@@ -234,7 +234,7 @@ abstract class HttpMessage
         $filtered = [];
         
         foreach ($headers as $h) {
-            if (!is_string($h[0]) || !is_string($h[1])) {
+            if (!\is_string($h[0]) || !\is_string($h[1])) {
                 continue;
             }
             

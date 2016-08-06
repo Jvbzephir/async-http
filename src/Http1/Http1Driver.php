@@ -205,7 +205,7 @@ class Http1Driver implements HttpDriverInterface
             }
             
             if (!$response instanceof HttpResponse) {
-                throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', is_object($response) ? get_class($response) : gettype($response)));
+                throw new \RuntimeException(sprintf('Action must return an HTTP response, actual value is %s', \is_object($response) ? get_class($response) : gettype($response)));
             }
             
             return yield from $this->sendResponse($endpoint, $socket, $request, $response, $request->getMethod() == 'HEAD', $started);

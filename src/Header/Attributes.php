@@ -83,17 +83,17 @@ abstract class Attributes
         $str = '';
         
         foreach ($attr as $k => $v) {
-            if (is_bool($v) && !$v) {
+            if (\is_bool($v)) {
+                if ($v) {
+                    $str .= ';' . $k;
+                }
+                
                 continue;
             }
             
             $str .= ';' . $k;
             
-            if (is_bool($v)) {
-                continue;
-            }
-            
-            if (is_int($v) || is_float($v)) {
+            if (\is_int($v) || \is_float($v)) {
                 $str .= '=' . $v;
             } else {
                 $str .= '="' . strtr($v, [

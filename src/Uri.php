@@ -227,7 +227,7 @@ class Uri implements \JsonSerializable
 
     public function withHost(string $host): Uri
     {
-        if (!is_string($host) && !method_exists($host, '__toString')) {
+        if (!\is_string($host) && !method_exists($host, '__toString')) {
             throw new \InvalidArgumentException('Invalid URI host');
         }
         
@@ -252,11 +252,11 @@ class Uri implements \JsonSerializable
 
     public function withPort(int $port): Uri
     {
-        if (is_string($port) && preg_match("'^[0-9]+$'", $port)) {
+        if (\is_string($port) && preg_match("'^[0-9]+$'", $port)) {
             $port = (int) $port;
         }
         
-        if ($port !== NULL && !is_int($port)) {
+        if ($port !== NULL && !\is_int($port)) {
             throw new \InvalidArgumentException('Invalid URL port');
         }
         
