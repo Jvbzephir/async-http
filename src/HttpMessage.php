@@ -184,7 +184,7 @@ abstract class HttpMessage
         return $message;
     }
     
-    public function getAttribute(string $name, mixed $default = NULL)
+    public function getAttribute(string $name, $default = NULL)
     {
         return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
     }
