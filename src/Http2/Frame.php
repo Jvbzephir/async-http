@@ -341,7 +341,7 @@ class Frame
      * @return string
      */
     public function encode(int $stream): string
-    {// FIXME: Optimize this!
-        return substr(pack('N', \strlen($this->data)), 1, 3) . chr($this->type) . chr($this->flags) . pack('N', $stream) . $this->data;
+    {
+        return substr(pack('NccN', \strlen($this->data), $this->type, $this->flags, $stream), 1) . $this->data;
     }
 }
