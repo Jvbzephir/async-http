@@ -79,12 +79,12 @@ class ChunkDecodedInputStream implements InputStreamInterface
             throw new \RuntimeException('Buffer does not contain a valid chunk header');
         }
         
-        if (strlen($m[1]) > 7) {
+        if (\strlen($m[1]) > 7) {
             throw new \RuntimeException('HTTP chunk size must not exceed 0xFFFFFFF bytes');
         }
         
         $this->remainder = hexdec($m[1]);
-        $this->buffer = substr($buffer, strlen($m[0]));
+        $this->buffer = substr($buffer, \strlen($m[0]));
         
         if ($this->remainder === 0) {
             $this->ended = true;
@@ -116,7 +116,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
     public function __debugInfo(): array
     {
         $info = get_object_vars($this);
-        $info['buffer'] = sprintf('%u bytes buffered', strlen($info['buffer']));
+        $info['buffer'] = sprintf('%u bytes buffered', \strlen($info['buffer']));
         
         return $info;
     }
@@ -167,7 +167,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
         }
         
         $chunk = substr($this->buffer, 0, min($length, $this->remainder));
-        $length = strlen($chunk);
+        $length = \strlen($chunk);
         
         $this->buffer = substr($this->buffer, $length);
         $this->remainder -= $length;
@@ -188,7 +188,7 @@ class ChunkDecodedInputStream implements InputStreamInterface
      */
     protected function readChunkHeader(float $timeout = 0): \Generator
     {
-        while ((strlen($this->buffer) < 3 || false === strpos($this->buffer, "\n", 2)) && !$this->stream->eof()) {
+        while ((\strlen($this->buffer) < 3 || false === strpos($this->buffer, "\n", 2)) && !$this->stream->eof()) {
             $this->buffer .= yield from $this->stream->read(8192, $timeout);
         }
         
@@ -202,12 +202,12 @@ class ChunkDecodedInputStream implements InputStreamInterface
             throw new \RuntimeException('Invalid HTTP chunk header received');
         }
         
-        if (strlen($m[1]) > 7) {
+        if (\strlen($m[1]) > 7) {
             throw new \RuntimeException('HTTP chunk size must not exceed 0xFFFFFFF bytes');
         }
         
         $this->remainder = hexdec($m[1]);
-        $this->buffer = substr($this->buffer, strlen($m[0]));
+        $this->buffer = substr($this->buffer, \strlen($m[0]));
         
         if ($this->remainder === 0) {
             $this->buffer = '';

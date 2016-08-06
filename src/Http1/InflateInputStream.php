@@ -123,7 +123,7 @@ class InflateInputStream implements InputStreamInterface
     public function __debugInfo(): array
     {
         $info = get_object_vars($this);
-        $info['buffer'] = sprintf('%u bytes buffered', strlen($info['buffer']));
+        $info['buffer'] = sprintf('%u bytes buffered', \strlen($info['buffer']));
         
         return $info;
     }
@@ -217,9 +217,7 @@ class InflateInputStream implements InputStreamInterface
         }
         
         $chunk = substr($this->buffer, 0, $length);
-        $len = strlen($chunk);
-        
-        $this->buffer = substr($this->buffer, $len);
+        $this->buffer = substr($this->buffer, \strlen($chunk));
         
         return $chunk;
     }

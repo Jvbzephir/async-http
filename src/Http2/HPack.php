@@ -161,11 +161,11 @@ class HPack
                     $v
                 ]);
                 
-                $this->encoderTableSize += 32 + strlen($k) + strlen($v);
+                $this->encoderTableSize += 32 + \strlen($k) + \strlen($v);
                 
                 while ($this->encoderTableSize > $this->decoderTableMaxSize) {
                     list ($name, $value) = array_pop($this->encoderTable);
-                    $this->encoderTableSize -= 32 + strlen($name) + strlen($value);
+                    $this->encoderTableSize -= 32 + \strlen($name) + \strlen($value);
                 }
                 
                 if ($index !== NULL) {
@@ -227,18 +227,18 @@ class HPack
         if ($this->context->isCompressionEnabled()) {
             $input = $this->context->getHuffmanEncoder()->encode($input);
             
-            if (strlen($input) < 0x7F) {
-                return chr(strlen($input) | 0x80) . $input;
+            if (\strlen($input) < 0x7F) {
+                return chr(\strlen($input) | 0x80) . $input;
             }
             
-            return "\xFF" . $this->encodeInt(strlen($input) - 0x7F) . $input;
+            return "\xFF" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
         }
         
-        if (strlen($input) < 0x7F) {
-            return chr(strlen($input)) . $input;
+        if (\strlen($input) < 0x7F) {
+            return chr(\strlen($input)) . $input;
         }
         
-        return "\x7F" . $this->encodeInt(strlen($input) - 0x7F) . $input;
+        return "\x7F" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
     }
     
     /**
@@ -254,7 +254,7 @@ class HPack
     public function decode(string $encoded): array
     {
         $headers = [];
-        $encodedLength = strlen($encoded);
+        $encodedLength = \strlen($encoded);
         $offset = 0;
         
         while ($offset < $encodedLength) {
@@ -324,7 +324,7 @@ class HPack
                 
                 if ($dynamic) {
                     array_unshift($this->decoderTable, $header);
-                    $this->decoderTableSize += 32 + strlen($header[0]) + strlen($header[1]);
+                    $this->decoderTableSize += 32 + \strlen($header[0]) + \strlen($header[1]);
                     
                     if ($this->decoderTableMaxSize < $this->decoderTableSize) {
                         $this->resizeDynamicTable();
@@ -362,7 +362,7 @@ class HPack
         
         while ($this->decoderTableSize > $this->decoderTableMaxSize) {
             list ($k, $v) = array_pop($this->decoderTable);
-            $this->decoderTableSize -= 32 + strlen($k) + strlen($v);
+            $this->decoderTableSize -= 32 + \strlen($k) + \strlen($v);
         }
     }
     

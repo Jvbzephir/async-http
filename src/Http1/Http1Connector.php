@@ -217,10 +217,10 @@ class Http1Connector implements HttpConnectorInterface
             $stream->flush();
             
             if ($chunked) {
-                yield from $stream->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                yield from $stream->write(sprintf("%x\r\n%s\r\n", \strlen($chunk), $chunk));
                 
                 yield from Stream::copy($in, $stream, 4, 4088, function (string $chunk) {
-                    return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
+                    return sprintf("%x\r\n%s\r\n", \strlen($chunk), $chunk);
                 });
                 
                 yield from $stream->write("0\r\n\r\n");

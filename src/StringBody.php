@@ -72,7 +72,7 @@ class StringBody implements HttpBodyInterface
     {
         yield noop();
         
-        return strlen($this->contents);
+        return \strlen($this->contents);
     }
     
     /**

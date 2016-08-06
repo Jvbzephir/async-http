@@ -118,7 +118,7 @@ class LimitInputStream implements InputStreamInterface, ResourceStreamInterface
         }
         
         $chunk = yield from $this->stream->read(min($length, $this->limit - $this->offset), $timeout);
-        $this->offset += strlen($chunk);
+        $this->offset += \strlen($chunk);
         
         return $chunk;
     }

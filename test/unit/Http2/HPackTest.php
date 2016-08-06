@@ -162,7 +162,7 @@ class HPackTest extends \PHPUnit_Framework_TestCase
     {
         $hex = '';
         
-        for ($len = strlen($input), $i = 0; $i < $len; $i++) {
+        for ($len = \strlen($input), $i = 0; $i < $len; $i++) {
             $hex .= str_pad(dechex(ord($input[$i])), 2, '0', STR_PAD_LEFT);
         }
         

@@ -237,7 +237,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
             
             $conn = new Connection(Connection::MODE_SERVER, $socket, $this->context, yield eventEmitter(), $this->logger);
             
-            $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE), true);
+            $preface = yield from IO::readBuffer($socket, \strlen(Connection::PREFACE), true);
             
             if ($preface !== Connection::PREFACE) {
                 if ($this->logger) {
@@ -281,7 +281,7 @@ class Http2Driver implements HttpDriverInterface, HttpUpgradeHandlerInterface
     protected function upgradeConnectionDirect(BufferedDuplexStreamInterface $socket, HttpRequest $request, HttpResponse $response, HttpEndpoint $endpoint, callable $action)
     {
         try {
-            $preface = yield from IO::readBuffer($socket, strlen(Connection::PREFACE_BODY), true);
+            $preface = yield from IO::readBuffer($socket, \strlen(Connection::PREFACE_BODY), true);
             
             if ($preface !== Connection::PREFACE_BODY) {
                 if ($this->logger) {

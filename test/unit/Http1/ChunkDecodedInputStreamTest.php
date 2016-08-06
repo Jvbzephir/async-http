@@ -25,7 +25,7 @@ class ChunkDecodedInputStreamTest extends \PHPUnit_Framework_TestCase
         $chunked = '';
         
         foreach (str_split($data, $len) as $chunk) {
-            $chunked .= sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
+            $chunked .= sprintf("%x\r\n%s\r\n", \strlen($chunk), $chunk);
         }
         
         return $chunked . "0\r\n\r\n";

@@ -501,7 +501,7 @@ class ConnectionHandler
         
         try {
             yield from Stream::copy($body, $this->stream, 4, 4088, function (string $chunk) use ($requestId) {
-                return pack('CCnnxx', Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, strlen($chunk)) . $chunk;
+                return pack('CCnnxx', Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $requestId, \strlen($chunk)) . $chunk;
             });
         } finally {
             $body->close();
@@ -586,7 +586,7 @@ class ConnectionHandler
      */
     protected function writeRecord(Record $record): \Generator
     {
-        $len = strlen($record->data);
+        $len = \strlen($record->data);
         
         if ($len === 0) {
             return;

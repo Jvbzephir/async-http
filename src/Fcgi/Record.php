@@ -154,7 +154,7 @@ class Record
             'version' => $this->version,
             'type' => $this->type,
             'requestId' => $this->requestId,
-            'data' => sprintf('%u bytes', strlen($this->data))
+            'data' => sprintf('%u bytes', \strlen($this->data))
         ];
     }
 }

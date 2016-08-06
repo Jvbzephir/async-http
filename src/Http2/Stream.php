@@ -207,7 +207,7 @@ class Stream
     {
         return [
             'id' => $this->id,
-            'headerBuffer' => sprintf('%u bytes buffered', strlen($this->headers))
+            'headerBuffer' => sprintf('%u bytes buffered', \strlen($this->headers))
         ];
     }
     
@@ -349,7 +349,7 @@ class Stream
                         $data = substr($data, 1, -1 * ord($data[0]));
                     }
                     
-                    $this->body->appendData($data, $frame->flags & Frame::END_STREAM, strlen($frame->data) - strlen($data));
+                    $this->body->appendData($data, $frame->flags & Frame::END_STREAM, \strlen($frame->data) - \strlen($data));
                     
                     if ($frame->flags & Frame::END_STREAM) {
                         $this->changeState(self::HALF_CLOSED_REMOTE);
@@ -393,7 +393,7 @@ class Stream
                 case Frame::PING:
                     throw new ConnectionException('PING frame must not be sent to a stream', Frame::PROTOCOL_ERROR);
                 case Frame::PRIORITY:
-                    if (strlen($frame->data) !== 5) {
+                    if (\strlen($frame->data) !== 5) {
                         throw new Http2StreamException('PRIORITY frame does not consist of 5 bytes', Frame::FRAME_SIZE_ERROR);
                     }
                     
@@ -419,7 +419,7 @@ class Stream
                 case Frame::SETTINGS:
                     throw new ConnectionException('SETTINGS frames must not be sent to an open stream', Frame::PROTOCOL_ERROR);
                 case Frame::WINDOW_UPDATE:
-                    if (strlen($frame->data) !== 4) {
+                    if (\strlen($frame->data) !== 4) {
                         throw new ConnectionException('WINDOW_UPDATE payload must consist of 4 bytes', Frame::FRAME_SIZE_ERROR);
                     }
                     
@@ -663,7 +663,7 @@ class Stream
         // Header size: 9 byte general header (optional: +4 bytes for stream dependency, +1 byte for weight).
         $chunkSize = 4096 - 9;
         
-        if (strlen($headers) > $chunkSize) {
+        if (\strlen($headers) > $chunkSize) {
             $parts = str_split($headers, $chunkSize);
             $frames = [
                 new Frame(Frame::HEADERS, $parts[0])
@@ -726,7 +726,7 @@ class Stream
             $eof = $in->eof();
             
             // Increase local flow control window in case response body does not return the desired number of bytes.
-            $delta = $len - strlen($chunk);
+            $delta = $len - \strlen($chunk);
             if ($delta > 0) {
                 $this->incrementLocalWindow($delta);
             }

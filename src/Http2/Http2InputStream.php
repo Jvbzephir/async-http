@@ -101,7 +101,7 @@ class Http2InputStream implements InputStreamInterface
     {
         return [
             'eof' => $this->eof,
-            'buffer' => sprintf('%u / %s bytes buffered', strlen($this->buffer), $this->size),
+            'buffer' => sprintf('%u / %s bytes buffered', \strlen($this->buffer), $this->size),
             'drained' => $this->drained,
             'timeout' => $this->timeout,
             'stream' => $this->stream
@@ -167,10 +167,12 @@ class Http2InputStream implements InputStreamInterface
         }
         
         $chunk = substr($this->buffer, 0, $length);
-        $this->buffer = substr($this->buffer, strlen($chunk));
-        $this->drained += strlen($chunk);
+        $length = \strlen($chunk);
         
-        if (($this->eof && $this->drained > 0) || ($this->drained > 4096 && strlen($this->buffer) < $this->size)) {
+        $this->buffer = substr($this->buffer, $length);
+        $this->drained += $length;
+        
+        if (($this->eof && $this->drained > 0) || ($this->drained > 4096 && \strlen($this->buffer) < $this->size)) {
             try {
                 yield runTask($this->incrementRemoteWindow(min($this->size, $this->drained)), 'HTTP/2 Remote Window Increment');
             } finally {

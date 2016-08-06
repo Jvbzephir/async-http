@@ -288,7 +288,7 @@ class Frame
      */
     public function __toString(): string
     {
-        return sprintf("%s [%b] %u bytes", $this->getTypeName(), $this->flags, strlen($this->data));
+        return sprintf("%s [%b] %u bytes", $this->getTypeName(), $this->flags, \strlen($this->data));
     }
 
     /**
@@ -298,7 +298,7 @@ class Frame
     {
         $debug = get_object_vars($this);
         $debug['name'] = $this->getTypeName();
-        $debug['data'] = sprintf('%u bytes', strlen($debug['data']));
+        $debug['data'] = sprintf('%u bytes', \strlen($debug['data']));
         
         return $debug;
     }
@@ -341,7 +341,7 @@ class Frame
      * @return string
      */
     public function encode(int $stream): string
-    {
-        return substr(pack('N', strlen($this->data)), 1, 3) . chr($this->type) . chr($this->flags) . pack('N', $stream) . $this->data;
+    {// FIXME: Optimize this!
+        return substr(pack('N', \strlen($this->data)), 1, 3) . chr($this->type) . chr($this->flags) . pack('N', $stream) . $this->data;
     }
 }

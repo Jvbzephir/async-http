@@ -372,10 +372,10 @@ class Http1Driver implements HttpDriverInterface
             if ($chunked || $compression !== NULL) {
                 try {
                     if ($chunk !== '') {
-                        yield from $socket->write(sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk));
+                        yield from $socket->write(sprintf("%x\r\n%s\r\n", \strlen($chunk), $chunk));
                         
                         yield from Stream::copy($in, $socket, 4, 4088, function (string $chunk) {
-                            return sprintf("%x\r\n%s\r\n", strlen($chunk), $chunk);
+                            return sprintf("%x\r\n%s\r\n", \strlen($chunk), $chunk);
                         });
                         
                         yield from $socket->write("0\r\n\r\n");

@@ -448,7 +448,7 @@ class Connection
             case Frame::HEADERS:
                 throw new ConnectionException('HEADERS frame must target a stream', Frame::PROTOCOL_ERROR);
             case Frame::PING:
-                if (strlen($frame->data) !== 8) {
+                if (\strlen($frame->data) !== 8) {
                     throw new ConnectionException('PING frame payload must consist of 8 octets', Frame::FRAME_SIZE_ERROR);
                 }
                 
@@ -468,14 +468,14 @@ class Connection
                 throw new ConnectionException('RST_STREAM frame must not be sent to connection', Frame::PROTOCOL_ERROR);
             case Frame::SETTINGS:
                 if ($frame->flags & Frame::ACK) {
-                    if (strlen($frame->data) !== 0) {
+                    if (\strlen($frame->data) !== 0) {
                         throw new ConnectionException('ACK SETTINGS frame must not have a length of more than 0 bytes', Frame::FRAME_SIZE_ERROR);
                     }
                     
                     break;
                 }
                 
-                if ((strlen($frame->data) % 6) !== 0) {
+                if ((\strlen($frame->data) % 6) !== 0) {
                     throw new ConnectionException('SETTINGS frame payload length must be a multiple of 6 ', Frame::FRAME_SIZE_ERROR);
                 }
                 
@@ -487,7 +487,7 @@ class Connection
                 yield from $this->writeFrame(new Frame(Frame::SETTINGS, '', Frame::ACK), 500);
                 break;
             case Frame::WINDOW_UPDATE:
-                if (strlen($frame->data) !== 4) {
+                if (\strlen($frame->data) !== 4) {
                     throw new ConnectionException('WINDOW_UPDATE payload must consist of 4 bytes', Frame::FRAME_SIZE_ERROR);
                 }
                 
