@@ -11,7 +11,9 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;
@@ -145,5 +147,70 @@ class Http1BodyTest extends AsyncTestCase
         } finally {
             $stream->close();
         }
+    }
+    
+    public function testLengthEncodedBodyFromMessage()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Content-Length', 4);
+        
+        $body = Http1Body::fromMessage(new ReadableMemoryStream('Test'), $message);
+        
+        $this->assertEquals('Test', yield $body->getContents());
+    }
+    
+    public function testInvalidContentLengthFromMessage()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Content-Length', 'x');
+        
+        $this->expectException(StatusException::class);
+        
+        Http1Body::fromMessage(new ReadableMemoryStream('Test'), $message);
+    }
+    
+    public function testChunkEncodedBodyFromMessage()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Transfer-Encoding', 'chunked');
+        
+        $body = Http1Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
+        
+        $this->assertEquals('Test', yield $body->getContents());
+    }
+    
+    public function testInvalidTransferEncodingFromMessage()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Transfer-Encoding', 'x');
+    
+        $this->expectException(StatusException::class);
+    
+        Http1Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
+    }
+    
+    public function testDetectsCompressionFromMessage()
+    {
+        if (!function_exists('inflate_init')) {
+            return $this->markTestSkipped('Test requires incremental zlib compression');
+        }
+        
+        $input = new ReadableMemoryStream(gzencode('Test'));
+        
+        $message = new HttpResponse();
+        $message = $message->withHeader('Content-Length', $input->getSize());
+        $message = $message->withHeader('Content-Encoding', 'gzip');
+        
+        $this->assertEquals('Test', yield Http1Body::fromMessage($input, $message)->getContents());
+    }
+    
+    public function testDetectsCompressedRequestBody()
+    {
+        $message = new HttpRequest('http://test.me/');
+        $message = $message->withHeader('Content-Encoding', 'gzip');
+        
+        $this->expectException(StatusException::class);
+        
+        Http1Body::fromMessage(new ReadableMemoryStream(), $message);
     }
 }

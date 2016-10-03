@@ -105,13 +105,11 @@ abstract class HttpMessage
         return \implode(',', $this->getHeader($name));
     }
 
-    public function withHeader(string $name, $value): HttpMessage
+    public function withHeader(string $name, string $value): HttpMessage
     {
-        if (\is_string($value) || \method_exists($value, '__toString')) {
-            $value = [
-                (string) $value
-            ];
-        }
+        $value = [
+            (string) $value
+        ];
         
         if (!\is_array($value) || !$this->assertArrayofStrings($value)) {
             throw new \InvalidArgumentException('Invalid HTTP header value');

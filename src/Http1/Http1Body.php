@@ -125,7 +125,7 @@ class Http1Body implements HttpBody
      * @param HttpMessage $message
      * @return Http1Body
      */
-    public static function fromHeaders(ReadableStream $stream, HttpMessage $message): Http1Body
+    public static function fromMessage(ReadableStream $stream, HttpMessage $message): Http1Body
     {
         $body = new static($stream);
         
@@ -136,31 +136,21 @@ class Http1Body implements HttpBody
             if (\in_array('chunked', $encodings)) {
                 $body->setChunkEncoded(true);
             } elseif (!empty($encodings)) {
-                throw new StatusException('Unsupported transfer encoding detected', Http::NOT_IMPLEMENTED);
+                throw new StatusException(Http::NOT_IMPLEMENTED, 'Unsupported transfer encoding detected');
             }
         } elseif ($message->hasHeader('Content-Length')) {
             $len = $message->getHeaderLine('Content-Length');
             
             if (!\preg_match("'^[0-9]+$'", $len)) {
-                throw new StatusException(\sprintf('Invalid content length value specified: "%s"', $len), Http::BAD_REQUEST);
+                throw new StatusException(Http::BAD_REQUEST, \sprintf('Invalid content length value specified: "%s"', $len));
             }
             
             $body->setLength((int) $len);
         }
         
-        if ($message instanceof HttpRequest) {
-//             if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
-//                 $expected = \array_map('strtolower', \array_map('trim', $message->getHeaderLine('Expect')));
-                
-//                 if (\in_array('100-continue', $expected)) {
-//                     $body->setExpectContinue(true);
-//                 }
-//             }
-        }
-        
         if ($message->hasHeader('Content-Encoding')) {
             if (!$message instanceof HttpResponse) {
-                throw new StatusException('Compressed request bodies are not supported', Http::BAD_REQUEST);
+                throw new StatusException(Http::BAD_REQUEST, 'Compressed request bodies are not supported');
             }
             
             $body->setCompression($message->getHeaderLine('Content-Encoding'));
