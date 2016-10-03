@@ -9,6 +9,8 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
 /**
@@ -26,7 +28,7 @@ abstract class Http
      * 
      * @var string
      */
-    const DATE_FORMAT_RFC1123 = 'D, d M Y H:i:s \G\M\T';
+    const DATE_RFC1123 = 'D, d M Y H:i:s \G\M\T';
 
     /**
      * Format of expires directive in HTTP cookies.
@@ -73,7 +75,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_HEAD = 'HEAD';
+    const HEAD = 'HEAD';
 
     /**
      * The GET method means retrieve whatever information (in the form of an entity) is identified
@@ -83,7 +85,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_GET = 'GET';
+    const GET = 'GET';
 
     /**
      * The POST method is used to request that the origin server accept the entity enclosed in the
@@ -91,7 +93,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_POST = 'POST';
+    const POST = 'POST';
 
     /**
      * The PUT method requests that the enclosed entity be stored under the supplied Request-URI.
@@ -109,7 +111,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_PUT = 'PUT';
+    const PUT = 'PUT';
 
     /**
      * The DELETE method requests that the origin server delete the resource identified by the
@@ -121,7 +123,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_DELETE = 'DELETE';
+    const DELETE = 'DELETE';
 
     /**
      * The TRACE method is used to invoke a remote, application-layer loop- back of the request
@@ -132,7 +134,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_TRACE = 'TRACE';
+    const TRACE = 'TRACE';
 
     /**
      * The OPTIONS method represents a request for information about the communication options
@@ -142,7 +144,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_OPTIONS = 'OPTIONS';
+    const OPTIONS = 'OPTIONS';
 
     /**
      * This specification reserves the method name CONNECT for use with a proxy that can dynamically
@@ -150,7 +152,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_CONNECT = 'CONNECT';
+    const CONNECT = 'CONNECT';
 
     /**
      * The PATCH method requests that a set of changes described in the request entity be applied to
@@ -161,7 +163,7 @@ abstract class Http
      * 
      * @var string
      */
-    const METHOD_PATCH = 'PATCH';
+    const PATCH = 'PATCH';
 
     /**
      * The client SHOULD continue with its request. This interim response is used to
@@ -174,7 +176,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_CONTINUE = 100;
+    const CONTINUE = 100;
 
     /**
      * The server understands and is willing to comply with the client's request, via
@@ -185,7 +187,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_SWITCHING_PROTOCOLS = 101;
+    const SWITCHING_PROTOCOLS = 101;
 
     /**
      * The request has succeeded. The information returned with the response is dependent
@@ -193,7 +195,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_OK = 200;
+    const OK = 200;
 
     /**
      * The request has been fulfilled and resulted in a new resource being created. The newly
@@ -207,7 +209,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_CREATED = 201;
+    const CREATED = 201;
 
     /**
      * The request has been accepted for processing, but the processing has not been completed.
@@ -217,7 +219,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_ACCEPTED = 202;
+    const ACCEPTED = 202;
 
     /**
      * The returned metainformation in the entity-header is not the definitive set as available
@@ -229,7 +231,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NON_AUTHORITATIVE_INFORMATION = 203;
+    const NON_AUTHORITATIVE_INFORMATION = 203;
 
     /**
      * The server has fulfilled the request but does not need to return an entity-body, and might
@@ -238,7 +240,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NO_CONTENT = 204;
+    const NO_CONTENT = 204;
 
     /**
      * The server has fulfilled the request and the user agent SHOULD reset the document view which
@@ -248,7 +250,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_RESET_CONTENT = 205;
+    const RESET_CONTENT = 205;
 
     /**
      * The server has fulfilled the partial GET request for the resource. The request MUST have
@@ -257,7 +259,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_PARTIAL_CONTENT = 206;
+    const PARTIAL_CONTENT = 206;
 
     /**
      * The requested resource corresponds to any one of a set of representations, each with its own
@@ -267,7 +269,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_MULTIPLE_CHOICES = 300;
+    const MULTIPLE_CHOICES = 300;
 
     /**
      * The requested resource has been assigned a new permanent URI and any future references to
@@ -278,7 +280,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_MOVED_PERMANENTLY = 301;
+    const MOVED_PERMANENTLY = 301;
 
     /**
      * The requested resource resides temporarily under a different URI. Since the redirection
@@ -287,7 +289,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_FOUND = 302;
+    const FOUND = 302;
 
     /**
      * The response to the request can be found under a different URI and SHOULD be retrieved using
@@ -298,7 +300,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_SEE_OTHER = 303;
+    const SEE_OTHER = 303;
 
     /**
      * If the client has performed a conditional GET request and access is allowed, but the document
@@ -308,7 +310,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NOT_MODIFIED = 304;
+    const NOT_MODIFIED = 304;
 
     /**
      * The requested resource MUST be accessed through the proxy given by the Location field.
@@ -317,7 +319,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_USE_PROXY = 305;
+    const USE_PROXY = 305;
 
     /**
      * The requested resource resides temporarily under a different URI. Since the redirection
@@ -327,7 +329,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_TEMPORARY_REDIRECT = 307;
+    const TEMPORARY_REDIRECT = 307;
 
     /**
      * The request could not be understood by the server due to malformed syntax. The client
@@ -335,7 +337,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_BAD_REQUEST = 400;
+    const BAD_REQUEST = 400;
 
     /**
      * The request requires user authentication. The response MUST include a WWW-Authenticate
@@ -350,14 +352,14 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_UNAUTHORIZED = 401;
+    const UNAUTHORIZED = 401;
 
     /**
      * This code is reserved for future use.
      * 
      * @var int
      */
-    const CODE_PAYMENT_REQUIRED = 402;
+    const PAYMENT_REQUIRED = 402;
 
     /**
      * The server understood the request, but is refusing to fulfill it. Authorization will not
@@ -368,7 +370,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_FORBIDDEN = 403;
+    const FORBIDDEN = 403;
 
     /**
      * The server has not found anything matching the Request-URI. No indication is given of
@@ -380,7 +382,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NOT_FOUND = 404;
+    const NOT_FOUND = 404;
 
     /**
      * The method specified in the Request-Line is not allowed for the resource identified by the
@@ -389,7 +391,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_METHOD_NOT_ALLOWED = 405;
+    const METHOD_NOT_ALLOWED = 405;
 
     /**
      * The resource identified by the request is only capable of generating response entities which
@@ -397,7 +399,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NOT_ACCEPTABLE = 406;
+    const NOT_ACCEPTABLE = 406;
 
     /**
      * This code is similar to 401 (Unauthorized), but indicates that the client must first
@@ -409,7 +411,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_PROXY_AUTHENTICATION_REQUIRED = 407;
+    const PROXY_AUTHENTICATION_REQUIRED = 407;
 
     /**
      * The client did not produce a request within the time that the server was prepared to
@@ -417,7 +419,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_REQUEST_TIMEOUT = 408;
+    const REQUEST_TIMEOUT = 408;
 
     /**
      * The request could not be completed due to a conflict with the current state of the resource.
@@ -429,7 +431,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_CONFLICT = 409;
+    const CONFLICT = 409;
 
     /**
      * The requested resource is no longer available at the server and no forwarding address is
@@ -441,7 +443,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_GONE = 410;
+    const GONE = 410;
 
     /**
      * The server refuses to accept the request without a defined Content-Length. The client
@@ -450,7 +452,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_LENGTH_REQUIRED = 411;
+    const LENGTH_REQUIRED = 411;
 
     /**
      * The precondition given in one or more of the request-header fields evaluated to false when
@@ -460,7 +462,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_PRECONDITION_FAILED = 412;
+    const PRECONDITION_FAILED = 412;
 
     /**
      * The server is refusing to process a request because the request entity is larger than the
@@ -469,7 +471,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_REQUEST_ENTITY_TOO_LARGE = 413;
+    const REQUEST_ENTITY_TOO_LARGE = 413;
 
     /**
      * The server is refusing to service the request because the Request-URI is longer than the
@@ -482,7 +484,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_REQUEST_URI_TOO_LONG = 414;
+    const REQUEST_URI_TOO_LONG = 414;
 
     /**
      * The server is refusing to service the request because the entity of the request is in a format
@@ -490,7 +492,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_UNSUPPORTED_MEDIA_TYPE = 415;
+    const UNSUPPORTED_MEDIA_TYPE = 415;
 
     /**
      * A server SHOULD return a response with this status code if a request included a Range
@@ -501,7 +503,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_REQUEST_RANGE_NOT_SATISFIABLE = 416;
+    const REQUEST_RANGE_NOT_SATISFIABLE = 416;
 
     /**
      * The expectation given in an Expect request-header field (see section 14.20) could not be met
@@ -510,7 +512,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_EXPECTATION_FAILED = 417;
+    const EXPECTATION_FAILED = 417;
 
     /**
      * The 428 status code indicates that the origin server requires the request to be conditional. Its
@@ -523,7 +525,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_PRECONDITION_REQUIRED = 428;
+    const PRECONDITION_REQUIRED = 428;
 
     /**
      * The 429 status code indicates that the user has sent too many requests in a given amount of
@@ -535,7 +537,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_TOO_MANY_REQUESTS = 429;
+    const TOO_MANY_REQUESTS = 429;
 
     /**
      * The 431 status code indicates that the server is unwilling to process the request because its
@@ -548,14 +550,14 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
+    const REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
 
     /**
      * The server encountered an unexpected condition which prevented it from fulfilling the request.
      * 
      * @var int
      */
-    const CODE_INTERNAL_SERVER_ERROR = 500;
+    const INTERNAL_SERVER_ERROR = 500;
 
     /**
      * The server does not support the functionality required to fulfill the request. This is the
@@ -564,7 +566,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NOT_IMPLEMENTED = 501;
+    const NOT_IMPLEMENTED = 501;
 
     /**
      * The server, while acting as a gateway or proxy, received an invalid response from the
@@ -572,7 +574,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_BAD_GATEWAY = 502;
+    const BAD_GATEWAY = 502;
 
     /**
      * The server is currently unable to handle the request due to a temporary overloading or
@@ -583,7 +585,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_SERVICE_UNAVAILABLE = 503;
+    const SERVICE_UNAVAILABLE = 503;
 
     /**
      * The server, while acting as a gateway or proxy, did not receive a timely response from the
@@ -592,7 +594,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_GATEWAY_TIMEOUT = 504;
+    const GATEWAY_TIMEOUT = 504;
 
     /**
      * The server does not support, or refuses to support, the HTTP protocol version that was
@@ -604,7 +606,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_HTTP_VERSION_NOT_SUPPORTED = 505;
+    const HTTP_VERSION_NOT_SUPPORTED = 505;
 
     /**
      * The 506 status code indicates that the server has an internal configuration error: the
@@ -615,14 +617,14 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_VARIANT_ALSO_NEGOTIATES = 506;
+    const VARIANT_ALSO_NEGOTIATES = 506;
 
     /**
      * This status code, while used by many servers, is not specified in any RFCs.
      * 
      * @var int
      */
-    const CODE_BANDWIDTH_LIMIT_EXCEEDED = 509;
+    const BANDWIDTH_LIMIT_EXCEEDED = 509;
 
     /**
      * The policy for accessing the resource has not been met in the request. The server should
@@ -633,7 +635,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NOT_EXTENDED = 510;
+    const NOT_EXTENDED = 510;
 
     /**
      * The 511 status code indicates that the client needs to authenticate to gain network access. The
@@ -646,7 +648,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CODE_NETWORK_AUTHENTICATION_REQUIRED = 511;
+    const NETWORK_AUTHENTICATION_REQUIRED = 511;
 
     /**
      * Perform a permanent redirect to the new location (a GET request will be used to aquire)
@@ -676,7 +678,7 @@ abstract class Http
     /**
      * Array of response codes and their status messages.
      * 
-     * @var array<int, string>
+     * @var array
      */
     protected static $reason = [
         self::CODE_CONTINUE => 'Continue',
@@ -736,7 +738,7 @@ abstract class Http
      */
     public static function isProtocol(string $protocol): bool
     {
-        switch (strtoupper($protocol)) {
+        switch (\strtoupper($protocol)) {
             case 'HTTP/1.0':
             case 'HTTP/1.1':
                 return true;
@@ -753,7 +755,7 @@ abstract class Http
      */
     public static function isSuccess(int $code): bool
     {
-        switch (floor(intval($code) / 100)) {
+        switch ((int) \floor($code / 100)) {
             case 1:
             case 2:
                 return true;
@@ -770,7 +772,7 @@ abstract class Http
      */
     public static function isRedirect(int $code): bool
     {
-        return (floor(intval($code) / 100) == 3);
+        return ((int) \floor($code / 100)) == 3;
     }
 
     /**
@@ -781,7 +783,7 @@ abstract class Http
      */
     public static function isError(int $code): bool
     {
-        switch (floor(intval($code) / 100)) {
+        switch ((int) \floor($code / 100)) {
             case 4:
             case 5:
                 return true;
@@ -799,7 +801,7 @@ abstract class Http
      */
     public static function getStatusLine(int $code, string $protocol = 'HTTP/1.1'): string
     {
-        return $protocol . ' ' . $code . rtrim(' ' . static::getReason($code, ''));
+        return $protocol . ' ' . $code . \rtrim(' ' . static::getReason($code, ''));
     }
 
     /**
@@ -829,8 +831,8 @@ abstract class Http
      */
     public static function normalizeHeaderName(string $name): string
     {
-        return preg_replace_callback("'-[a-z]'", function ($m) {
-            return strtoupper($m[0]);
-        }, ucfirst(strtolower(trim($name))));
+        return \preg_replace_callback("'-[a-z]'", function ($m) {
+            return \strtoupper($m[0]);
+        }, \ucfirst(\strtolower(\trim($name))));
     }
 }

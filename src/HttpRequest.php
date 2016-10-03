@@ -9,6 +9,8 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
 /**
@@ -24,36 +26,36 @@ class HttpRequest extends HttpMessage
 
     protected $uri;
 
-    public function __construct($uri, string $method = NULL, array $headers = [], string $protocolVersion = '1.1')
+    public function __construct($uri, string $method = Http::GET, array $headers = [], string $protocolVersion = '1.1')
     {
         parent::__construct($headers, $protocolVersion);
         
         $this->method = $this->filterMethod(($method === NULL) ? 'GET' : $method);
         $this->uri = Uri::parse($uri);
     }
-    
+
     public function __debugInfo(): array
     {
         $headers = [];
         foreach ($this->getHeaders() as $k => $header) {
             foreach ($header as $v) {
-                $headers[] = sprintf('%s: %s', $k, $v);
+                $headers[] = \sprintf('%s: %s', $k, $v);
             }
         }
         
-        sort($headers, SORT_NATURAL);
+        \sort($headers, SORT_NATURAL);
         
         return [
-            'protocol' => sprintf('HTTP/%s', $this->protocolVersion),
+            'protocol' => \sprintf('HTTP/%s', $this->protocolVersion),
             'method' => $this->method,
             'uri' => (string) $this->uri,
             'target' => $this->getRequestTarget(),
             'headers' => $headers,
             'body' => $this->body,
-            'attributes' => array_keys($this->attributes)
+            'attributes' => \array_keys($this->attributes)
         ];
     }
-    
+
     public function getRequestTarget(): string
     {
         if (NULL !== $this->target) {
@@ -72,9 +74,9 @@ class HttpRequest extends HttpMessage
 
     public function withRequestTarget(string $requestTarget): HttpRequest
     {
-        $requestTarget = trim($requestTarget);
+        $requestTarget = \trim($requestTarget);
         
-        if (preg_match("'\s'", $requestTarget)) {
+        if (\preg_match("'\s'", $requestTarget)) {
             throw new \InvalidArgumentException('Request target must not contain whitespace');
         }
         
@@ -126,7 +128,7 @@ class HttpRequest extends HttpMessage
 
     public function getHeader(string $name): array
     {
-        $n = strtolower($name);
+        $n = \strtolower($name);
         
         if ($n === 'host' && empty($this->headers[$n]) && $this->uri !== NULL) {
             $host = $this->uri->getHost();
@@ -151,7 +153,7 @@ class HttpRequest extends HttpMessage
         
         return $headers;
     }
-    
+
     public function hasQueryParam(string $name): bool
     {
         return $this->uri->hasQueryParam($name);
@@ -159,8 +161,8 @@ class HttpRequest extends HttpMessage
 
     public function getQueryParam(string $name)
     {
-        if (func_num_args() > 1) {
-            return $this->uri->getQueryParams(...func_get_args());
+        if (\func_num_args() > 1) {
+            return $this->uri->getQueryParams($name, \func_get_arg(1));
         }
         
         return $this->uri->getQueryParam($name);
@@ -170,11 +172,11 @@ class HttpRequest extends HttpMessage
     {
         return $this->uri->getQueryParams();
     }
-    
+
     protected function filterMethod(string $method): string
     {
-        if (!preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
-            throw new \InvalidArgumentException(sprintf('Invalid HTTP method'));
+        if (!\preg_match('/^[!#$%&\'*+.^_`\|~0-9a-z-]+$/i', $method)) {
+            throw new \InvalidArgumentException(\sprintf('Invalid HTTP method'));
         }
         
         return $method;

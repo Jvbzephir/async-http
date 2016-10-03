@@ -9,20 +9,22 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\Stream;
+use Interop\Async\Awaitable;
+use KoolKode\Async\Coroutine;
+use KoolKode\Async\Loop\LoopConfig;
+use KoolKode\Async\ReadContents;
 use KoolKode\Util\Filesystem;
-
-use function KoolKode\Async\currentExecutor;
-use function KoolKode\Async\fileOpenRead;
 
 /**
  * HTTP body that can stream contents of a file.
  * 
  * @author Martin Schröder
  */
-class FileBody implements HttpBodyInterface
+class FileBody implements HttpBody
 {
     /**
      * Path the file being transfered.
@@ -40,7 +42,7 @@ class FileBody implements HttpBodyInterface
     {
         $this->file = $file;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -48,7 +50,7 @@ class FileBody implements HttpBodyInterface
     {
         return true;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -70,28 +72,30 @@ class FileBody implements HttpBodyInterface
     {
         return $this->file;
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getSize(): \Generator
+    public function getSize(): Awaitable
     {
-        return yield from (yield currentExecutor())->getFilesystem()->size($this->file);
+        return LoopConfig::currentFilesystem()->size($this->file);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getInputStream(): \Generator
+    public function getReadableStream(): Awaitable
     {
-        return yield fileOpenRead($this->file);
+        return LoopConfig::currentFilesystem()->readStream($this->file);
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getContents(): \Generator
+    public function getContents(): Awaitable
     {
-        return yield from Stream::readContents(yield from $this->getInputStream());
+        return new Coroutine(function () {
+            return yield new ReadContents(yield $this->getReadableStream());
+        });
     }
 }

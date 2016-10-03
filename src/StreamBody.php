@@ -9,20 +9,21 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\CachedInputStream;
-use KoolKode\Async\Stream\InputStreamInterface;
-use KoolKode\Async\Stream\Stream;
-
-use function KoolKode\Async\noop;
+use Interop\Async\Awaitable;
+use KoolKode\Async\ReadContents;
+use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Success;
 
 /**
  * HTTP message body based on an input stream.
  * 
  * @author Martin Schröder
  */
-class StreamBody implements HttpBodyInterface
+class StreamBody implements HttpBody
 {
     /**
      * Body data stream.
@@ -30,25 +31,25 @@ class StreamBody implements HttpBodyInterface
      * @var InputStreamInterface
      */
     protected $stream;
-    
+
     /**
      * Create message body backed by the given stream.
      * 
-     * @param InputStreamInterface $stream
+     * @param ReadableStream $stream
      */
-    public function __construct(InputStreamInterface $stream)
+    public function __construct(ReadableStream $stream)
     {
         $this->stream = $stream;
     }
-    
+
     /**
      * {@inheritdoc}
      */
     public function isCached(): bool
     {
-        return $this->stream instanceof CachedInputStream;
+        return false;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -56,40 +57,28 @@ class StreamBody implements HttpBodyInterface
     {
         return $message;
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getSize(): \Generator
+    public function getSize(): Awaitable
     {
-        yield noop();
-        
-        return;
+        return new Success(NULL);
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getInputStream(): \Generator
+    public function getReadableStream(): Awaitable
     {
-        yield noop();
-        
-        if ($this->stream instanceof CachedInputStream && $this->stream->eof()) {
-            $this->stream->rewind();
-        }
-        
-        return $this->stream;
+        return new Success($this->stream);
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getContents(): \Generator
+    public function getContents(): Awaitable
     {
-        if ($this->stream instanceof CachedInputStream && $this->stream->eof()) {
-            $this->stream->rewind();
-        }
-        
-        return yield from Stream::readContents($this->stream);
+        return new ReadContents($this->stream);
     }
 }

@@ -9,16 +9,19 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\InputStreamInterface;
+use Interop\Async\Awaitable;
+use KoolKode\Async\Stream\ReadableStream;
 
 /**
  * Contract for an HTTP message body.
  * 
  * @author Martin Schröder
  */
-interface HttpBodyInterface
+interface HttpBody
 {
     /**
      * Check if the contents / input stream can be accessed multiple times (replayed).
@@ -45,14 +48,14 @@ interface HttpBodyInterface
      * 
      * @return int Body size in bytes or NULL when size is unknown.
      */
-    public function getSize(): \Generator;
+    public function getSize(): Awaitable;
     
     /**
      * Provides an input stream that can be used to read HTTP body contents.
      * 
-     * @return InputStreamInterface
+     * @return ReadableStream
      */
-    public function getInputStream(): \Generator;
+    public function getReadableStream(): Awaitable;
     
     /**
      * Assemble HTTP body contents into a string.
@@ -61,5 +64,5 @@ interface HttpBodyInterface
      * 
      * @return string
      */
-    public function getContents(): \Generator;
+    public function getContents(): Awaitable;
 }

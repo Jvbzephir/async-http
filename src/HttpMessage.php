@@ -9,6 +9,8 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
 /**
@@ -21,9 +23,9 @@ abstract class HttpMessage
     protected $protocolVersion;
 
     protected $headers;
-    
+
     protected $body;
-    
+
     protected $attributes = [];
 
     public function __construct(array $headers = [], string $protocolVersion = '1.1')
@@ -34,14 +36,14 @@ abstract class HttpMessage
         
         foreach ($headers as $k => $v) {
             if (\is_object($v)) {
-                if (!method_exists($v, '__toString')) {
+                if (!\method_exists($v, '__toString')) {
                     continue;
                 }
                 
                 $v = (string) $v;
             }
             
-            $filtered = $this->filterHeaders(array_map(function ($v) use ($k) {
+            $filtered = $this->filterHeaders(\array_map(function ($v) use ($k) {
                 return [
                     $k,
                     $v
@@ -49,11 +51,11 @@ abstract class HttpMessage
             }, (array) $v));
             
             if (!empty($filtered)) {
-                $this->headers[strtolower($k)] = $filtered;
+                $this->headers[\strtolower($k)] = $filtered;
             }
         }
     }
-        
+
     public function getProtocolVersion(): string
     {
         return $this->protocolVersion;
@@ -72,7 +74,7 @@ abstract class HttpMessage
         $headers = [];
         
         foreach ($this->headers as $data) {
-            $headers[Http::normalizeHeaderName($data[0][0])] = array_map(function (array $header) {
+            $headers[Http::normalizeHeaderName($data[0][0])] = \array_map(function (array $header) {
                 return $header[1];
             }, $data);
         }
@@ -82,30 +84,30 @@ abstract class HttpMessage
 
     public function hasHeader(string $name): bool
     {
-        return !empty($this->headers[strtolower($name)]);
+        return !empty($this->headers[\strtolower($name)]);
     }
 
     public function getHeader(string $name): array
     {
-        $n = strtolower($name);
+        $n = \strtolower($name);
         
         if (empty($this->headers[$n])) {
             return [];
         }
         
-        return array_map(function (array $header) {
+        return \array_map(function (array $header) {
             return $header[1];
         }, $this->headers[$n]);
     }
 
     public function getHeaderLine(string $name): string
     {
-        return implode(',', $this->getHeader($name));
+        return \implode(',', $this->getHeader($name));
     }
 
     public function withHeader(string $name, $value): HttpMessage
     {
-        if (\is_string($value) || method_exists($value, '__toString')) {
+        if (\is_string($value) || \method_exists($value, '__toString')) {
             $value = [
                 (string) $value
             ];
@@ -115,7 +117,7 @@ abstract class HttpMessage
             throw new \InvalidArgumentException('Invalid HTTP header value');
         }
         
-        $filtered = $this->filterHeaders(array_map(function ($val) use ($name) {
+        $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
                 (string) $val
@@ -127,14 +129,14 @@ abstract class HttpMessage
         }
         
         $message = clone $this;
-        $message->headers[strtolower($name)] = $filtered;
+        $message->headers[\strtolower($name)] = $filtered;
         
         return $message;
     }
 
     public function withAddedHeader(string $name, $value): HttpMessage
     {
-        if (\is_string($value) || method_exists($value, '__toString')) {
+        if (\is_string($value) || \method_exists($value, '__toString')) {
             $value = [
                 (string) $value
             ];
@@ -144,7 +146,7 @@ abstract class HttpMessage
             throw new \InvalidArgumentException('Invalid HTTP header value');
         }
         
-        $filtered = $this->filterHeaders(array_map(function ($val) use ($name) {
+        $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
                 (string) $val
@@ -155,10 +157,10 @@ abstract class HttpMessage
             return $this;
         }
         
-        $n = strtolower($name);
+        $n = \strtolower($name);
         
         $message = clone $this;
-        $message->headers[$n] = array_merge(empty($this->headers[$n]) ? [] : $this->headers[$n], $filtered);
+        $message->headers[$n] = \array_merge(empty($this->headers[$n]) ? [] : $this->headers[$n], $filtered);
         
         return $message;
     }
@@ -166,29 +168,29 @@ abstract class HttpMessage
     public function withoutHeader(string $name): HttpMessage
     {
         $message = clone $this;
-        unset($message->headers[strtolower($name)]);
+        unset($message->headers[\strtolower($name)]);
         
         return $message;
     }
-    
-    public function getBody(): HttpBodyInterface
+
+    public function getBody(): HttpBody
     {
         return $this->body;
     }
-    
-    public function withBody(HttpBodyInterface $body): HttpMessage
+
+    public function withBody(HttpBody $body): HttpMessage
     {
         $message = clone $this;
         $message->body = $body;
         
         return $message;
     }
-    
+
     public function getAttribute(string $name, $default = NULL)
     {
-        return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
+        return \array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
     }
-    
+
     public function withAttribute(string $name, $value): HttpMessage
     {
         $message = clone $this;
@@ -217,11 +219,11 @@ abstract class HttpMessage
         
         return $message;
     }
-    
+
     protected function assertArrayOfStrings(array $strings): bool
     {
         foreach ($strings as $string) {
-            if (!\is_string($string) && !method_exists($string, '__toString')) {
+            if (!\is_string($string) && !\method_exists($string, '__toString')) {
                 return false;
             }
         }
@@ -238,11 +240,11 @@ abstract class HttpMessage
                 continue;
             }
             
-            if (false !== strpos($h[0], "\n") || false !== strpos($h[0], "\r") || false !== strpos($h[1], "\n") || false !== strpos($h[1], "\r")) {
+            if (false !== \strpos($h[0], "\n") || false !== \strpos($h[0], "\r") || false !== \strpos($h[1], "\n") || false !== \strpos($h[1], "\r")) {
                 throw new \InvalidArgumentException('Header injection vector detected');
             }
             
-            if (!preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/', $h[0])) {
+            if (!\preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/', $h[0])) {
                 continue;
             }
             

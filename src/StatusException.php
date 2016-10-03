@@ -9,6 +9,8 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
 /**
@@ -26,6 +28,6 @@ class StatusException extends \RuntimeException
      */
     public function __construct(int $status, \Throwable $cause = NULL)
     {
-        parent::__construct(Http::getReason($status, sprintf('HTTP status %s', $status)), $status, $cause);
+        parent::__construct(Http::getReason($status, \sprintf('HTTP status %s', $status)), $status, $cause);
     }
 }

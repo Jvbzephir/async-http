@@ -9,18 +9,20 @@
  * file that was distributed with this source code.
  */
 
+declare(strict_types = 1);
+
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\StringInputStream;
-
-use function KoolKode\Async\noop;
+use Interop\Async\Awaitable;
+use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Success;
 
 /**
  * HTTP message body wrapping a string.
  * 
  * @author Martin Schröder
  */
-class StringBody implements HttpBodyInterface
+class StringBody implements HttpBody
 {
     /**
      * Message body.
@@ -28,7 +30,7 @@ class StringBody implements HttpBodyInterface
      * @var string
      */
     protected $contents;
-  
+
     /**
      * Create a message body around the given contents.
      * 
@@ -38,7 +40,7 @@ class StringBody implements HttpBodyInterface
     {
         $this->contents = $contents;
     }
-    
+
     /**
      * Dump the message body.
      * 
@@ -48,7 +50,7 @@ class StringBody implements HttpBodyInterface
     {
         return $this->contents;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -56,7 +58,7 @@ class StringBody implements HttpBodyInterface
     {
         return true;
     }
-    
+
     /**
      * {@inheritdoc}
      */
@@ -64,34 +66,28 @@ class StringBody implements HttpBodyInterface
     {
         return $message;
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getSize(): \Generator
+    public function getSize(): Awaitable
     {
-        yield noop();
-        
-        return \strlen($this->contents);
+        return new Success(\strlen($this->contents));
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getInputStream(): \Generator
+    public function getReadableStream(): Awaitable
     {
-        yield noop();
-        
-        return new StringInputStream($this->contents);
+        return new Success(new ReadableMemoryStream($this->contents));
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function getContents(): \Generator
+    public function getContents(): Awaitable
     {
-        yield noop();
-        
-        return $this->contents;
+        return new Success($this->contents);
     }
 }
