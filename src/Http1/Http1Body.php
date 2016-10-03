@@ -20,11 +20,12 @@ use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\ReadContents;
-use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableInflateStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\WritableStream;
 use KoolKode\Async\Success;
 
 /**
@@ -41,25 +42,18 @@ class Http1Body implements HttpBody
     const COMPRESSION_DEFLATE = 'deflate';
 
     /**
-     * HTTP protocol version (needed by expect-continue).
-     * 
-     * @var string
-     */
-    protected $protocolVersion;
-
-    /**
      * Wrapped input stream that is being used to receive data from the remote peer.
      * 
-     * @var DuplexStream
+     * @var ReadableStream
      */
-    protected $socket;
+    protected $stream;
 
     /**
      * Input stream that is being used to read decoded data.
      * 
      * @var ReadableStream
      */
-    protected $stream;
+    protected $decodedStream;
 
     /**
      * Is incoming data chunk-encoded?
@@ -89,9 +83,11 @@ class Http1Body implements HttpBody
     /**
      * Indicates that the remote peer expects a 100 Continue response before data will be sent.
      * 
-     * @var bool
+     * The 100 continue line will be sent to the given stream as needed.
+     * 
+     * @var WritableStream
      */
-    protected $expectContinue = false;
+    protected $expectContinue;
 
     /**
      * Cascade the close operation of the input stream to the socket being used to communicate with the remote peer.
@@ -103,13 +99,11 @@ class Http1Body implements HttpBody
     /**
      * Create a body that can decode contents received by the given socket.
      * 
-     * @param DuplexStream $socket
-     * @param string $protocolVersion
+     * @param ReadableStream $stream
      */
-    public function __construct(DuplexStream $socket, string $protocolVersion)
+    public function __construct(ReadableStream $stream)
     {
-        $this->protocolVersion = $protocolVersion;
-        $this->socket = $socket;
+        $this->stream = $stream;
     }
 
     /**
@@ -118,7 +112,7 @@ class Http1Body implements HttpBody
     public function __destruct()
     {
         if ($this->cascadeClose) {
-            $this->socket->close();
+            $this->stream->close();
         }
     }
 
@@ -127,13 +121,13 @@ class Http1Body implements HttpBody
      * 
      * Exceptions thrown by this method use codes that can be sent as HTTP response status codes.
      * 
-     * @param DuplexStream $socket
+     * @param ReadableStream $stream
      * @param HttpMessage $message
      * @return Http1Body
      */
-    public static function fromHeaders(DuplexStream $socket, HttpMessage $message): Http1Body
+    public static function fromHeaders(ReadableStream $stream, HttpMessage $message): Http1Body
     {
-        $body = new static($socket, $message->getProtocolVersion());
+        $body = new static($stream);
         
         if ($message->hasHeader('Transfer-Encoding')) {
             $encodings = \strtolower($message->getHeaderLine('Transfer-Encoding'));
@@ -142,31 +136,31 @@ class Http1Body implements HttpBody
             if (\in_array('chunked', $encodings)) {
                 $body->setChunkEncoded(true);
             } elseif (!empty($encodings)) {
-                throw new \RuntimeException('Unsupported transfer encoding detected', Http::NOT_IMPLEMENTED);
+                throw new StatusException('Unsupported transfer encoding detected', Http::NOT_IMPLEMENTED);
             }
         } elseif ($message->hasHeader('Content-Length')) {
             $len = $message->getHeaderLine('Content-Length');
             
             if (!\preg_match("'^[0-9]+$'", $len)) {
-                throw new \RuntimeException(\sprintf('Invalid content length value specified: "%s"', $len), Http::BAD_REQUEST);
+                throw new StatusException(\sprintf('Invalid content length value specified: "%s"', $len), Http::BAD_REQUEST);
             }
             
             $body->setLength((int) $len);
         }
         
         if ($message instanceof HttpRequest) {
-            if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
-                $expected = \array_map('strtolower', \array_map('trim', $message->getHeaderLine('Expect')));
+//             if ($message->hasHeader('Expect') && $message->getProtocolVersion() == '1.1') {
+//                 $expected = \array_map('strtolower', \array_map('trim', $message->getHeaderLine('Expect')));
                 
-                if (\in_array('100-continue', $expected)) {
-                    $body->setExpectContinue(true);
-                }
-            }
+//                 if (\in_array('100-continue', $expected)) {
+//                     $body->setExpectContinue(true);
+//                 }
+//             }
         }
         
         if ($message->hasHeader('Content-Encoding')) {
             if (!$message instanceof HttpResponse) {
-                throw new \RuntimeException('Compressed request bodies are not supported', Http::BAD_REQUEST);
+                throw new StatusException('Compressed request bodies are not supported', Http::BAD_REQUEST);
             }
             
             $body->setCompression($message->getHeaderLine('Content-Encoding'));
@@ -188,14 +182,10 @@ class Http1Body implements HttpBody
             $compression = \function_exists('inflate_init');
         }
         
-        if (!$compression) {
-            return [];
-        }
-        
-        return [
+        return $compression ? [
             self::COMPRESSION_GZIP,
             self::COMPRESSION_DEFLATE
-        ];
+        ] : [];
     }
 
     /**
@@ -255,11 +245,11 @@ class Http1Body implements HttpBody
     /**
      * Send 100 Continue response line before reading data from remote peer?
      * 
-     * @param bool $expectContinue
+     * @param WritableStream $stream
      */
-    public function setExpectContinue(bool $expectContinue)
+    public function setExpectContinue(WritableStream $stream)
     {
-        $this->expectContinue = $expectContinue;
+        $this->expectContinue = $stream;
     }
 
     /**
@@ -292,11 +282,11 @@ class Http1Body implements HttpBody
     public function getReadableStream(): Awaitable
     {
         return new Coroutine(function () {
-            if ($this->stream === NULL) {
-                $this->stream = yield from $this->createInputStream();
+            if ($this->decodedStream === NULL) {
+                $this->decodedStream = yield from $this->createInputStream();
             }
             
-            return $this->stream;
+            return $this->decodedStream;
         });
     }
 
@@ -306,11 +296,11 @@ class Http1Body implements HttpBody
     public function getContents(): Awaitable
     {
         return new Coroutine(function () {
-            if ($this->stream === NULL) {
-                $this->stream = yield from $this->createInputStream();
+            if ($this->decodedStream === NULL) {
+                $this->decodedStream = yield from $this->createInputStream();
             }
             
-            return yield new ReadContents($this->stream);
+            return yield new ReadContents($this->decodedStream);
         });
     }
 
@@ -322,16 +312,16 @@ class Http1Body implements HttpBody
     protected function createInputStream(): \Generator
     {
         if ($this->expectContinue) {
-            yield $this->socket->write(\sprintf("HTTP/%s 100 Continue\r\n", $this->protocolVersion));
+            yield $this->expectContinue->write("HTTP/1.1 100 Continue\r\n");
         }
         
         if ($this->chunked) {
-            $stream = new ChunkDecodedStream($this->socket, $this->cascadeClose);
+            $stream = new ChunkDecodedStream($this->stream, $this->cascadeClose);
         } elseif ($this->length > 0) {
-            $stream = new LimitStream($this->socket, $this->length, $this->cascadeClose);
+            $stream = new LimitStream($this->stream, $this->length, $this->cascadeClose);
         } else {
             if ($this->cascadeClose) {
-                $this->socket->close();
+                $this->stream->close();
             }
             
             return new ReadableMemoryStream();

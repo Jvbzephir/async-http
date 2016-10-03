@@ -78,7 +78,7 @@ class HttpResponse extends HttpMessage
             $status = (string) $status;
         }
         
-        if (!\preg_match("'^[1-5][0-9]{2}$'", $status)) {
+        if (!\preg_match("'^[1-5][0-9]{2}$'", (string) $status)) {
             throw new \InvalidArgumentException(\sprintf('Invalid HTTP status code: %s', \is_object($status) ? \get_class($status) : \gettype($status)));
         }
         
