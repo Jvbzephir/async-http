@@ -13,10 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use Interop\Async\Awaitable;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
-use KoolKode\Async\Success;
 
 /**
  * Input stream with pre-defined maximum number of bytes that can be read.

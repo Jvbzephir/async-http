@@ -18,7 +18,6 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
-use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\ReadContents;
