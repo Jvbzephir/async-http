@@ -21,7 +21,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $message = new HttpResponse(Http::OK, [], '1.0');
         $this->assertEquals('1.0', $message->getProtocolVersion());
         
-        $message = $message->withProtocolVersion('1.1');
+        $this->assertNotSame($message, $message = $message->withProtocolVersion('1.1'));
         $this->assertEquals('1.1', $message->getProtocolVersion());
     }
 
@@ -46,18 +46,18 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $message = new HttpResponse();
         $this->assertFalse($message->hasHeader('Foo'));
         
-        $message = $message->withHeader('Foo', 'bar');
+        $this->assertNotSame($message, $message = $message->withHeader('Foo', 'bar'));
         $this->assertTrue($message->hasHeader('Foo'));
         $this->assertEquals('bar', $message->getHeaderLine('Foo'));
         
-        $message = $message->withAddedHeader('Foo', 'baz');
+        $this->assertNotSame($message, $message = $message->withAddedHeader('Foo', 'baz'));
         $this->assertTrue($message->hasHeader('Foo'));
         $this->assertEquals([
             'bar',
             'baz'
         ], $message->getHeader('Foo'));
         
-        $message = $message->withoutHeader('Foo');
+        $this->assertNotSame($message, $message = $message->withoutHeader('Foo'));
         $this->assertFalse($message->hasHeader('Foo'));
         $this->assertEquals('', $message->getHeaderLine('Foo'));
         $this->assertEquals([], $message->getHeader('Foo'));
@@ -77,7 +77,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
     public function testDetetcsHeaderInjectionVectors(string $name, string $value)
     {
         $message = new HttpResponse();
-       
+        
         $this->expectException(\InvalidArgumentException::class);
         
         $message->withHeader($name, $value);
@@ -91,7 +91,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $this->assertInstanceOf(StringBody::class, $message->getBody());
         $this->assertNotSame($body, $message->getBody());
         
-        $message = $message->withBody($body);
+        $this->assertNotSame($message, $message = $message->withBody($body));
         $this->assertSame($body, $message->getBody());
     }
 
@@ -101,16 +101,16 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $this->assertNull($message->getAttribute('foo'));
         $this->assertEquals([], $message->getAttributes());
         
-        $message = $message->withAttribute('foo', 'bar');
+        $this->assertNotSame($message, $message = $message->withAttribute('foo', 'bar'));
         $this->assertEquals('bar', $message->getAttribute('foo'));
         $this->assertEquals('#', $message->getAttribute('bar', '#'));
         
-        $message = $message->withAttributes([
+        $this->assertNotSame($message, $message = $message->withAttributes([
             'bar' => '#'
-        ]);
+        ]));
         $this->assertEquals('#', $message->getAttribute('bar'));
         
-        $message = $message->withoutAttribute('foo');
+        $this->assertNotSame($message, $message = $message->withoutAttribute('foo'));
         $this->assertNull($message->getAttribute('foo'));
         $this->assertEquals('#', $message->getAttribute('bar'));
     }

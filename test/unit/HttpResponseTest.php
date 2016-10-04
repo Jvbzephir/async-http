@@ -14,7 +14,7 @@ namespace KoolKode\Async\Http;
 /**
  * @covers \KoolKode\Async\Http\HttpResponse
  */
-class HttpMessageTest extends \PHPUnit_Framework_TestCase
+class HttpResponseTest extends \PHPUnit_Framework_TestCase
 {
     public function testDebugInfo()
     {
