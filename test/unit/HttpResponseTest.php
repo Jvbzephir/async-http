@@ -74,9 +74,11 @@ class HttpResponseTest extends \PHPUnit_Framework_TestCase
      */
     public function testDetectsInvalidStatusCodeInMutator(int $status)
     {
+        $response = new HttpResponse();
+        
         $this->expectException(\InvalidArgumentException::class);
         
-        (new HttpResponse())->withStatus($status);
+        $response->withStatus($status);
     }
     
     public function testCanChangeStatusAndReason()

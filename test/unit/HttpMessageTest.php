@@ -74,6 +74,18 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider provideHeaderInjectionVectors
      */
+    public function testDetetcsHeaderInjectionVectorsInConstructor(string $name, string $value)
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        
+        new HttpResponse(Http::OK, [
+            $name => $value
+        ]);
+    }
+    
+    /**
+     * @dataProvider provideHeaderInjectionVectors
+     */
     public function testDetetcsHeaderInjectionVectors(string $name, string $value)
     {
         $message = new HttpResponse();

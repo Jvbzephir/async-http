@@ -62,12 +62,7 @@ class HttpRequest extends HttpMessage
             return $this->target;
         }
         
-        if ($this->uri === NULL) {
-            return '/';
-        }
-        
-        $target = $this->uri->getPath();
-        $target .= $this->uri->getQuery() ? '?' . $this->uri->getQuery() : '';
+        $target = $this->uri->getPath() . ($this->uri->getQuery() ? ('?' . $this->uri->getQuery()) : '');
         
         return empty($target) ? '/' : $target;
     }
@@ -104,8 +99,10 @@ class HttpRequest extends HttpMessage
         return $this->uri;
     }
 
-    public function withUri(Uri $uri, bool $preserveHost = false): HttpRequest
+    public function withUri($uri): HttpRequest
     {
+        $uri = Uri::parse($uri);
+        
         $request = clone $this;
         $request->uri = $uri;
         
@@ -113,17 +110,21 @@ class HttpRequest extends HttpMessage
         
         if ($host != '') {
             $host .= $uri->getPort() ? ':' . $uri->getPort() : '';
-            
-            if ($preserveHost) {
-                if (empty($request->getHeader('Host'))) {
-                    $request = $request->withHeader('Host', $host);
-                }
-            } else {
-                $request = $request->withHeader('Host', $host);
-            }
+            $request = $request->withHeader('Host', $host);
         }
         
         return $request;
+    }
+    
+    public function hasHeader(string $name): bool
+    {
+        $name = \strtolower($name);
+        
+        if ($name === 'host') {
+            return $this->getHeader('Host') ? true : false;
+        }
+        
+        return isset($this->headers[$name]);
     }
 
     public function getHeader(string $name): array
@@ -148,7 +149,7 @@ class HttpRequest extends HttpMessage
         $headers = parent::getHeaders();
         
         if (empty($this->headers['host']) && $this->uri !== NULL && !empty($this->uri->getHost())) {
-            $headers['Host'] = $this->getHeader('Host');
+            $headers['host'] = $this->getHeader('Host');
         }
         
         return $headers;
@@ -162,7 +163,7 @@ class HttpRequest extends HttpMessage
     public function getQueryParam(string $name)
     {
         if (\func_num_args() > 1) {
-            return $this->uri->getQueryParams($name, \func_get_arg(1));
+            return $this->uri->getQueryParam($name, \func_get_arg(1));
         }
         
         return $this->uri->getQueryParam($name);
@@ -178,7 +179,7 @@ class HttpRequest extends HttpMessage
         if ($this->hasHeader('Expect') && $this->protocolVersion === '1.1') {
             $expected = \array_map('strtolower', \array_map('trim', $this->getHeader('Expect')));
             
-            if (\in_array('100-continue', $expected)) {
+            if (\in_array('100-continue', $expected, true)) {
                 return true;
             }
         }
