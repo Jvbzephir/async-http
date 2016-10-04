@@ -21,8 +21,7 @@ class StringBodyTest extends AsyncTestCase
 {
     public function testCanAccessBodyContents()
     {
-        $contents = 'Hello World';
-        $body = new StringBody($contents);
+        $body = new StringBody($contents = 'Hello World');
         
         $this->assertEquals($contents, (string) $body);
         $this->assertEquals($contents, yield $body->getContents());
@@ -31,8 +30,7 @@ class StringBodyTest extends AsyncTestCase
     
     public function testCanAccessMetaData()
     {
-        $contents = 'Hello World';
-        $body = new StringBody($contents);
+        $body = new StringBody($contents = 'Hello World');
         $message = new HttpResponse();
         
         $this->assertTrue($body->isCached());
