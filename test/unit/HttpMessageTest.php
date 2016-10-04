@@ -62,6 +62,26 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('', $message->getHeaderLine('Foo'));
         $this->assertEquals([], $message->getHeader('Foo'));
     }
+    
+    public function provideHeaderInjectionVectors()
+    {
+        yield ["Foo\nbar", "..."];
+        yield ["Foo\rbar", "..."];
+        yield ["Test", "Foo\nbar"];
+        yield ["Test", "Foo\rbar"];
+    }
+    
+    /**
+     * @dataProvider provideHeaderInjectionVectors
+     */
+    public function testDetetcsHeaderInjectionVectors(string $name, string $value)
+    {
+        $message = new HttpResponse();
+       
+        $this->expectException(\InvalidArgumentException::class);
+        
+        $message->withHeader($name, $value);
+    }
 
     public function testCanUseBody()
     {

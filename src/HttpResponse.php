@@ -22,14 +22,13 @@ class HttpResponse extends HttpMessage
 {
     protected $status;
 
-    protected $reason;
+    protected $reason = '';
 
     public function __construct(int $status = Http::OK, array $headers = [], string $protocolVersion = '1.1')
     {
         parent::__construct($headers, $protocolVersion);
         
         $this->status = $this->filterStatus($status);
-        $this->reason = '';
     }
 
     public function __debugInfo(): array

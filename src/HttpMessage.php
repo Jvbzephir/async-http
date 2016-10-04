@@ -113,7 +113,7 @@ abstract class HttpMessage
             $message->headers[\strtolower($name)] = $filtered;
         }
         
-        return $message ?? $this;
+        return $message ?? clone $this;
     }
 
     public function withAddedHeader(string $name, string ...$values): HttpMessage
@@ -132,7 +132,7 @@ abstract class HttpMessage
             $message->headers[$n] = \array_merge(empty($this->headers[$n]) ? [] : $this->headers[$n], $filtered);
         }
         
-        return $message ?? $this;
+        return $message ?? clone $this;
     }
 
     public function withoutHeader(string $name): HttpMessage
@@ -203,11 +203,9 @@ abstract class HttpMessage
                 throw new \InvalidArgumentException('Header injection vector in header value detected');
             }
             
-            if (!\preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/', $h[0])) {
-                continue;
+            if (\preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/', $h[0])) {
+                $filtered[] = $h;
             }
-            
-            $filtered[] = $h;
         }
         
         return $filtered;
