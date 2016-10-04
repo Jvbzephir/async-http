@@ -30,7 +30,7 @@ class HttpRequest extends HttpMessage
     {
         parent::__construct($headers, $protocolVersion);
         
-        $this->method = $this->filterMethod(($method === NULL) ? 'GET' : $method);
+        $this->method = $this->filterMethod($method);
         $this->uri = Uri::parse($uri);
     }
 
@@ -39,7 +39,7 @@ class HttpRequest extends HttpMessage
         $headers = [];
         foreach ($this->getHeaders() as $k => $header) {
             foreach ($header as $v) {
-                $headers[] = \sprintf('%s: %s', $k, $v);
+                $headers[] = \sprintf('%s: %s', Http::normalizeHeaderName($k), $v);
             }
         }
         
@@ -88,7 +88,7 @@ class HttpRequest extends HttpMessage
 
     public function getMethod(): string
     {
-        return $this->method ?: 'GET';
+        return $this->method;
     }
 
     public function withMethod(string $method): HttpRequest
@@ -176,7 +176,7 @@ class HttpRequest extends HttpMessage
     public function isContinueExpected(): bool
     {
         if ($this->hasHeader('Expect') && $this->protocolVersion === '1.1') {
-            $expected = \array_map('strtolower', \array_map('trim', $this->getHeaderLine('Expect')));
+            $expected = \array_map('strtolower', \array_map('trim', $this->getHeader('Expect')));
             
             if (\in_array('100-continue', $expected)) {
                 return true;

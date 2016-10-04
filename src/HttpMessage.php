@@ -35,20 +35,14 @@ abstract class HttpMessage
         $this->headers = [];
         
         foreach ($headers as $k => $v) {
-            if (\is_object($v)) {
-                if (!\method_exists($v, '__toString')) {
-                    continue;
-                }
-                
-                $v = (string) $v;
-            }
-            
             $filtered = $this->filterHeaders(\array_map(function ($v) use ($k) {
                 return [
                     $k,
                     $v
                 ];
-            }, (array) $v));
+            }, [
+                (string) $v
+            ]));
             
             if (!empty($filtered)) {
                 $this->headers[\strtolower($k)] = $filtered;
@@ -73,8 +67,8 @@ abstract class HttpMessage
     {
         $headers = [];
         
-        foreach ($this->headers as $data) {
-            $headers[Http::normalizeHeaderName($data[0][0])] = \array_map(function (array $header) {
+        foreach ($this->headers as $k => $data) {
+            $headers[$k] = \array_map(function (array $header) {
                 return $header[1];
             }, $data);
         }
@@ -84,7 +78,7 @@ abstract class HttpMessage
 
     public function hasHeader(string $name): bool
     {
-        return !empty($this->headers[\strtolower($name)]);
+        return isset($this->headers[\strtolower($name)]);
     }
 
     public function getHeader(string $name): array
@@ -105,62 +99,40 @@ abstract class HttpMessage
         return \implode(',', $this->getHeader($name));
     }
 
-    public function withHeader(string $name, string $value): HttpMessage
+    public function withHeader(string $name, string ...$values): HttpMessage
     {
-        $value = [
-            (string) $value
-        ];
-        
-        if (!\is_array($value) || !$this->assertArrayofStrings($value)) {
-            throw new \InvalidArgumentException('Invalid HTTP header value');
-        }
-        
         $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
                 (string) $val
             ];
-        }, $value));
+        }, $values));
         
-        if (empty($filtered)) {
-            return $this;
+        if ($filtered) {
+            $message = clone $this;
+            $message->headers[\strtolower($name)] = $filtered;
         }
         
-        $message = clone $this;
-        $message->headers[\strtolower($name)] = $filtered;
-        
-        return $message;
+        return $message ?? $this;
     }
 
-    public function withAddedHeader(string $name, $value): HttpMessage
+    public function withAddedHeader(string $name, string ...$values): HttpMessage
     {
-        if (\is_string($value) || \method_exists($value, '__toString')) {
-            $value = [
-                (string) $value
-            ];
-        }
-        
-        if (!\is_array($value) || !$this->assertArrayofStrings($value)) {
-            throw new \InvalidArgumentException('Invalid HTTP header value');
-        }
-        
         $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
                 (string) $val
             ];
-        }, $value));
+        }, $values));
         
-        if (empty($filtered)) {
-            return $this;
+        if ($filtered) {
+            $n = \strtolower($name);
+            
+            $message = clone $this;
+            $message->headers[$n] = \array_merge(empty($this->headers[$n]) ? [] : $this->headers[$n], $filtered);
         }
         
-        $n = \strtolower($name);
-        
-        $message = clone $this;
-        $message->headers[$n] = \array_merge(empty($this->headers[$n]) ? [] : $this->headers[$n], $filtered);
-        
-        return $message;
+        return $message ?? $this;
     }
 
     public function withoutHeader(string $name): HttpMessage
@@ -218,28 +190,17 @@ abstract class HttpMessage
         return $message;
     }
 
-    protected function assertArrayOfStrings(array $strings): bool
-    {
-        foreach ($strings as $string) {
-            if (!\is_string($string) && !\method_exists($string, '__toString')) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-
     protected function filterHeaders(array $headers): array
     {
         $filtered = [];
         
         foreach ($headers as $h) {
-            if (!\is_string($h[0]) || !\is_string($h[1])) {
-                continue;
+            if (false !== \strpos($h[0], "\n") || false !== \strpos($h[0], "\r")) {
+                throw new \InvalidArgumentException('Header injection vector in header name detected');
             }
             
-            if (false !== \strpos($h[0], "\n") || false !== \strpos($h[0], "\r") || false !== \strpos($h[1], "\n") || false !== \strpos($h[1], "\r")) {
-                throw new \InvalidArgumentException('Header injection vector detected');
+            if (false !== \strpos($h[1], "\n") || false !== \strpos($h[1], "\r")) {
+                throw new \InvalidArgumentException('Header injection vector in header value detected');
             }
             
             if (!\preg_match('/^[a-zA-Z0-9\'`#$%&*+.^_|~!-]+$/', $h[0])) {

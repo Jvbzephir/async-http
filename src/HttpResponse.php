@@ -37,7 +37,7 @@ class HttpResponse extends HttpMessage
         $headers = [];
         foreach ($this->getHeaders() as $k => $header) {
             foreach ($header as $v) {
-                $headers[] = \sprintf('%s: %s', $k, $v);
+                $headers[] = \sprintf('%s: %s', Http::normalizeHeaderName($k), $v);
             }
         }
         
@@ -74,16 +74,8 @@ class HttpResponse extends HttpMessage
 
     protected function filterStatus(int $status): int
     {
-        if (\method_exists($status, '__toString')) {
-            $status = (string) $status;
-        }
-        
-        if (!\preg_match("'^[1-5][0-9]{2}$'", (string) $status)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid HTTP status code: %s', \is_object($status) ? \get_class($status) : \gettype($status)));
-        }
-        
         if ($status < 100 || $status > 599) {
-            throw new \InvalidArgumentException(\sprintf('HTTP status out of range: %u', $status));
+            throw new \InvalidArgumentException(\sprintf('HTTP status out of range: %d', $status));
         }
         
         return $status;
