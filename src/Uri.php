@@ -63,10 +63,10 @@ class Uri implements \JsonSerializable
      * @param string $uri
      * @return Uri
      */
-    public static function parse(string $uri): Uri
+    public static function parse($uri): Uri
     {
         if ($uri instanceof Uri) {
-            return clone $uri;
+            return $uri;
         }
         
         if (false === ($parts = \parse_url((string) $uri))) {
@@ -115,11 +115,7 @@ class Uri implements \JsonSerializable
         if (empty($this->host)) {
             $uri .= $this->path;
         } else {
-            if (empty($this->path)) {
-                $uri .= $this->getHostWithPort();
-            } else {
-                $uri .= $this->getHostWithPort() . '/' . \ltrim($this->path, '/');
-            }
+            $uri .= $this->getHostWithPort() . '/' . \ltrim($this->path, '/');
         }
         
         if (!empty($this->query)) {
@@ -221,7 +217,7 @@ class Uri implements \JsonSerializable
         }
         
         if ($port === NULL && $forcePort) {
-            $port = ($this->getScheme() === 'https') ? 443 : 80;
+            $port = ($this->scheme === 'https') ? 443 : 80;
         }
         
         return empty($port) ? $this->host : \sprintf('%s:%u', $this->host, $port);
@@ -229,10 +225,6 @@ class Uri implements \JsonSerializable
 
     public function withHost(string $host): Uri
     {
-        if (!\is_string($host) && !\method_exists($host, '__toString')) {
-            throw new \InvalidArgumentException('Invalid URI host');
-        }
-        
         $m = NULL;
         
         if (\preg_match("'^([^:]+):([0-9]+)'", $host, $m)) {
@@ -252,19 +244,9 @@ class Uri implements \JsonSerializable
         return $this->port;
     }
 
-    public function withPort(int $port): Uri
+    public function withPort(int $port = NULL): Uri
     {
-        if (\is_string($port) && \preg_match("'^[0-9]+$'", $port)) {
-            $port = (int) $port;
-        }
-        
-        if ($port !== NULL && !\is_int($port)) {
-            throw new \InvalidArgumentException('Invalid URL port');
-        }
-        
         if ($port !== NULL) {
-            $port = (int) $port;
-            
             if ($port < 1 || $port > 65535) {
                 throw new \InvalidArgumentException('Invalid URL port');
             }
@@ -388,7 +370,7 @@ class Uri implements \JsonSerializable
      */
     public static function decode(string $string): string
     {
-        return \rawurldecode($string);
+        return \rawurldecode(\str_replace('+', '%20', $string));
     }
 
     /**
@@ -409,12 +391,13 @@ class Uri implements \JsonSerializable
     /**
      * Build a URL-encoded query string from the given parameter array.
      * 
-     * @param array<string, mixed> $query
+     * @param array $query
+     * @param bool $plusEncoded
      * @return string
      */
-    public static function buildQuery(array $query, bool $plusEncoded): string
+    public static function buildQuery(array $query, bool $plusEncoded = false): string
     {
-        return empty($query) ? '' : \http_build_query($query, NULL, '&', $plusEncoded ? \PHP_QUERY_RFC1738 : \PHP_QUERY_RFC3986);
+        return empty($query) ? '' : \http_build_query($query, '', '&', $plusEncoded ? \PHP_QUERY_RFC1738 : \PHP_QUERY_RFC3986);
     }
 
     protected function filterScheme(string $scheme): string
@@ -442,14 +425,6 @@ class Uri implements \JsonSerializable
         $path = \preg_replace_callback('/(?:[^a-zA-Z0-9_\-\.~:@&=\+\$,\/;%]+|%(?![A-Fa-f0-9]{2}))/', function ($m) {
             return \rawurlencode($m[0]);
         }, $path);
-        
-        if (empty($path)) {
-            return '';
-        }
-        
-        if ($path[0] !== '/') {
-            return $path;
-        }
         
         return '/' . \ltrim($path, '/');
     }
