@@ -681,71 +681,54 @@ abstract class Http
      * @var array
      */
     protected static $reason = [
-        self::CODE_CONTINUE => 'Continue',
-        self::CODE_SWITCHING_PROTOCOLS => 'Switching Protocols',
-        self::CODE_OK => 'OK',
-        self::CODE_CREATED => 'Created',
-        self::CODE_ACCEPTED => 'Accepted',
-        self::CODE_NON_AUTHORITATIVE_INFORMATION => 'Non-Authoritative Information',
-        self::CODE_NO_CONTENT => 'No Content',
-        self::CODE_RESET_CONTENT => 'Reset Content',
-        self::CODE_PARTIAL_CONTENT => 'Partial Content',
-        self::CODE_MULTIPLE_CHOICES => 'Multiple Choices',
-        self::CODE_MOVED_PERMANENTLY => 'Moved Permanently',
-        self::CODE_FOUND => 'Found',
-        self::CODE_SEE_OTHER => 'See Other',
-        self::CODE_NOT_MODIFIED => 'Not Modified',
-        self::CODE_USE_PROXY => 'Use Proxy',
-        self::CODE_TEMPORARY_REDIRECT => 'Temporary Redirect',
-        self::CODE_BAD_REQUEST => 'Bad Request',
-        self::CODE_UNAUTHORIZED => 'Unauthorized',
-        self::CODE_PAYMENT_REQUIRED => 'Payment Required',
-        self::CODE_FORBIDDEN => 'Forbidden',
-        self::CODE_NOT_FOUND => 'Not Found',
-        self::CODE_METHOD_NOT_ALLOWED => 'Method Not Allowed',
-        self::CODE_NOT_ACCEPTABLE => 'Not Acceptable',
-        self::CODE_PROXY_AUTHENTICATION_REQUIRED => 'Proxy Authentication Required',
-        self::CODE_REQUEST_TIMEOUT => 'Request Timeout',
-        self::CODE_CONFLICT => 'Conflict',
-        self::CODE_GONE => 'Gone',
-        self::CODE_LENGTH_REQUIRED => 'Length Required',
-        self::CODE_PRECONDITION_FAILED => 'Precondition Failed',
-        self::CODE_REQUEST_ENTITY_TOO_LARGE => 'Request Entity Too Large',
-        self::CODE_REQUEST_URI_TOO_LONG => 'Request-URI Too Long',
-        self::CODE_UNSUPPORTED_MEDIA_TYPE => 'Unsupported Media Type',
-        self::CODE_REQUEST_RANGE_NOT_SATISFIABLE => 'Requested Range Not Satisfiable',
-        self::CODE_EXPECTATION_FAILED => 'Expectation Failed',
-        self::CODE_PRECONDITION_REQUIRED => 'Precondition Required',
-        self::CODE_TOO_MANY_REQUESTS => 'Too Many Requests',
-        self::CODE_REQUEST_HEADER_FIELDS_TOO_LARGE => 'Request Header Fields Too Large',
-        self::CODE_INTERNAL_SERVER_ERROR => 'Internal Server Error',
-        self::CODE_NOT_IMPLEMENTED => 'Not Implemented',
-        self::CODE_BAD_GATEWAY => 'Bad Gateway',
-        self::CODE_SERVICE_UNAVAILABLE => 'Service Unavailable',
-        self::CODE_GATEWAY_TIMEOUT => 'Gateway Timeout',
-        self::CODE_HTTP_VERSION_NOT_SUPPORTED => 'HTTP Version Not Supported',
-        self::CODE_BANDWIDTH_LIMIT_EXCEEDED => 'Bandwidth Limit Exceeded',
-        self::CODE_VARIANT_ALSO_NEGOTIATES => 'Variant Also Negotiates',
-        self::CODE_NOT_EXTENDED => 'Not Extended',
-        self::CODE_NETWORK_AUTHENTICATION_REQUIRED => 'Network Authentication Required'
+        self::CONTINUE => 'Continue',
+        self::SWITCHING_PROTOCOLS => 'Switching Protocols',
+        self::OK => 'OK',
+        self::CREATED => 'Created',
+        self::ACCEPTED => 'Accepted',
+        self::NON_AUTHORITATIVE_INFORMATION => 'Non-Authoritative Information',
+        self::NO_CONTENT => 'No Content',
+        self::RESET_CONTENT => 'Reset Content',
+        self::PARTIAL_CONTENT => 'Partial Content',
+        self::MULTIPLE_CHOICES => 'Multiple Choices',
+        self::MOVED_PERMANENTLY => 'Moved Permanently',
+        self::FOUND => 'Found',
+        self::SEE_OTHER => 'See Other',
+        self::NOT_MODIFIED => 'Not Modified',
+        self::USE_PROXY => 'Use Proxy',
+        self::TEMPORARY_REDIRECT => 'Temporary Redirect',
+        self::BAD_REQUEST => 'Bad Request',
+        self::UNAUTHORIZED => 'Unauthorized',
+        self::PAYMENT_REQUIRED => 'Payment Required',
+        self::FORBIDDEN => 'Forbidden',
+        self::NOT_FOUND => 'Not Found',
+        self::METHOD_NOT_ALLOWED => 'Method Not Allowed',
+        self::NOT_ACCEPTABLE => 'Not Acceptable',
+        self::PROXY_AUTHENTICATION_REQUIRED => 'Proxy Authentication Required',
+        self::REQUEST_TIMEOUT => 'Request Timeout',
+        self::CONFLICT => 'Conflict',
+        self::GONE => 'Gone',
+        self::LENGTH_REQUIRED => 'Length Required',
+        self::PRECONDITION_FAILED => 'Precondition Failed',
+        self::REQUEST_ENTITY_TOO_LARGE => 'Request Entity Too Large',
+        self::REQUEST_URI_TOO_LONG => 'Request-URI Too Long',
+        self::UNSUPPORTED_MEDIA_TYPE => 'Unsupported Media Type',
+        self::REQUEST_RANGE_NOT_SATISFIABLE => 'Requested Range Not Satisfiable',
+        self::EXPECTATION_FAILED => 'Expectation Failed',
+        self::PRECONDITION_REQUIRED => 'Precondition Required',
+        self::TOO_MANY_REQUESTS => 'Too Many Requests',
+        self::REQUEST_HEADER_FIELDS_TOO_LARGE => 'Request Header Fields Too Large',
+        self::INTERNAL_SERVER_ERROR => 'Internal Server Error',
+        self::NOT_IMPLEMENTED => 'Not Implemented',
+        self::BAD_GATEWAY => 'Bad Gateway',
+        self::SERVICE_UNAVAILABLE => 'Service Unavailable',
+        self::GATEWAY_TIMEOUT => 'Gateway Timeout',
+        self::HTTP_VERSION_NOT_SUPPORTED => 'HTTP Version Not Supported',
+        self::BANDWIDTH_LIMIT_EXCEEDED => 'Bandwidth Limit Exceeded',
+        self::VARIANT_ALSO_NEGOTIATES => 'Variant Also Negotiates',
+        self::NOT_EXTENDED => 'Not Extended',
+        self::NETWORK_AUTHENTICATION_REQUIRED => 'Network Authentication Required'
     ];
-
-    /**
-     * Check if the given string is a valid HTTP protocol.
-     * 
-     * @param string $protocol
-     * @return bool
-     */
-    public static function isProtocol(string $protocol): bool
-    {
-        switch (\strtoupper($protocol)) {
-            case 'HTTP/1.0':
-            case 'HTTP/1.1':
-                return true;
-        }
-        
-        return false;
-    }
 
     /**
      * Check if the HTTP code is a success code (1## or 2##)
@@ -755,13 +738,7 @@ abstract class Http
      */
     public static function isSuccess(int $code): bool
     {
-        switch ((int) \floor($code / 100)) {
-            case 1:
-            case 2:
-                return true;
-        }
-        
-        return false;
+        return ($code >= 100 && $code < 300);
     }
 
     /**
@@ -772,7 +749,7 @@ abstract class Http
      */
     public static function isRedirect(int $code): bool
     {
-        return ((int) \floor($code / 100)) == 3;
+        return ($code >= 300 && $code < 400);
     }
 
     /**
@@ -783,13 +760,7 @@ abstract class Http
      */
     public static function isError(int $code): bool
     {
-        switch ((int) \floor($code / 100)) {
-            case 4:
-            case 5:
-                return true;
-        }
-        
-        return false;
+        return ($code >= 400 && $code < 600);
     }
 
     /**
