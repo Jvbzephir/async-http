@@ -20,7 +20,14 @@ use KoolKode\Async\Stream\ReadableDeflateStream;
 
 class Driver
 {
+    protected $parser;
+    
     protected $keepAliveSupported = false;
+    
+    public function __construct(RequestParser $parser = null)
+    {
+        $this->parser = $parser ?? new RequestParser();
+    }
     
     public function getProtocols(): array
     {
@@ -33,7 +40,12 @@ class Driver
     {
         try {
             do {
-                $request = yield from $this->parseRequest($stream);
+                $request = yield from $this->parser->parseRequest($stream);
+                $request->getBody()->setCascadeClose(false);
+                
+                if ($request->isContinueExpected()) {
+                    $request->getBody()->setExpectContinue($stream);
+                }
                 
                 $response = new HttpResponse();
                 $response = $response->withHeader('Served-By', 'KoolKode HTTP');

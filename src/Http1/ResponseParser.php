@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableStream;
 
-class ResponseParser
+class ResponseParser extends MessageParser
 {
     public function parseResponse(ReadableStream $stream): \Generator
     {
@@ -31,15 +31,7 @@ class ResponseParser
         $response = $response->withProtocolVersion(\substr($version, -3));
         $response = $response->withStatus($status, $reason);
         
-        while (NULL !== ($line = yield $stream->readLine())) {
-            if (\trim($line) === '') {
-                break;
-            }
-            
-            $parts = \explode(':', $line, 2);
-            
-            $response = $response->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
-        }
+        $response = yield from $this->parseHeaders($stream, $response);
         
         $body = Body::fromMessage($stream, $response);
         
