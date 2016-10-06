@@ -45,7 +45,7 @@ class HttpEndpointTest extends AsyncTestCase
                 $request .= "Conection: close\r\n";
                 $request .= "Content-Length: 8\r\n";
                 
-                if (!\function_exists('inflate_init')) {
+                if (\function_exists('inflate_init')) {
                     $request .= "Accept-Encoding: gzip, deflate\r\n";
                 }
                 

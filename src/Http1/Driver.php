@@ -16,7 +16,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\DuplexStream;
-use KoolKode\Async\Stream\WritableDeflateStream;
+use KoolKode\Async\Stream\ReadableDeflateStream;
 
 class Driver
 {
@@ -44,7 +44,7 @@ class Driver
                 } elseif ($request->getProtocolVersion() == '1.0') {
                     // HTTP/1.0 does not support keep alive.
                     $close = true;
-                } elseif ('close' === $request->getHeaderLine('Connection')) {
+                } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
                     // Close connection if client does not want to use keep alive.
                     $close = true;
                 } else {
@@ -113,10 +113,11 @@ class Driver
             $buffer .= "Connection: close\r\n";
         }
         
-        $accept = \array_map('trim', explode(',', \strtolower($request->getHeaderLine('Accept-Encoding'))));
         $compress = NULL;
         
         if (\function_exists('deflate_init')) {
+            $accept = $request->getHeaderTokens('Accept-Encoding');
+            
             if (\in_array('gzip', $accept, true)) {
                 $compress = \ZLIB_ENCODING_GZIP;
                 $size = NULL;
@@ -160,7 +161,7 @@ class Driver
         yield $stream->flush();
         
         if ($compress !== NULL) {
-            $stream = new WritableDeflateStream($stream, $compress);
+            $bodyStream = new ReadableDeflateStream($bodyStream, $compress);
         }
         
         if ($size === NULL) {
