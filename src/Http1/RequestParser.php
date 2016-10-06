@@ -15,23 +15,23 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 class RequestParser extends MessageParser
 {
     public function parseRequest(ReadableStream $stream): \Generator
     {
-        $line = yield $stream->readLine();
-        $parts = \preg_split("'\s+'", \trim((string) $line), 3);
-        
-        if (\count($parts) !== 3) {
-            throw new \RuntimeException('Invalid HTTP request received');
+        if (null === ($line = yield $stream->readLine())) {
+            throw new StreamClosedException('Stream closed before HTTP request line was read');
         }
         
-        if ($parts[2] !== 'HTTP/1.0' && $parts[2] !== 'HTTP/1.1') {
-            throw new \RuntimeException('Invalid HTTP version');
+        $m = null;
+        
+        if (!\preg_match("'^(\S+)\s+(.+)\s+HTTP/(1\\.[01])$'i", trim($line), $m)) {
+            throw new StreamClosedException('Invalid HTTP request line received');
         }
         
-        $request = new HttpRequest($parts[1], $parts[0], [], \substr($parts[2], -3));
+        $request = new HttpRequest($m[2], $m[1], [], $m[3]);
         
         $request = yield from $this->parseHeaders($stream, $request);
         

@@ -47,10 +47,6 @@ class Driver
                     $request->getBody()->setExpectContinue($stream);
                 }
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Served-By', 'KoolKode HTTP');
-                $response = $response->withBody(new \KoolKode\Async\Http\StringBody('Hello Test Client :)'));
-                
                 if (!$this->keepAliveSupported) {
                     $close = true;
                 } elseif ($request->getProtocolVersion() == '1.0') {
@@ -63,6 +59,11 @@ class Driver
                     $close = false;
                 }
                 
+                $response = new HttpResponse();
+                $response = $response->withProtocolVersion($request->getProtocolVersion());
+                $response = $response->withHeader('Served-By', 'KoolKode HTTP');
+                $response = $response->withBody(new \KoolKode\Async\Http\StringBody('Hello Test Client :)'));
+                
                 yield from $this->sendResponse($stream, $request, $response, $close);
             } while (!$close);
         } catch (\Throwable $e) {
@@ -72,43 +73,10 @@ class Driver
         }
     }
     
-    protected function parseRequest(DuplexStream $stream): \Generator
-    {
-        $line = yield $stream->readLine();
-        $parts = \preg_split("'\s+'", \trim((string) $line), 3);
-        
-        if (\count($parts) !== 3) {
-            throw new \RuntimeException('Invalid HTTP request received');
-        }
-        
-        if ($parts[2] !== 'HTTP/1.0' && $parts[2] !== 'HTTP/1.1') {
-            throw new \RuntimeException('Invalid HTTP version');
-        }
-        
-        $request = new HttpRequest($parts[1], $parts[0], [], \substr($parts[2], -3));
-        
-        while (NULL !== ($line = yield $stream->readLine())) {
-            if (\trim($line) === '') {
-                break;
-            }
-            
-            $parts = \explode(':', $line, 2);
-            
-            $request = $request->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
-        }
-        
-        $body = Body::fromMessage($stream, $request);
-        $body->setCascadeClose(false);
-        
-        if ($request->isContinueExpected()) {
-            $body->setExpectContinue($stream);
-        }
-        
-        return $request->withBody($body);
-    }
-    
     protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
+        $response = $response->withProtocolVersion($request->getProtocolVersion());
+        
         $input = yield $request->getBody()->getReadableStream();
         
         // Discard remaining request body before sending response.
