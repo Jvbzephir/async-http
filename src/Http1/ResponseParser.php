@@ -13,8 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Stream\ReadableStream;
 
 class ResponseParser
 {
@@ -43,8 +43,19 @@ class ResponseParser
         
         $body = Body::fromMessage($stream, $response);
         
-        $response = $response->withBody($body);
+        static $remove = [
+            'Connection',
+            'Content-Encoding',
+            'Content-Length',
+            'Keep-Alive',
+            'Trailer',
+            'Transfer-Encoding'
+        ];
         
-        return $response;
+        foreach ($remove as $name) {
+            $response = $response->withoutHeader($name);
+        }
+        
+        return $response->withBody($body);
     }
 }
