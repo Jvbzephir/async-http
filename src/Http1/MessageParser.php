@@ -13,21 +13,39 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
+use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\StreamException;
 
 abstract class MessageParser
 {
     protected function parseHeaders(ReadableStream $stream, HttpMessage $message): \Generator
     {
-        while (NULL !== ($line = yield $stream->readLine())) {
-            if (\trim($line) === '') {
-                break;
+        $remaining = 131072;
+        
+        try {
+            while (NULL !== ($line = yield $stream->readLine($remaining))) {
+                if (\trim($line) === '') {
+                    break;
+                }
+                
+                $remaining -= \strlen($line);
+                $parts = \explode(':', $line, 2);
+                
+                if (!isset($parts[1])) {
+                    throw new \RuntimeException('Malformed HTTP header received');
+                }
+                
+                $message = $message->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
             }
-            
-            $parts = \explode(':', $line, 2);
-            
-            $message = $message->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
+        } catch (StreamException $e) {
+            throw new StatusException(Http::REQUEST_HEADER_FIELDS_TOO_LARGE, 'Maximum HTTP header size exceeded', $e);
+        }
+        
+        if ($line === null) {
+            throw new \RuntimeException('Premature end of HTTP headers detected');
         }
         
         return $message;
