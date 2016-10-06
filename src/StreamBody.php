@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
-use Interop\Async\Awaitable;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
@@ -63,7 +63,7 @@ class StreamBody implements HttpBody
      */
     public function getSize(): Awaitable
     {
-        return new Success(NULL);
+        return new Success(null);
     }
 
     /**

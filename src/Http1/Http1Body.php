@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use Interop\Async\Awaitable;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBody;
@@ -64,7 +64,7 @@ class Http1Body implements HttpBody
     /**
      * Length of input data as specified by Content-Length.
      * 
-     * A value of NULL indicates that the HTTP header was not set.
+     * A value of null indicates that the HTTP header was not set.
      * 
      * @var int
      */
@@ -73,7 +73,7 @@ class Http1Body implements HttpBody
     /**
      * Compression method being used by the remote peer.
      * 
-     * A value of NULL indicates thatincoming data is not compressed.
+     * A value of null indicates thatincoming data is not compressed.
      * 
      * @var string
      */
@@ -167,7 +167,7 @@ class Http1Body implements HttpBody
     {
         static $compression;
         
-        if ($compression === NULL) {
+        if ($compression === null) {
             $compression = \function_exists('inflate_init');
         }
         
@@ -262,7 +262,7 @@ class Http1Body implements HttpBody
      */
     public function getSize(): Awaitable
     {
-        return new Success($this->chunked ? NULL : $this->length);
+        return new Success($this->chunked ? null : $this->length);
     }
 
     /**
@@ -271,7 +271,7 @@ class Http1Body implements HttpBody
     public function getReadableStream(): Awaitable
     {
         return new Coroutine(function () {
-            if ($this->decodedStream === NULL) {
+            if ($this->decodedStream === null) {
                 $this->decodedStream = yield from $this->createInputStream();
             }
             
@@ -285,7 +285,7 @@ class Http1Body implements HttpBody
     public function getContents(): Awaitable
     {
         return new Coroutine(function () {
-            if ($this->decodedStream === NULL) {
+            if ($this->decodedStream === null) {
                 $this->decodedStream = yield from $this->createInputStream();
             }
             

@@ -58,7 +58,7 @@ class ChunkDecodedStream extends ReadableStreamDecorator
         }
         
         if (empty($this->remainder)) {
-            if (NULL === ($header = yield $this->stream->readLine())) {
+            if (null === ($header = yield $this->stream->readLine())) {
                 return;
             }
             

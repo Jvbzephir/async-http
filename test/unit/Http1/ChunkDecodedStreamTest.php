@@ -36,14 +36,14 @@ class ChunkDecodedStreamTest extends AsyncTestCase
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream());
         
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
     }
     
     public function testDetectsEmptyChunkedData()
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("0\r\n\r\n"));
         
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
     }
     
     public function testDetectsInvalidChunkHeader()
@@ -69,7 +69,7 @@ class ChunkDecodedStreamTest extends AsyncTestCase
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("3\r\nFOO\r\n0\r\n\r\n"));
         
         $this->assertEquals('FOO', yield $stream->read());
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
     }
     
     public function testDetectsMissingBreakAfterChunk()
@@ -115,6 +115,6 @@ class ChunkDecodedStreamTest extends AsyncTestCase
         $stream = new ChunkDecodedStream(new ReadableMemoryStream($this->chunkEncode($data, $len)));
         
         $this->assertEquals($data, yield new ReadContents($stream));
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
     }
 }

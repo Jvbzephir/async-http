@@ -26,7 +26,7 @@ class StatusException extends \RuntimeException
      * @param int $status
      * @param \Throwable $cause
      */
-    public function __construct(int $status, string $reason = NULL, \Throwable $cause = NULL)
+    public function __construct(int $status, string $reason = null, \Throwable $cause = null)
     {
         parent::__construct($reason ?? Http::getReason($status, \sprintf('HTTP status %s', $status)), $status, $cause);
     }

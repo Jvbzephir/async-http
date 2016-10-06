@@ -43,7 +43,7 @@ class StreamBodyTest extends AsyncTestCase
         $message = new HttpResponse();
         
         $this->assertFalse($body->isCached());
-        $this->assertNull(yield $body->getSize());
+        $this->assertnull(yield $body->getSize());
         $this->assertSame($message, $body->prepareMessage($message));
     }
 }

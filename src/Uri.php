@@ -40,11 +40,11 @@ class Uri implements \JsonSerializable
 
     protected $uriString;
 
-    public function __construct(string $scheme = 'http', string $host = '', int $port = NULL, string $path = '', string $query = '', string $fragment = '', string $username = '', string $password = '')
+    public function __construct(string $scheme = 'http', string $host = '', int $port = null, string $path = '', string $query = '', string $fragment = '', string $username = '', string $password = '')
     {
         $this->scheme = $this->filterScheme($scheme);
         $this->host = (string) $host;
-        $this->port = ($port === NULL) ? NULL : (int) $port;
+        $this->port = ($port === null) ? null : (int) $port;
         $this->path = $this->filterPath($path);
         $this->query = $this->filterQuery($query);
         $this->fragment = $this->filterFragment($fragment);
@@ -54,7 +54,7 @@ class Uri implements \JsonSerializable
 
     public function __clone()
     {
-        $this->uriString = NULL;
+        $this->uriString = null;
     }
 
     /**
@@ -77,7 +77,7 @@ class Uri implements \JsonSerializable
         $user = isset($parts['user']) ? $parts['user'] : '';
         $pass = isset($parts['pass']) ? $parts['pass'] : '';
         $host = isset($parts['host']) ? $parts['host'] : '';
-        $port = isset($parts['port']) ? $parts['port'] : NULL;
+        $port = isset($parts['port']) ? $parts['port'] : null;
         $path = isset($parts['path']) ? $parts['path'] : '';
         $query = isset($parts['query']) ? $parts['query'] : '';
         $fragment = isset($parts['fragment']) ? $parts['fragment'] : '';
@@ -92,7 +92,7 @@ class Uri implements \JsonSerializable
      */
     public function __toString(): string
     {
-        if ($this->uriString !== NULL) {
+        if ($this->uriString !== null) {
             return $this->uriString;
         }
         
@@ -167,7 +167,7 @@ class Uri implements \JsonSerializable
         return \sprintf('%s:%s', $this->username, $this->password);
     }
 
-    public function withUserInfo(string $user, string $password = NULL): Uri
+    public function withUserInfo(string $user, string $password = null): Uri
     {
         $user = \trim($user);
         
@@ -209,14 +209,14 @@ class Uri implements \JsonSerializable
         $port = $this->port;
         
         if ($this->scheme === 'https' && $this->port === 443) {
-            $port = NULL;
+            $port = null;
         }
         
         if ($this->scheme === 'http' && $this->port === 80) {
-            $port = NULL;
+            $port = null;
         }
         
-        if ($port === NULL && $forcePort) {
+        if ($port === null && $forcePort) {
             $port = ($this->scheme === 'https') ? 443 : 80;
         }
         
@@ -225,7 +225,7 @@ class Uri implements \JsonSerializable
 
     public function withHost(string $host): Uri
     {
-        $m = NULL;
+        $m = null;
         
         if (\preg_match("'^([^:]+):([0-9]+)'", $host, $m)) {
             $uri = clone $this;
@@ -244,9 +244,9 @@ class Uri implements \JsonSerializable
         return $this->port;
     }
 
-    public function withPort(int $port = NULL): Uri
+    public function withPort(int $port = null): Uri
     {
-        if ($port !== NULL) {
+        if ($port !== null) {
             if ($port < 1 || $port > 65535) {
                 throw new \InvalidArgumentException('Invalid URL port');
             }
@@ -288,14 +288,14 @@ class Uri implements \JsonSerializable
         
         $uri = clone $this;
         $uri->query = $query;
-        $uri->parsedQuery = NULL;
+        $uri->parsedQuery = null;
         
         return $uri;
     }
 
     public function hasQueryParam(string $name): bool
     {
-        if ($this->parsedQuery === NULL) {
+        if ($this->parsedQuery === null) {
             $this->parsedQuery = self::parseQuery($this->query);
         }
         
@@ -304,7 +304,7 @@ class Uri implements \JsonSerializable
 
     public function getQueryParam(string $name)
     {
-        if ($this->parsedQuery === NULL) {
+        if ($this->parsedQuery === null) {
             $this->parsedQuery = self::parseQuery($this->query);
         }
         
@@ -321,7 +321,7 @@ class Uri implements \JsonSerializable
 
     public function getQueryParams(): array
     {
-        if ($this->parsedQuery === NULL) {
+        if ($this->parsedQuery === null) {
             $this->parsedQuery = self::parseQuery($this->query);
         }
         
@@ -458,7 +458,7 @@ class Uri implements \JsonSerializable
         $data = \explode('=', $value, 2);
         
         if (1 === \count($data)) {
-            $data[] = NULL;
+            $data[] = null;
         }
         
         return $data;

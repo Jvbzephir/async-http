@@ -48,9 +48,9 @@ class HttpTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider provideStatusLines
      */
-    public function testStatusLine(int $status, string $line, string $protocol = NULL)
+    public function testStatusLine(int $status, string $line, string $protocol = null)
     {
-        if ($protocol === NULL) {
+        if ($protocol === null) {
             $this->assertEquals($line, Http::getStatusLine($status));
         } else {
             $this->assertEquals($line, Http::getStatusLine($status, $protocol));

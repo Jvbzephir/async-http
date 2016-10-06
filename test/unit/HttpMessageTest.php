@@ -110,7 +110,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
     public function testMessageAttributes()
     {
         $message = new HttpResponse();
-        $this->assertNull($message->getAttribute('foo'));
+        $this->assertnull($message->getAttribute('foo'));
         $this->assertEquals([], $message->getAttributes());
         
         $this->assertNotSame($message, $message = $message->withAttribute('foo', 'bar'));
@@ -123,7 +123,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('#', $message->getAttribute('bar'));
         
         $this->assertNotSame($message, $message = $message->withoutAttribute('foo'));
-        $this->assertNull($message->getAttribute('foo'));
+        $this->assertnull($message->getAttribute('foo'));
         $this->assertEquals('#', $message->getAttribute('bar'));
     }
 }

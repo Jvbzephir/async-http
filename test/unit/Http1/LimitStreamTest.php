@@ -26,12 +26,12 @@ class LimitStreamTest extends AsyncTestCase
         $stream = new LimitStream($input, 5);
         
         $this->assertEquals('FOO &', yield new ReadContents($stream, false));
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
         $this->assertFalse($input->isClosed());
         $this->assertEquals(5, $input->getOffset());
         
         $stream->close();
-        $this->assertNull(yield $stream->read());
+        $this->assertnull(yield $stream->read());
         $this->assertTrue($input->isClosed());
     }
     

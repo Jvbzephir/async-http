@@ -58,7 +58,7 @@ class HttpRequest extends HttpMessage
 
     public function getRequestTarget(): string
     {
-        if (NULL !== $this->target) {
+        if (null !== $this->target) {
             return $this->target;
         }
         
@@ -131,7 +131,7 @@ class HttpRequest extends HttpMessage
     {
         $n = \strtolower($name);
         
-        if ($n === 'host' && empty($this->headers[$n]) && $this->uri !== NULL) {
+        if ($n === 'host' && empty($this->headers[$n]) && $this->uri !== null) {
             $host = $this->uri->getHost();
             
             if (!empty($host)) {
@@ -148,7 +148,7 @@ class HttpRequest extends HttpMessage
     {
         $headers = parent::getHeaders();
         
-        if (empty($this->headers['host']) && $this->uri !== NULL && !empty($this->uri->getHost())) {
+        if (empty($this->headers['host']) && $this->uri !== null && !empty($this->uri->getHost())) {
             $headers['host'] = $this->getHeader('Host');
         }
         

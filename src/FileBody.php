@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
-use Interop\Async\Awaitable;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;

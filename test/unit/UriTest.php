@@ -109,7 +109,7 @@ class UriTest extends \PHPUnit_Framework_TestCase
         
         $this->assertNotSame($uri, $uri = $uri->withHost('localhost'));
         $this->assertEquals('localhost', $uri->getHost());
-        $this->assertNull($uri->getPort());
+        $this->assertnull($uri->getPort());
         $this->assertEquals('localhost', $uri->getHostWithPort());
         $this->assertEquals('localhost:80', $uri->getHostWithPort(true));
         
@@ -131,7 +131,7 @@ class UriTest extends \PHPUnit_Framework_TestCase
         
         $this->assertNotSame($uri, $uri = $uri->withHost('localhost'));
         $this->assertEquals('localhost', $uri->getHost());
-        $this->assertNull($uri->getPort());
+        $this->assertnull($uri->getPort());
         $this->assertEquals('localhost', $uri->getHostWithPort());
         $this->assertEquals('localhost:443', $uri->getHostWithPort(true));
         
@@ -145,13 +145,13 @@ class UriTest extends \PHPUnit_Framework_TestCase
     public function testCanMutatePort()
     {
         $uri = Uri::parse('http://localhost/');
-        $this->assertNull($uri->getPort());
+        $this->assertnull($uri->getPort());
         
         $this->assertNotSame($uri, $uri = $uri->withPort(88));
         $this->assertEquals(88, $uri->getPort());
         
-        $this->assertNotSame($uri, $uri = $uri->withPort(NULL));
-        $this->assertNull($uri->getPort());
+        $this->assertNotSame($uri, $uri = $uri->withPort(null));
+        $this->assertnull($uri->getPort());
     }
     
     public function provideInvalidPorts()

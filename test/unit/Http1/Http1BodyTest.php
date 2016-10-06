@@ -73,7 +73,7 @@ class Http1BodyTest extends AsyncTestCase
         
         $stream = yield $body->getReadableStream();
         
-        $this->assertNull(yield $body->getSize());
+        $this->assertnull(yield $body->getSize());
         
         try {
             $this->assertEquals('Test', yield $stream->read());

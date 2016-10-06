@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
-use Interop\Async\Awaitable;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\Stream\ReadableStream;
 
 /**
@@ -44,9 +44,9 @@ interface HttpBody
     /**
      * Get the size of the request body.
      * 
-     * This method must return NULL when body size is unknown!
+     * This method must return null when body size is unknown!
      * 
-     * @return int Body size in bytes or NULL when size is unknown.
+     * @return int Body size in bytes or null when size is unknown.
      */
     public function getSize(): Awaitable;
     
