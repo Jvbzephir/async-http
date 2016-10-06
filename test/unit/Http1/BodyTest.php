@@ -20,14 +20,14 @@ use KoolKode\Async\Stream\WritableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
- * @covers \KoolKode\Async\Http\Http1\Http1Body
+ * @covers \KoolKode\Async\Http\Http1\Body
  */
-class Http1BodyTest extends AsyncTestCase
+class BodyTest extends AsyncTestCase
 {
     public function testUnspecifiedContentLength()
     {
         $input = new ReadableMemoryStream();
-        $body = new Http1Body($input);
+        $body = new Body($input);
         
         $this->assertFalse($body->isCached());
         $this->assertEquals('', yield $body->getContents());
@@ -38,7 +38,7 @@ class Http1BodyTest extends AsyncTestCase
     {
         $input = new ReadableMemoryStream('Test');
         
-        $body = new Http1Body($input);
+        $body = new Body($input);
         $body->setCascadeClose(false);
         $body->setLength(3);
         
@@ -57,7 +57,7 @@ class Http1BodyTest extends AsyncTestCase
     
     public function testDetectsInvalidContentLength()
     {
-        $body = new Http1Body(new ReadableMemoryStream());
+        $body = new Body(new ReadableMemoryStream());
         
         $this->expectException(\InvalidArgumentException::class);
         
@@ -68,7 +68,7 @@ class Http1BodyTest extends AsyncTestCase
     {
         $input = new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n");
         
-        $body = new Http1Body($input);
+        $body = new Body($input);
         $body->setChunkEncoded(true);
         
         $stream = yield $body->getReadableStream();
@@ -86,7 +86,7 @@ class Http1BodyTest extends AsyncTestCase
     
     public function testDoesNotModifyMessage()
     {
-        $body = new Http1Body(new ReadableMemoryStream());
+        $body = new Body(new ReadableMemoryStream());
         $message = new HttpResponse();
         
         $this->assertSame($message, $body->prepareMessage($message));
@@ -100,9 +100,9 @@ class Http1BodyTest extends AsyncTestCase
     
         $input = new ReadableMemoryStream(gzcompress('Hello'));
     
-        $body = new Http1Body($input);
+        $body = new Body($input);
         $body->setLength($input->getSize());
-        $body->setCompression(Http1Body::COMPRESSION_DEFLATE);
+        $body->setCompression(Body::COMPRESSION_DEFLATE);
     
         $this->assertEquals('Hello', yield $body->getContents());
     }
@@ -115,16 +115,16 @@ class Http1BodyTest extends AsyncTestCase
         
         $input = new ReadableMemoryStream(gzencode('Hello'));
         
-        $body = new Http1Body($input);
+        $body = new Body($input);
         $body->setLength($input->getSize());
-        $body->setCompression(Http1Body::COMPRESSION_GZIP);
+        $body->setCompression(Body::COMPRESSION_GZIP);
         
         $this->assertEquals('Hello', yield $body->getContents());
     }
     
     public function testDetectsInvalidCompressionEncoding()
     {
-        $body = new Http1Body(new ReadableMemoryStream());
+        $body = new Body(new ReadableMemoryStream());
         
         $this->expectException(\InvalidArgumentException::class);
         
@@ -135,7 +135,7 @@ class Http1BodyTest extends AsyncTestCase
     {
         $expect = new WritableMemoryStream();
         
-        $body = new Http1Body(new ReadableMemoryStream('Foo'));
+        $body = new Body(new ReadableMemoryStream('Foo'));
         $body->setLength(3);
         $body->setExpectContinue($expect);
         
@@ -154,7 +154,7 @@ class Http1BodyTest extends AsyncTestCase
         $message = new HttpResponse();
         $message = $message->withHeader('Content-Length', 4);
         
-        $body = Http1Body::fromMessage(new ReadableMemoryStream('Test'), $message);
+        $body = Body::fromMessage(new ReadableMemoryStream('Test'), $message);
         
         $this->assertEquals('Test', yield $body->getContents());
     }
@@ -166,7 +166,7 @@ class Http1BodyTest extends AsyncTestCase
         
         $this->expectException(StatusException::class);
         
-        Http1Body::fromMessage(new ReadableMemoryStream('Test'), $message);
+        Body::fromMessage(new ReadableMemoryStream('Test'), $message);
     }
     
     public function testChunkEncodedBodyFromMessage()
@@ -174,7 +174,7 @@ class Http1BodyTest extends AsyncTestCase
         $message = new HttpResponse();
         $message = $message->withHeader('Transfer-Encoding', 'chunked');
         
-        $body = Http1Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
+        $body = Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
         
         $this->assertEquals('Test', yield $body->getContents());
     }
@@ -186,7 +186,7 @@ class Http1BodyTest extends AsyncTestCase
     
         $this->expectException(StatusException::class);
     
-        Http1Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
+        Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
     }
     
     public function testDetectsCompressionFromMessage()
@@ -201,7 +201,7 @@ class Http1BodyTest extends AsyncTestCase
         $message = $message->withHeader('Content-Length', $input->getSize());
         $message = $message->withHeader('Content-Encoding', 'gzip');
         
-        $this->assertEquals('Test', yield Http1Body::fromMessage($input, $message)->getContents());
+        $this->assertEquals('Test', yield Body::fromMessage($input, $message)->getContents());
     }
     
     public function testDetectsCompressedRequestBody()
@@ -211,6 +211,6 @@ class Http1BodyTest extends AsyncTestCase
         
         $this->expectException(StatusException::class);
         
-        Http1Body::fromMessage(new ReadableMemoryStream(), $message);
+        Body::fromMessage(new ReadableMemoryStream(), $message);
     }
 }

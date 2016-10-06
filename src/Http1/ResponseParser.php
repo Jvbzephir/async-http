@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Http\HttpResponse;
 
-class Http1ResponseParser
+class ResponseParser
 {
     public function parseResponse(ReadableStream $stream): \Generator
     {
@@ -41,7 +41,7 @@ class Http1ResponseParser
             $response = $response->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
         }
         
-        $body = Http1Body::fromMessage($stream, $response);
+        $body = Body::fromMessage($stream, $response);
         
         $response = $response->withBody($body);
         

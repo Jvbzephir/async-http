@@ -18,7 +18,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\WritableDeflateStream;
 
-class Http1Driver
+class Driver
 {
     protected $keepAliveSupported = false;
     
@@ -85,7 +85,7 @@ class Http1Driver
             $request = $request->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
         }
         
-        $body = Http1Body::fromMessage($stream, $request);
+        $body = Body::fromMessage($stream, $request);
         $body->setCascadeClose(false);
         
         if ($request->isContinueExpected()) {

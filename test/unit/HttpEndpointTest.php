@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Http\Http1\Http1ResponseParser;
+use KoolKode\Async\Http\Http1\ResponseParser;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -63,7 +63,7 @@ class HttpEndpointTest extends AsyncTestCase
                 
                 yield $socket->write('Hello :)');
                 
-                $parser = new Http1ResponseParser();
+                $parser = new ResponseParser();
                 $response = yield from $parser->parseResponse($socket);
                 
                 $this->assertTrue($response instanceof HttpResponse);

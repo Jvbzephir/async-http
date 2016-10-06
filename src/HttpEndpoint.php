@@ -15,7 +15,7 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Http\Http1\Http1Driver;
+use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -35,7 +35,7 @@ class HttpEndpoint
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
         
-        $this->http1 = new Http1Driver();
+        $this->http1 = new Driver();
     }
 
     public function isEncrypted(): bool

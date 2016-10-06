@@ -34,7 +34,7 @@ use KoolKode\Async\Success;
  * 
  * @author Martin Schröder
  */
-class Http1Body implements HttpBody
+class Body implements HttpBody
 {
     const COMPRESSION_GZIP = 'gzip';
 
@@ -122,9 +122,9 @@ class Http1Body implements HttpBody
      * 
      * @param ReadableStream $stream
      * @param HttpMessage $message
-     * @return Http1Body
+     * @return Body
      */
-    public static function fromMessage(ReadableStream $stream, HttpMessage $message): Http1Body
+    public static function fromMessage(ReadableStream $stream, HttpMessage $message): Body
     {
         $body = new static($stream);
         
