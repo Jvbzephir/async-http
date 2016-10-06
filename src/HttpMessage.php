@@ -98,13 +98,26 @@ abstract class HttpMessage
     {
         return \implode(',', $this->getHeader($name));
     }
+    
+    public function getHeaderTokens(string $name, string $separator = ','): array
+    {
+        $tokens = [];
+        
+        foreach ($this->getHeader($name) as $v) {
+            foreach (\explode($separator, \strtolower($v)) as $t) {
+                $tokens[] = \trim($t);
+            }
+        }
+        
+        return $tokens;
+    }
 
     public function withHeader(string $name, string ...$values): HttpMessage
     {
         $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
-                (string) $val
+                $val
             ];
         }, $values));
         
@@ -121,7 +134,7 @@ abstract class HttpMessage
         $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
             return [
                 $name,
-                (string) $val
+                $val
             ];
         }, $values));
         
