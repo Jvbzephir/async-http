@@ -13,13 +13,24 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
 class ResponseParser extends MessageParser
 {
-    public function parseResponse(ReadableStream $stream): \Generator
+    /**
+     * Parse the next HTTP response from the given stream.
+     * 
+     * @param ReadableStream $stream
+     * @param bool $dropBody Drop response body (needed when the response is caused by a HEAD request).
+     * @return HttpResponse
+     * 
+     * @throws StreamClosedException When no HTTP response line could be parsed.
+     */
+    public function parseResponse(ReadableStream $stream, bool $dropBody = false): \Generator
     {
         if (null === ($line = yield $stream->readLine())) {
             throw new StreamClosedException('Stream closed before HTTP response line was read');
@@ -37,7 +48,11 @@ class ResponseParser extends MessageParser
         
         $response = yield from $this->parseHeaders($stream, $response);
         
-        $body = Body::fromMessage($stream, $response);
+        if ($dropBody || Http::isResponseWithoutBody($response->getStatusCode())) {
+            $body = new StringBody();
+        } else {
+            $body = Body::fromMessage($stream, $response);
+        }
         
         static $remove = [
             'Content-Encoding',

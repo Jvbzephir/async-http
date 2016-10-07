@@ -76,7 +76,7 @@ class HttpEndpoint
                     $alpn = '';
                 }
                 
-                yield from $this->http1->handleConnection($socket);
+                yield $this->http1->handleConnection($socket);
             });
         } finally {
             $this->server = null;

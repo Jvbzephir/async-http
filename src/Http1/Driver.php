@@ -11,11 +11,14 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
+use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Stream\StreamClosedException;
@@ -45,56 +48,61 @@ class Driver
         ];
     }
     
-    public function handleConnection(DuplexStream $stream): \Generator
+    public function handleConnection(DuplexStream $stream): Awaitable
     {
-        try {
-            do {
-                $request = yield from $this->parser->parseRequest($stream);
-                $request->getBody()->setCascadeClose(false);
-                
-                if ($request->getProtocolVersion() == '1.1') {
-                    if (!$request->hasHeader('Host')) {
-                        throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+        return new Coroutine(function () use ($stream) {
+            try {
+                do {
+                    $request = yield from $this->parser->parseRequest($stream);
+                    $request->getBody()->setCascadeClose(false);
+                    
+                    if ($request->getProtocolVersion() == '1.1') {
+                        if (!$request->hasHeader('Host')) {
+                            throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+                        }
+                        
+                        if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+                            $request->getBody()->setExpectContinue($stream);
+                        }
                     }
                     
-                    if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
-                        $request->getBody()->setExpectContinue($stream);
+                    if (!$this->keepAliveSupported) {
+                        $close = true;
+                    } elseif ($request->getProtocolVersion() == '1.0') {
+                        // HTTP/1.0 does not support keep alive.
+                        $close = true;
+                    } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
+                        // Close connection if client does not want to use keep alive.
+                        $close = true;
+                    } elseif (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
+                        // 
+                        $close = true;
+                    } else {
+                        $close = false;
                     }
+                    
+                    $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
+                    $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
+                    $response = $response->withBody(new \KoolKode\Async\Http\StringBody('Hello Test Client :)'));
+                    
+                    yield from $this->sendResponse($stream, $request, $response, $close);
+                } while (!$close);
+            } catch (StreamClosedException $e) {
+                yield from $this->handleClosedConnection($e);
+            } catch (\Throwable $e) {
+                $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+                
+                if ($e instanceof StatusException) {
+                    try {
+                        $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
+                    } catch (\Throwable $e) {}
                 }
                 
-                if (!$this->keepAliveSupported) {
-                    $close = true;
-                } elseif ($request->getProtocolVersion() == '1.0') {
-                    // HTTP/1.0 does not support keep alive.
-                    $close = true;
-                } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
-                    // Close connection if client does not want to use keep alive.
-                    $close = true;
-                } else {
-                    $close = false;
-                }
-                
-                $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
-                $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
-                $response = $response->withBody(new \KoolKode\Async\Http\StringBody('Hello Test Client :)'));
-                
-                yield from $this->sendResponse($stream, $request, $response, $close);
-            } while (!$close);
-        } catch (StreamClosedException $e) {
-            yield from $this->handleClosedConnection($e);
-        } catch (\Throwable $e) {
-            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-            
-            if ($e instanceof StatusException) {
-                try {
-                    $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
-                } catch (\Throwable $e) {}
+                yield from $this->sendErrorResponse($stream, $request, $response);
+            } finally {
+                $stream->close();
             }
-            
-            yield from $this->sendErrorResponse($stream, $request, $response);
-        } finally {
-            $stream->close();
-        }
+        });
     }
 
     protected function handleClosedConnection(\Throwable $e): \Generator
@@ -122,6 +130,7 @@ class Driver
         while (null !== yield $input->read());
         
         $http11 = ($response->getProtocolVersion() == '1.1');
+        $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));
         $body = $response->getBody();
         $size = yield $body->getSize();
         
@@ -139,14 +148,14 @@ class Driver
         
         $compress = null;
         
-        if ($size !== 0) {
+        if (!$nobody && $size !== 0) {
             $buffer .= $this->enableCompression($request, $compress, $size);
         }
         
         $bodyStream = yield $body->getReadableStream();
         
         // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
-        if ($http11 || $size !== null) {
+        if (!$nobody && ($http11 || $size !== null)) {
             if ($size === null) {
                 $buffer .= "Transfer-Encoding: chunked\r\n";
             } else {
@@ -162,27 +171,29 @@ class Driver
             }
         }
         
-        $buffer .= "\r\n";
-        
-        yield $stream->write($buffer);
+        yield $stream->write($buffer . "\r\n");
         yield $stream->flush();
         
         if ($compress !== null) {
             $bodyStream = new ReadableDeflateStream($bodyStream, $compress);
         }
         
-        if ($size === null) {
-            // Align each chunk with length and line breaks to fit into 4 KB payload.
-            yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
-                return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
-            });
-            
-            yield $stream->write("0\r\n\r\n");
+        if ($nobody) {
+            $bodyStream->close();
         } else {
-            yield new CopyBytes($bodyStream, $stream, true, $size);
+            if ($size === null) {
+                // Align each chunk with length and line breaks to fit into 4 KB payload.
+                yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                    return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
+                });
+                
+                yield $stream->write("0\r\n\r\n");
+            } else {
+                yield new CopyBytes($bodyStream, $stream, true, $size);
+            }
+            
+            yield $stream->flush();
         }
-        
-        yield $stream->flush();
     }
 
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse
@@ -202,9 +213,7 @@ class Driver
             $response = $response->withoutHeader($name);
         }
         
-        $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
-        
-        return $response;
+        return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
     }
 
     protected function enableCompression(HttpRequest $request, & $compress, & $size): string

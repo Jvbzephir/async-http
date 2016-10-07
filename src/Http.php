@@ -762,6 +762,27 @@ abstract class Http
     {
         return ($code >= 400 && $code < 600);
     }
+    
+    /**
+     * Check if the given response status indicates no body will be sent.
+     * 
+     * @param int $code
+     * @return bool
+     */
+    public static function isResponseWithoutBody(int $code): bool
+    {
+        switch ($code) {
+            case self::NO_CONTENT:
+            case self::NOT_MODIFIED:
+                return true;
+        }
+        
+        if ($code >= 100 && $code < 200) {
+            return true;
+        }
+        
+        return false;
+    }
 
     /**
      * Arrange an HTTP response status line using the given data.

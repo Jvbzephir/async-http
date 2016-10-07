@@ -38,6 +38,15 @@ class HttpTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($error, Http::isError($status));
     }
     
+    public function testDetectsResponsesWithoutBody()
+    {
+        $this->assertTrue(Http::isResponseWithoutBody(Http::CONTINUE));
+        $this->assertFalse(Http::isResponseWithoutBody(Http::OK));
+        $this->assertTrue(Http::isResponseWithoutBody(Http::NO_CONTENT));
+        $this->assertFalse(Http::isResponseWithoutBody(Http::CONFLICT));
+        $this->assertTrue(Http::isResponseWithoutBody(Http::NOT_MODIFIED));
+    }
+    
     public function provideStatusLines()
     {
         yield [Http::SEE_OTHER, 'HTTP/1.1 303 See Other'];
