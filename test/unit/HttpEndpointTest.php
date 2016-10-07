@@ -12,7 +12,6 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\Connector;
-use KoolKode\Async\Http\Http1\ResponseParser;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -35,11 +34,8 @@ class HttpEndpointTest extends AsyncTestCase
             $socket = yield $factory->createSocketStream();
             
             try {
-                $client = new Connector();
-                
                 $request = new HttpRequest('http://' . $factory->getPeer() . '/');
-                
-                $response = yield $client->send($socket, $request);
+                $response = yield (new Connector())->send($socket, $request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals('1.1', $response->getProtocolVersion());
@@ -69,17 +65,8 @@ class HttpEndpointTest extends AsyncTestCase
             $socket = yield $factory->createSocketStream();
             
             try {
-                $parser = new ResponseParser();
-                
-                $request = "HEAD / HTTP/1.0\r\n";
-                $request .= "Host: {$factory->getPeer()}\r\n";
-                $request .= "Conection: close\r\n";
-                $request .= "Content-Length: 0\r\n";
-                $request .= "\r\n";
-                
-                yield $socket->write($request);
-                
-                $response = yield from $parser->parseResponse($socket);
+                $request = new HttpRequest('http://' . $factory->getPeer() . '/', Http::HEAD, [], '1.0');
+                $response = yield (new Connector())->send($socket, $request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals('1.0', $response->getProtocolVersion());

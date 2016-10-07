@@ -52,6 +52,7 @@ class Connector
             $compression = \function_exists('inflate_init');
         }
         
+        $request = $this->normalizeRequest($request);
         $body = $request->getBody();
         $size = yield $body->getSize();
         $nobody = ($request->getMethod() === Http::HEAD);
@@ -118,7 +119,16 @@ class Connector
             'Transfer-Encoding'
         ];
         
-        $request = $request->withProtocolVersion('1.1');
+        $version = $request->getProtocolVersion();
+        
+        switch ($version) {
+            case '1.0':
+            case '1.1':
+                // Everything fine, version is supported.
+                break;
+            default:
+                $request = $request->withProtocolVersion('1.1');
+        }
         
         foreach ($remove as $name) {
             $request = $request->withoutHeader($name);
