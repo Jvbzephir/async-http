@@ -27,7 +27,7 @@ class RequestParser extends MessageParser
         
         $m = null;
         
-        if (!\preg_match("'^(\S+)\s+(.+)\s+HTTP/(1\\.[01])$'i", trim($line), $m)) {
+        if (!\preg_match("'^(\S+)\s+(.+)\s+HTTP/(1\\.[01])$'i", \trim($line), $m)) {
             throw new StreamClosedException('Invalid HTTP request line received');
         }
         
@@ -40,7 +40,6 @@ class RequestParser extends MessageParser
         static $remove = [
             'Content-Encoding',
             'Content-Length',
-            'Keep-Alive',
             'Trailer',
             'Transfer-Encoding'
         ];

@@ -27,23 +27,21 @@ class ResponseParser extends MessageParser
         
         $m = null;
         
-        if (!\preg_match("'^HTTP/(1\\.[01])\s+([1-5][0-9]{2})(.*)$'i", trim($line), $m)) {
+        if (!\preg_match("'^HTTP/(1\\.[01])\s+([1-5][0-9]{2})(.*)$'i", \trim($line), $m)) {
             throw new StreamClosedException('Invalid HTTP response line received');
         }
         
         $response = new HttpResponse();
         $response = $response->withProtocolVersion($m[1]);
-        $response = $response->withStatus((int) $m[2], trim($m[3]));
+        $response = $response->withStatus((int) $m[2], \trim($m[3]));
         
         $response = yield from $this->parseHeaders($stream, $response);
         
         $body = Body::fromMessage($stream, $response);
         
         static $remove = [
-            'Connection',
             'Content-Encoding',
             'Content-Length',
-            'Keep-Alive',
             'Trailer',
             'Transfer-Encoding'
         ];

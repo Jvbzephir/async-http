@@ -26,7 +26,7 @@ abstract class MessageParser
         $remaining = 131072;
         
         try {
-            while (NULL !== ($line = yield $stream->readLine($remaining))) {
+            while (null !== ($line = yield $stream->readLine($remaining))) {
                 if (\trim($line) === '') {
                     break;
                 }
