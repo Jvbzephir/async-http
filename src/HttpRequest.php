@@ -173,11 +173,6 @@ class HttpRequest extends HttpMessage
     {
         return $this->uri->getQueryParams();
     }
-    
-    public function isContinueExpected(): bool
-    {
-        return $this->protocolVersion == '1.1' && \in_array('100-continue', $this->getHeaderTokens('Expect'), true);
-    }
 
     protected function filterMethod(string $method): string
     {

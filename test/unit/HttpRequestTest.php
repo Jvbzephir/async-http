@@ -155,13 +155,4 @@ class HttpRequestTest extends \PHPUnit_Framework_TestCase
         $this->assertNotSame($uri, $request->getUri());
         $this->assertEquals('http://test.me/', (string) $request->getUri());
     }
-    
-    public function testDetectsExpectedContinue()
-    {
-        $request = new HttpRequest('http://localhost/');
-        $this->assertFalse($request->isContinueExpected());
-        
-        $request = $request->withHeader('Expect', '100-continue', '199-crap');
-        $this->assertTrue($request->isContinueExpected());
-    }
 }

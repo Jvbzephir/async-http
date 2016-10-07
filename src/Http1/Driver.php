@@ -52,12 +52,14 @@ class Driver
                 $request = yield from $this->parser->parseRequest($stream);
                 $request->getBody()->setCascadeClose(false);
                 
-                if ($request->isContinueExpected()) {
-                    $request->getBody()->setExpectContinue($stream);
-                }
-                
-                if ($request->getProtocolVersion() == '1.1' && !$request->hasHeader('Host')) {
-                    throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+                if ($request->getProtocolVersion() == '1.1') {
+                    if (!$request->hasHeader('Host')) {
+                        throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+                    }
+                    
+                    if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+                        $request->getBody()->setExpectContinue($stream);
+                    }
                 }
                 
                 if (!$this->keepAliveSupported) {
