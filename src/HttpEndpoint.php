@@ -79,7 +79,7 @@ class HttpEndpoint
                 yield from $this->http1->handleConnection($socket);
             });
         } finally {
-            $this->server = NULL;
+            $this->server = null;
         }
     }
 }

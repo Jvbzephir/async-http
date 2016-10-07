@@ -176,15 +176,7 @@ class HttpRequest extends HttpMessage
     
     public function isContinueExpected(): bool
     {
-        if ($this->hasHeader('Expect') && $this->protocolVersion === '1.1') {
-            $expected = \array_map('strtolower', \array_map('trim', $this->getHeader('Expect')));
-            
-            if (\in_array('100-continue', $expected, true)) {
-                return true;
-            }
-        }
-        
-        return false;
+        return $this->protocolVersion == '1.1' && \in_array('100-continue', $this->getHeaderTokens('Expect'), true);
     }
 
     protected function filterMethod(string $method): string

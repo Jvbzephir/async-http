@@ -782,7 +782,7 @@ abstract class Http
      * @param mixed $default
      * @return mixed
      */
-    public static function getReason(int $code, string $default = null): string
+    public static function getReason(int $code, string $default = ''): string
     {
         $code = (int) $code;
         

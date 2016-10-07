@@ -35,10 +35,12 @@ abstract class HttpMessage
         $this->headers = [];
         
         foreach ($headers as $k => $v) {
-            $filtered = $this->filterHeaders(\array_map(function ($v) use ($k) {
+            $k = \trim($k);
+            
+            $filtered = $this->filterHeaders(\array_map(function (string $v) use ($k) {
                 return [
                     $k,
-                    $v
+                    \trim($v)
                 ];
             }, [
                 (string) $v
@@ -78,12 +80,12 @@ abstract class HttpMessage
 
     public function hasHeader(string $name): bool
     {
-        return isset($this->headers[\strtolower($name)]);
+        return isset($this->headers[\strtolower(\trim($name))]);
     }
 
     public function getHeader(string $name): array
     {
-        $n = \strtolower($name);
+        $n = \strtolower(\trim($name));
         
         if (empty($this->headers[$n])) {
             return [];
@@ -114,10 +116,12 @@ abstract class HttpMessage
 
     public function withHeader(string $name, string ...$values): HttpMessage
     {
-        $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
+        $name = \trim($name);
+        
+        $filtered = $this->filterHeaders(\array_map(function (string $val) use ($name) {
             return [
                 $name,
-                $val
+                \trim($val)
             ];
         }, $values));
         
@@ -131,10 +135,12 @@ abstract class HttpMessage
 
     public function withAddedHeader(string $name, string ...$values): HttpMessage
     {
-        $filtered = $this->filterHeaders(\array_map(function ($val) use ($name) {
+        $name = \trim($name);
+        
+        $filtered = $this->filterHeaders(\array_map(function (string $val) use ($name) {
             return [
                 $name,
-                $val
+                \trim($val)
             ];
         }, $values));
         
@@ -151,7 +157,7 @@ abstract class HttpMessage
     public function withoutHeader(string $name): HttpMessage
     {
         $message = clone $this;
-        unset($message->headers[\strtolower($name)]);
+        unset($message->headers[\strtolower(\trim($name))]);
         
         return $message;
     }
