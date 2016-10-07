@@ -18,6 +18,7 @@ use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
+use KoolKode\Async\Http\StreamBody;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Body
@@ -212,5 +213,42 @@ class BodyTest extends AsyncTestCase
         $this->expectException(StatusException::class);
         
         Body::fromMessage(new ReadableMemoryStream(), $message);
+    }
+    
+    public function testSupportsEOFUsingMessage()
+    {
+        $input = new ReadableMemoryStream('Hi');
+        
+        $message = new HttpResponse();
+        $message = $message->withHeader('Connection', 'close');
+        $message = $message->withBody(new StreamBody($input));
+        
+        $stream = yield Body::fromMessage($input, $message)->getReadableStream();
+        
+        try {
+            $this->assertSame($input, $stream);
+            $this->assertEquals('Hi', yield new ReadContents($stream));
+        } finally {
+            $stream->close();
+        }
+    }
+
+    public function testDecoratesStreamWhenNotCascadingClose()
+    {
+        $input = new ReadableMemoryStream('Hi');
+        
+        $body = new Body($input, true);
+        $body->setCascadeClose(false);
+        
+        $stream = yield $body->getReadableStream();
+        
+        try {
+            $this->assertEquals('Hi', yield new ReadContents($stream));
+        } finally {
+            $stream->close();
+        }
+        
+        $this->assertEquals(2, $input->getOffset());
+        $this->assertFalse($input->isClosed());
     }
 }

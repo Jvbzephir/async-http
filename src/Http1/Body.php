@@ -24,6 +24,7 @@ use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableInflateStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\ReadableStreamDecorator;
 use KoolKode\Async\Stream\WritableStream;
 use KoolKode\Async\Success;
 
@@ -94,15 +95,24 @@ class Body implements HttpBody
      * @var bool
      */
     protected $cascadeClose = true;
+    
+    /**
+     * Can the length of the body be determined using stream EOF?
+     * 
+     * @var bool
+     */
+    protected $closeSupported;
 
     /**
      * Create a body that can decode contents received by the given socket.
      * 
      * @param ReadableStream $stream
+     * @param bool $closeSupported Can the length of the body be determined using stream EOF?
      */
-    public function __construct(ReadableStream $stream)
+    public function __construct(ReadableStream $stream, bool $closeSupported = false)
     {
         $this->stream = $stream;
+        $this->closeSupported = $closeSupported;
     }
 
     /**
@@ -126,7 +136,13 @@ class Body implements HttpBody
      */
     public static function fromMessage(ReadableStream $stream, HttpMessage $message): Body
     {
-        $body = new static($stream);
+        $close = false;
+        
+        if ($message instanceof HttpResponse && \in_array('close', $message->getHeaderTokens('Connection'))) {
+            $close = true;
+        }
+        
+        $body = new static($stream, $close);
         
         if ($message->hasHeader('Transfer-Encoding')) {
             $encodings = \strtolower($message->getHeaderLine('Transfer-Encoding'));
@@ -308,6 +324,20 @@ class Body implements HttpBody
             $stream = new ChunkDecodedStream($this->stream, $this->cascadeClose);
         } elseif ($this->length > 0) {
             $stream = new LimitStream($this->stream, $this->length, $this->cascadeClose);
+        } elseif ($this->closeSupported) {
+            if ($this->cascadeClose) {
+                return $this->stream;
+            }
+            
+            return new class($this->stream) extends ReadableStreamDecorator {
+
+                protected $cascadeClose = false;
+
+                protected function processChunk(string $chunk): string
+                {
+                    return $chunk;
+                }
+            };
         } else {
             if ($this->cascadeClose) {
                 $this->stream->close();
