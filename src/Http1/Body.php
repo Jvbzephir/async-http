@@ -320,24 +320,16 @@ class Body implements HttpBody
             yield $this->expectContinue->write("HTTP/1.1 100 Continue\r\n");
         }
         
+        $decorated = false;
+        
         if ($this->chunked) {
             $stream = new ChunkDecodedStream($this->stream, $this->cascadeClose);
+            $decorated = true;
         } elseif ($this->length > 0) {
             $stream = new LimitStream($this->stream, $this->length, $this->cascadeClose);
+            $decorated = true;
         } elseif ($this->closeSupported) {
-            if ($this->cascadeClose) {
-                return $this->stream;
-            }
-            
-            return new class($this->stream) extends ReadableStreamDecorator {
-
-                protected $cascadeClose = false;
-
-                protected function processChunk(string $chunk): string
-                {
-                    return $chunk;
-                }
-            };
+            $stream = $this->stream;
         } else {
             if ($this->cascadeClose) {
                 $this->stream->close();
@@ -346,13 +338,35 @@ class Body implements HttpBody
             return new ReadableMemoryStream();
         }
         
-        switch ($this->compression) {
-            case self::COMPRESSION_GZIP:
-                return new ReadableInflateStream($stream, \ZLIB_ENCODING_GZIP);
-            case self::COMPRESSION_DEFLATE:
-                return new ReadableInflateStream($stream, \ZLIB_ENCODING_DEFLATE);
+        if ($this->compression) {
+            switch ($this->compression) {
+                case self::COMPRESSION_GZIP:
+                    $stream = new ReadableInflateStream($stream, \ZLIB_ENCODING_GZIP);
+                    break;
+                case self::COMPRESSION_DEFLATE:
+                    $stream = new ReadableInflateStream($stream, \ZLIB_ENCODING_DEFLATE);
+                    break;
+            }
+            
+            if (!$decorated) {
+                $stream->setCascadeClose($this->cascadeClose);
+                
+                $decorated = true;
+            }
         }
         
-        return $stream;
+        if ($decorated || $this->cascadeClose) {
+            return $stream;
+        }
+        
+        return new class($this->stream) extends ReadableStreamDecorator {
+
+            protected $cascadeClose = false;
+
+            protected function processChunk(string $chunk): string
+            {
+                return $chunk;
+            }
+        };
     }
 }

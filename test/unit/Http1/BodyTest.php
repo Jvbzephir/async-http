@@ -231,6 +231,8 @@ class BodyTest extends AsyncTestCase
         } finally {
             $stream->close();
         }
+        
+        $this->assertTrue($input->isClosed());
     }
 
     public function testDecoratesStreamWhenNotCascadingClose()
@@ -248,7 +250,27 @@ class BodyTest extends AsyncTestCase
             $stream->close();
         }
         
-        $this->assertEquals(2, $input->getOffset());
+        $this->assertNull(yield $input->read());
+        $this->assertFalse($input->isClosed());
+    }
+    
+    public function testDecoratesCompressedStreamWhenNotCascadingClose()
+    {
+        $input = new ReadableMemoryStream(gzencode('Hi'));
+    
+        $body = new Body($input, true);
+        $body->setCascadeClose(false);
+        $body->setCompression(Body::COMPRESSION_GZIP);
+    
+        $stream = yield $body->getReadableStream();
+    
+        try {
+            $this->assertEquals('Hi', yield new ReadContents($stream));
+        } finally {
+            $stream->close();
+        }
+    
+        $this->assertNull(yield $input->read());
         $this->assertFalse($input->isClosed());
     }
 }
