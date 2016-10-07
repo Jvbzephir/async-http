@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Http\Http1\ResponseParser;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -21,47 +22,7 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class HttpEndpointTest extends AsyncTestCase
 {
-    public function testHttp1HeadRequest()
-    {
-        $endpoint = new HttpEndpoint();
-        $server = yield $endpoint->listen();
-    
-        $this->assertTrue($server instanceof HttpServer);
-    
-        try {
-            $factory = $server->createSocketFactory();
-            
-            $socket = yield $factory->createSocketStream();
-    
-            try {
-                $parser = new ResponseParser();
-    
-                $request = "HEAD / HTTP/1.0\r\n";
-                $request .= "Host: {$factory->getPeer()}\r\n";
-                $request .= "Conection: close\r\n";
-                $request .= "Content-Length: 0\r\n";
-                $request .= "\r\n";
-    
-                yield $socket->write($request);
-    
-                $response = yield from $parser->parseResponse($socket);
-    
-                $this->assertTrue($response instanceof HttpResponse);
-                $this->assertEquals('1.0', $response->getProtocolVersion());
-                $this->assertEquals(Http::OK, $response->getStatusCode());
-                $this->assertEquals('OK', $response->getReasonPhrase());
-                $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
-    
-                $this->assertEquals('', yield $response->getBody()->getContents());
-            } finally {
-                $socket->close();
-            }
-        } finally {
-            $server->stop();
-        }
-    }
-    
-    public function testHttp1Roundtrip()
+    public function testClient()
     {
         $endpoint = new HttpEndpoint();
         $server = yield $endpoint->listen();
@@ -71,40 +32,14 @@ class HttpEndpointTest extends AsyncTestCase
         try {
             $factory = $server->createSocketFactory();
             
-            if (Socket::isAlpnSupported()) {
-                $factory->setOption('ssl', 'alpn_protocols', 'http/1.1,h2');
-            }
-            
             $socket = yield $factory->createSocketStream();
             
             try {
-                $parser = new ResponseParser();
-                $expect = true;
+                $client = new Connector();
                 
-                $request = "POST / HTTP/1.1\r\n";
-                $request .= "Host: {$factory->getPeer()}\r\n";
-                $request .= "Conection: close\r\n";
-                $request .= "Content-Length: 8\r\n";
+                $request = new HttpRequest('http://' . $factory->getPeer() . '/');
                 
-                if (\function_exists('inflate_init')) {
-                    $request .= "Accept-Encoding: gzip, deflate\r\n";
-                }
-                
-                if ($expect) {
-                    $request .= "Expect: 100-continue\r\n";
-                }
-                
-                $request .= "\r\n";
-                
-                yield $socket->write($request);
-                
-                if ($expect) {
-                    $this->assertEquals('HTTP/1.1 100 Continue', yield $socket->readLine());
-                }
-                
-                yield $socket->write('Hello :)');
-                
-                $response = yield from $parser->parseResponse($socket);
+                $response = yield $client->send($socket, $request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
                 $this->assertEquals('1.1', $response->getProtocolVersion());
@@ -113,6 +48,46 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
+            } finally {
+                $socket->close();
+            }
+        } finally {
+            $server->stop();
+        }
+    }
+
+    public function testHttp1HeadRequest()
+    {
+        $endpoint = new HttpEndpoint();
+        $server = yield $endpoint->listen();
+        
+        $this->assertTrue($server instanceof HttpServer);
+        
+        try {
+            $factory = $server->createSocketFactory();
+            
+            $socket = yield $factory->createSocketStream();
+            
+            try {
+                $parser = new ResponseParser();
+                
+                $request = "HEAD / HTTP/1.0\r\n";
+                $request .= "Host: {$factory->getPeer()}\r\n";
+                $request .= "Conection: close\r\n";
+                $request .= "Content-Length: 0\r\n";
+                $request .= "\r\n";
+                
+                yield $socket->write($request);
+                
+                $response = yield from $parser->parseResponse($socket);
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals('1.0', $response->getProtocolVersion());
+                $this->assertEquals(Http::OK, $response->getStatusCode());
+                $this->assertEquals('OK', $response->getReasonPhrase());
+                $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
+                
+                $this->assertEquals('', yield $response->getBody()->getContents());
             } finally {
                 $socket->close();
             }

@@ -88,14 +88,21 @@ class Driver
                     yield from $this->sendResponse($stream, $request, $response, $close);
                 } while (!$close);
             } catch (StreamClosedException $e) {
+                fwrite(STDERR, "\n$e\n");
                 yield from $this->handleClosedConnection($e);
             } catch (\Throwable $e) {
+                fwrite(STDERR, "\n$e\n");
                 $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
                 
                 if ($e instanceof StatusException) {
                     try {
                         $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
                     } catch (\Throwable $e) {}
+                }
+                
+                if ($this->debug) {
+                    $response = $response->withHeader('Content-Type', 'text/plain');
+                    $response = $response->withBody(new StringBody($e->getMessage()));
                 }
                 
                 yield from $this->sendErrorResponse($stream, $request, $response);
@@ -116,6 +123,7 @@ class Driver
         try {
             yield from $this->sendResponse($stream, $request, $response, true);
         } catch (\Throwable $e) {
+            fwrite(STDERR, "\n$e\n");
             yield from $this->handleClosedConnection($e);
         }
     }
@@ -244,5 +252,7 @@ class Driver
                 return \sprintf("Content-Encoding: %s\r\n", $key);
             }
         }
+        
+        return '';
     }
 }
