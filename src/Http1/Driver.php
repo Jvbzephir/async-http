@@ -22,12 +22,15 @@ use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Stream\StreamClosedException;
+use KoolKode\Async\Util\Executor;
+use KoolKode\Async\Deferred;
+use KoolKode\Async\Timeout;
 
 class Driver
 {
     protected $parser;
     
-    protected $keepAliveSupported = false;
+    protected $keepAliveSupported = true;
     
     protected $debug = false;
     
@@ -51,65 +54,89 @@ class Driver
     public function handleConnection(DuplexStream $stream): Awaitable
     {
         return new Coroutine(function () use ($stream) {
+            $executor = new Executor();
+            $jobs = new \SplQueue();
+            
             try {
                 do {
-                    $request = yield from $this->parser->parseRequest($stream);
-                    $request->getBody()->setCascadeClose(false);
-                    
-                    if ($request->getProtocolVersion() == '1.1') {
-                        if (!$request->hasHeader('Host')) {
-                            throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+                    try {
+                        $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
+                        $request->getBody()->setCascadeClose(false);
+                        
+                        if ($request->getProtocolVersion() == '1.1') {
+                            if (!$request->hasHeader('Host')) {
+                                throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+                            }
+                            
+                            if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+                                $request->getBody()->setExpectContinue($stream);
+                            }
                         }
                         
-                        if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
-                            $request->getBody()->setExpectContinue($stream);
+                        if (!$this->keepAliveSupported) {
+                            $close = true;
+                        } elseif ($request->getProtocolVersion() == '1.0') {
+                            // HTTP/1.0 does not support keep alive.
+                            $close = true;
+                        } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
+                            // Close connection if client does not want to use keep alive.
+                            $close = true;
+                        } elseif (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
+                            // Eighter content length or chunked encoding required to read request body.
+                            $close = true;
+                        } else {
+                            $close = false;
                         }
+                        
+                        $request = $request->withoutHeader('Content-Length');
+                        $request = $request->withoutHeader('Transfer-Encoding');
+                        
+                        $defer = new Deferred();
+                        
+                        $jobs->enqueue($executor->execute(function () use ($stream, $request, $defer, $close) {
+                            yield from $this->processRequest($stream, $request, $defer, $close);
+                        }));
+                        
+                        if (!yield $defer) {
+                            break;
+                        }
+                    } catch (StreamClosedException $e) {
+                        break;
+                    } catch (\Throwable $e) {
+                        yield from $this->sendErrorResponse($stream, $request, $e);
+                        
+                        break;
                     }
-                    
-                    if (!$this->keepAliveSupported) {
-                        $close = true;
-                    } elseif ($request->getProtocolVersion() == '1.0') {
-                        // HTTP/1.0 does not support keep alive.
-                        $close = true;
-                    } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
-                        // Close connection if client does not want to use keep alive.
-                        $close = true;
-                    } elseif (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
-                        // 
-                        $close = true;
-                    } else {
-                        $close = false;
-                    }
-                    
-                    $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
-                    $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
-                    $response = $response->withBody(new \KoolKode\Async\Http\StringBody('Hello Test Client :)'));
-                    
-                    yield from $this->sendResponse($stream, $request, $response, $close);
                 } while (!$close);
-            } catch (StreamClosedException $e) {
-                fwrite(STDERR, "\n$e\n");
-                yield from $this->handleClosedConnection($e);
-            } catch (\Throwable $e) {
-                fwrite(STDERR, "\n$e\n");
-                $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
                 
-                if ($e instanceof StatusException) {
-                    try {
-                        $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
-                    } catch (\Throwable $e) {}
+                while (!$jobs->isEmpty()) {
+                    yield $jobs->dequeue();
                 }
-                
-                if ($this->debug) {
-                    $response = $response->withHeader('Content-Type', 'text/plain');
-                    $response = $response->withBody(new StringBody($e->getMessage()));
-                }
-                
-                yield from $this->sendErrorResponse($stream, $request, $response);
             } finally {
                 $stream->close();
             }
         });
+    }
+    
+    protected function processRequest(DuplexStream $stream, HttpRequest $request, Deferred $defer, bool $close): \Generator
+    {
+        try {
+            $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
+            $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
+            $response = $response->withBody(new StringBody('Hello Test Client :)'));
+            
+            yield from $this->sendResponse($stream, $request, $response, $defer, $close);
+        } catch (StreamClosedException $e) {
+            if ($defer->isPending()) {
+                $defer->resolve(false);
+            }
+        } catch (\Throwable $e) {
+            if ($defer->isPending()) {
+                $defer->resolve(false);
+            }
+            
+            yield from $this->sendErrorResponse($stream, $request, $e);
+        }
     }
 
     protected function handleClosedConnection(\Throwable $e): \Generator
@@ -118,24 +145,44 @@ class Driver
         yield 1;
     }
 
-    protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response): \Generator
+    protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
+        fwrite(STDERR, "\n$e\n");
+        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+        
+        if ($e instanceof StatusException) {
+            try {
+                $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
+            } catch (\Throwable $e) {}
+        }
+        
+        if ($this->debug) {
+            $response = $response->withHeader('Content-Type', 'text/plain');
+            $response = $response->withBody(new StringBody($e->getMessage()));
+        }
+        
         try {
-            yield from $this->sendResponse($stream, $request, $response, true);
+            yield from $this->sendResponse($stream, $request, $response, new Deferred(), true);
         } catch (\Throwable $e) {
             fwrite(STDERR, "\n$e\n");
             yield from $this->handleClosedConnection($e);
         }
     }
 
-    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, Deferred $defer, bool $close): \Generator
     {
         $response = $this->normalizeResponse($request, $response);
         
+        // Discard remaining request body before sending response.
         $input = yield $request->getBody()->getReadableStream();
         
-        // Discard remaining request body before sending response.
-        while (null !== yield $input->read());
+        try {
+            while (null !== yield $input->read());
+        } finally {
+            $input->close();
+            
+            $defer->resolve(true);
+        }
         
         $http11 = ($response->getProtocolVersion() == '1.1');
         $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));

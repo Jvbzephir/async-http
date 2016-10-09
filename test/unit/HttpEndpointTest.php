@@ -44,6 +44,8 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
+                
+                yield new \KoolKode\Async\Pause(.1);
             } finally {
                 $socket->close();
             }

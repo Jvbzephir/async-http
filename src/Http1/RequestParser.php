@@ -39,9 +39,7 @@ class RequestParser extends MessageParser
         
         static $remove = [
             'Content-Encoding',
-            'Content-Length',
-            'Trailer',
-            'Transfer-Encoding'
+            'Trailer'
         ];
         
         foreach ($remove as $name) {
