@@ -226,7 +226,6 @@ class BodyTest extends AsyncTestCase
         $stream = yield Body::fromMessage($input, $message)->getReadableStream();
         
         try {
-            $this->assertSame($input, $stream);
             $this->assertEquals('Hi', yield new ReadContents($stream));
         } finally {
             $stream->close();

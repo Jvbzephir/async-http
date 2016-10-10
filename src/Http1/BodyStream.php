@@ -14,72 +14,47 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\Success;
-use KoolKode\Async\Util\Channel;
+use KoolKode\Async\Stream\ReadableStreamDecorator;
 
-class BodyStream implements ReadableStream
+class BodyStream extends ReadableStreamDecorator
 {
-    protected $stream;
-    
-    protected $cascadeClose;
-    
+    protected $defer;
+
     public function __construct(ReadableStream $stream, bool $cascadeClose = true)
     {
-        $this->stream = $stream;
+        parent::__construct($stream);
+        
         $this->cascadeClose = $cascadeClose;
+        $this->defer = new Deferred();
+    }
+    
+    public function __destruct()
+    {
+        $this->close();
+    }
+
+    public function getAwaitable(): Awaitable
+    {
+        return $this->defer;
     }
 
     public function close(): Awaitable
     {
-        if ($this->cascadeClose && $this->stream !== null) {
-            try {
-                return $this->stream->close();
-            } finally {
-                $this->stream = null;
-            }
+        if ($this->defer->isPending()) {
+            $this->defer->resolve(true);
         }
         
-        return new Success(null);
+        return parent::close();
     }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function read(int $length = 8192): Awaitable
+
+    protected function processChunk(string $chunk): string
     {
-        return $this->stream->read($length);
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function readBuffer(int $length, bool $enforceLength = false): Awaitable
-    {
-        return $this->stream->readBuffer($length, $enforceLength);
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function readLine(int $length = 8192): Awaitable
-    {
-        return $this->stream->readLine($length);
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function readTo(string $delim, int $length = 8192): Awaitable
-    {
-        return $this->stream->readTo($delim, $length);
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
-    public function channel(int $chunkSize = 4096, int $length = null): Channel
-    {
-        return $this->stream->channel($chunkSize, $length);
+        if ($chunk === '' && $this->defer->isPending()) {
+            $this->defer->resolve(true);
+        }
+        
+        return $chunk;
     }
 }

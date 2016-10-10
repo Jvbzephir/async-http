@@ -24,7 +24,6 @@ use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableInflateStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\Stream\ReadableStreamDecorator;
 use KoolKode\Async\Stream\WritableStream;
 use KoolKode\Async\Success;
 
@@ -114,13 +113,13 @@ class Body implements HttpBody
         $this->stream = $stream;
         $this->closeSupported = $closeSupported;
     }
-
+    
     /**
-     * Ensure the underlying stream is closed in case of cascaded close.
+     * Close underlying stream when cascaded close is requested and the body has not been accessed.
      */
     public function __destruct()
     {
-        if ($this->cascadeClose) {
+        if ($this->cascadeClose && $this->decodedStream === null) {
             $this->stream->close();
         }
     }
@@ -320,14 +319,10 @@ class Body implements HttpBody
             yield $this->expectContinue->write("HTTP/1.1 100 Continue\r\n");
         }
         
-        $decorated = false;
-        
         if ($this->chunked) {
-            $stream = new ChunkDecodedStream($this->stream, $this->cascadeClose);
-            $decorated = true;
+            $stream = new ChunkDecodedStream($this->stream);
         } elseif ($this->length > 0) {
-            $stream = new LimitStream($this->stream, $this->length, $this->cascadeClose);
-            $decorated = true;
+            $stream = new LimitStream($this->stream, $this->length);
         } elseif ($this->closeSupported) {
             $stream = $this->stream;
         } else {
@@ -335,7 +330,7 @@ class Body implements HttpBody
                 $this->stream->close();
             }
             
-            return new ReadableMemoryStream();
+            return new BodyStream(new ReadableMemoryStream());
         }
         
         if ($this->compression) {
@@ -347,26 +342,8 @@ class Body implements HttpBody
                     $stream = new ReadableInflateStream($stream, \ZLIB_ENCODING_DEFLATE);
                     break;
             }
-            
-            if (!$decorated) {
-                $stream->setCascadeClose($this->cascadeClose);
-                
-                $decorated = true;
-            }
         }
         
-        if ($decorated || $this->cascadeClose) {
-            return $stream;
-        }
-        
-        return new class($this->stream) extends ReadableStreamDecorator {
-
-            protected $cascadeClose = false;
-
-            protected function processChunk(string $chunk): string
-            {
-                return $chunk;
-            }
-        };
+        return new BodyStream($stream, $this->cascadeClose);
     }
 }
