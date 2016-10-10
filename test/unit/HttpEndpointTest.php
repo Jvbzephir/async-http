@@ -134,4 +134,18 @@ class HttpEndpointTest extends AsyncTestCase
             $server->stop();
         }
     }
+    
+//     public function testHttp2Client()
+//     {
+//         $client = new HttpClient(new \KoolKode\Async\Http\Http2\Connector());
+        
+//         try {
+//             $request = new HttpRequest('https://http2.golang.org/reqinfo');
+//             $response = yield $client->send($request);
+            
+//             fwrite(STDERR, yield $response->getBody()->getContents());
+//         } finally {
+//             $client->shutdown();
+//         }
+//     }
 }
