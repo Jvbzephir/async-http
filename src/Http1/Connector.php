@@ -16,16 +16,15 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
 
-class Connector
+class Connector implements HttpConnector
 {
     protected $parser;
-    
-    protected $keepAliveSupported = true;
     
     protected $debug = false;
 
@@ -34,33 +33,47 @@ class Connector
         $this->parser = $parser ?? new ResponseParser();
     }
     
-    public function isKeepAliveSupported(): bool
-    {
-        return $this->keepAliveSupported;
-    }
-    
-    public function setKeepAliveSupported(bool $keepAlive)
-    {
-        $this->keepAliveSupported = $keepAlive;
-    }
-    
     public function setDebug(bool $debug)
     {
         $this->debug = $debug;
     }
 
-    public function send(DuplexStream $stream, HttpRequest $request): Awaitable
+    /**
+     * {@inheritdoc}
+     */
+    public function getProtocols(): array
     {
-        return new Coroutine(function () use ($stream, $request) {
+        return [
+            'http/1.1'
+        ];
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function isSupported(string $protocol, array $meta = []): bool
+    {
+        return \in_array($protocol, [
+            'http/1.1',
+            ''
+        ], true);
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function send(DuplexStream $stream, HttpRequest $request, bool $keepAlive = true): Awaitable
+    {
+        return new Coroutine(function () use ($stream, $request, $keepAlive) {
             $done = false;
             
             try {
                 // Ensure no partial requests are being sent.
-                yield new Atomic(new Coroutine($this->sendRequest($stream, $request, $done)));
+                yield new Atomic(new Coroutine($this->sendRequest($stream, $request, $done, $keepAlive)));
                 
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
                 
-                if (!$this->shouldConnectionBeClosed($response)) {
+                if ($keepAlive && !$this->shouldConnectionBeClosed($response)) {
                     $response->getBody()->setCascadeClose(false);
                 }
                 
@@ -82,10 +95,6 @@ class Connector
 
     protected function shouldConnectionBeClosed(HttpResponse $response): bool
     {
-        if (!$this->keepAliveSupported) {
-            return true;
-        }
-        
         if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
             return true;
         }
@@ -97,7 +106,7 @@ class Connector
         return false;
     }
     
-    protected function sendRequest(DuplexStream $stream, HttpRequest $request, bool & $done): \Generator
+    protected function sendRequest(DuplexStream $stream, HttpRequest $request, bool & $done, bool $keepAlive): \Generator
     {
         static $compression;
         
@@ -115,7 +124,7 @@ class Connector
             
             $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
             
-            if ($this->keepAliveSupported) {
+            if ($keepAlive) {
                 $buffer .= "Connection: keep-alive\r\n";
             } else {
                 $buffer .= "Connection: close\r\n";
@@ -160,7 +169,6 @@ class Connector
             
             // TODO: Add support for Expect: 100-continue
             
-
             if ($nobody) {
                 $bodyStream->close();
             } else {

@@ -15,6 +15,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
@@ -25,7 +26,7 @@ use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Executor;
 
-class Driver
+class Driver implements HttpDriver
 {
     protected $parser;
     
@@ -48,6 +49,9 @@ class Driver
         $this->debug = $debug;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function getProtocols(): array
     {
         return [
@@ -55,6 +59,9 @@ class Driver
         ];
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function handleConnection(DuplexStream $stream): Awaitable
     {
         return new Coroutine(function () use ($stream) {

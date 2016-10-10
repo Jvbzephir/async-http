@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\DNS\Address;
@@ -34,23 +35,35 @@ class ConnectionPool
         $this->protocols = $protocols;
     }
     
-    public function shutdown()
+    public function setProtocols(array $protocols)
     {
+        $this->protocols = $protocols;
+    }
+
+    public function shutdown(): Awaitable
+    {
+        $tasks = [];
         $e = new StreamClosedException('Http connection closed');
         
         foreach ($this->conns as $q) {
             if (isset($q[1])) {
                 while (!$q[1]->isEmpty()) {
-                    $q[1]->dequeue()->fail($e);
+                    $q[1]->dequeue()->cancel($e);
                 }
             }
             
             if (isset($q[0])) {
                 while (!$q[0]->isEmpty()) {
-                    $q[0]->dequeue()->close();
+                    $tasks[] = $q[0]->dequeue()->close();
                 }
             }
         }
+        
+        if ($tasks) {
+            return new AwaitPending($tasks);
+        }
+        
+        return new Success(null);
     }
     
     public function connect(Uri $uri, bool $keepAlive): Awaitable

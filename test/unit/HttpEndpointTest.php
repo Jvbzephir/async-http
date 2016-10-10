@@ -11,8 +11,6 @@
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Http\Http1\Client;
-use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
@@ -21,21 +19,19 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class HttpEndpointTest extends AsyncTestCase
 {
-    public function provideKeepAlive()
+    public function provideKeepAliveMode()
     {
         yield [false];
         yield [true];
     }
     
     /**
-     * @dataProvider provideKeepAlive
+     * @dataProvider provideKeepAliveMode
      */
     public function testConnect(bool $keepAlive)
     {
-        $connector = new Connector();
-        $connector->setKeepAliveSupported($keepAlive);
-        
-        $client = new Client($connector);
+        $client = new HttpClient();
+        $client->setKeepAlive($keepAlive);
         
         try {
             $request = new HttpRequest('https://httpbin.org/user-agent');
@@ -70,7 +66,7 @@ class HttpEndpointTest extends AsyncTestCase
         $this->assertTrue($server instanceof HttpServer);
         
         try {
-            $client = new Client();
+            $client = new HttpClient();
             
             try {
                 $data = json_encode([
@@ -118,7 +114,7 @@ class HttpEndpointTest extends AsyncTestCase
         $this->assertTrue($server instanceof HttpServer);
         
         try {
-            $client = new Client();
+            $client = new HttpClient();
             
             try {
                 $request = new HttpRequest($server->getBaseUri(), Http::HEAD, [], '1.0');

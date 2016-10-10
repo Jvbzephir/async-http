@@ -11,7 +11,7 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http\Http1;
+namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;

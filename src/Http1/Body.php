@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\BodyStream;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
