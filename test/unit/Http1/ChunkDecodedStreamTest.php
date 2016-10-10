@@ -64,6 +64,15 @@ class ChunkDecodedStreamTest extends AsyncTestCase
         yield $stream->read();
     }
     
+    public function testDetectsMissingBreakAfterLastChunk()
+    {
+        $stream = new ChunkDecodedStream(new ReadableMemoryStream("0\r\n"));
+    
+        $this->expectException(StreamException::class);
+    
+        yield $stream->read();
+    }
+    
     public function testCanReadSingleChunk()
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("3\r\nFOO\r\n0\r\n\r\n"));

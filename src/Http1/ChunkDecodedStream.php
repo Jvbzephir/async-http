@@ -71,6 +71,10 @@ class ChunkDecodedStream extends ReadableStreamDecorator
             $this->remainder = \hexdec($header);
             
             if ($this->remainder === 0) {
+                if ("\r\n" !== yield $this->stream->readBuffer(2)) {
+                    throw new StreamException('Missing CRLF after last chunk');
+                }
+                
                 return;
             }
         }
