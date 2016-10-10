@@ -24,17 +24,43 @@ class HttpServer
     protected $server;
     
     protected $runner;
+    
+    protected $socketFactory;
 
     public function __construct(HttpEndpoint $endpoint, SocketServer $server, Awaitable $runner)
     {
         $this->endpoint = $endpoint;
         $this->server = $server;
         $this->runner = $runner;
+        
+        $this->socketFactory = $server->createSocketFactory();
     }
 
+    public function getPeer(): string
+    {
+        return $this->socketFactory->getPeer();
+    }
+
+    public function getPeerName(): string
+    {
+        return $this->socketFactory->getPeerName();
+    }
+
+    public function getPort(): int
+    {
+        $parts = \explode(':', $this->socketFactory->getPeer());
+        
+        return (int) \array_pop($parts);
+    }
+    
     public function isEncrypted(): bool
     {
         return $this->server->isEncrypted();
+    }
+    
+    public function getBaseUri(): Uri
+    {
+        return Uri::parse(\sprintf('%s://%s/', $this->server->isEncrypted() ? 'https' : 'http', $this->socketFactory->getPeer()));
     }
     
     public function createSocketFactory(): SocketFactory

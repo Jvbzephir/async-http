@@ -42,11 +42,15 @@ class BodyStream extends ReadableStreamDecorator
 
     public function close(): Awaitable
     {
-        if ($this->defer->isPending()) {
-            $this->defer->resolve(true);
-        }
+        $close = parent::close();
         
-        return parent::close();
+        $close->when(function () {
+            if ($this->defer->isPending()) {
+                $this->defer->resolve(null);
+            }
+        });
+        
+        return $close;
     }
 
     protected function processChunk(string $chunk): string

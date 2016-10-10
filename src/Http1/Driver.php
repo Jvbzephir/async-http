@@ -38,6 +38,11 @@ class Driver
         $this->parser = $parser ?? new RequestParser();
     }
     
+    public function setKeepAliveSupported(bool $keepAlive)
+    {
+        $this->keepAliveSupported = $keepAlive;
+    }
+    
     public function setDebug(bool $debug)
     {
         $this->debug = $debug;
@@ -72,20 +77,7 @@ class Driver
                             }
                         }
                         
-                        if (!$this->keepAliveSupported) {
-                            $close = true;
-                        } elseif ($request->getProtocolVersion() == '1.0' && !\in_array('keep-alive', $request->getHeaderTokens('Connection'), true)) {
-                            // HTTP/1.0 must explicitly specify keep-alive to use persistent connections.
-                            $close = true;
-                        } elseif (\in_array('close', $request->getHeaderTokens('Connection'), true)) {
-                            // Close connection if client does not want to use keep alive.
-                            $close = true;
-                        } elseif (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
-                            // Eighter content length or chunked encoding required to read request body.
-                            $close = true;
-                        } else {
-                            $close = false;
-                        }
+                        $close = $this->shouldConnectionBeClosed($request);
                         
                         $request = $request->withoutHeader('Content-Length');
                         $request = $request->withoutHeader('Transfer-Encoding');
@@ -118,11 +110,37 @@ class Driver
         });
     }
     
+    protected function shouldConnectionBeClosed(HttpRequest $request): bool
+    {
+        if (!$this->keepAliveSupported) {
+            return true;
+        }
+        
+        $conn = $request->getHeaderTokens('Connection');
+        
+        // HTTP/1.0 must explicitly specify keep-alive to use persistent connections.
+        if ($request->getProtocolVersion() == '1.0' && !\in_array('keep-alive', $conn, true)) {
+            return true;
+        }
+        
+        // Close connection if client does not want to use keep-alive.
+        if (\in_array('close', $conn, true)) {
+            return true;
+        }
+        
+        // Eighter content length or chunked encoding required to read request body.
+        if (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
+            return true;
+        }
+        
+        return false;
+    }
+    
     protected function processRequest(DuplexStream $stream, HttpRequest $request, bool $close): \Generator
     {
         try {
             $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
-            $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
+            $response = $response->withHeader('Server', 'KoolKode HTTP Server');
             
             if ($request->getMethod() == Http::POST) {
                 $response = $response->withHeader('Content-Type', $request->getHeaderLine('Content-Type'));

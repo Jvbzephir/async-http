@@ -18,14 +18,34 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Http\HttpResponse;
 
 class Connector
 {
     protected $parser;
+    
+    protected $keepAliveSupported = true;
+    
+    protected $debug = false;
 
     public function __construct(ResponseParser $parser = null)
     {
         $this->parser = $parser ?? new ResponseParser();
+    }
+    
+    public function isKeepAliveSupported(): bool
+    {
+        return $this->keepAliveSupported;
+    }
+    
+    public function setKeepAliveSupported(bool $keepAlive)
+    {
+        $this->keepAliveSupported = $keepAlive;
+    }
+    
+    public function setDebug(bool $debug)
+    {
+        $this->debug = $debug;
     }
 
     public function send(DuplexStream $stream, HttpRequest $request): Awaitable
@@ -36,15 +56,7 @@ class Connector
                 
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
                 
-                if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
-                    $close = true;
-                } elseif (!$response->hasHeader('Content-Length') && 'chunked' !== \strtolower($response->getHeaderLine('Transfer-Encoding'))) {
-                    $close = true;
-                } else {
-                    $close = false;
-                }
-                
-                if (!$close) {
+                if (!$this->shouldConnectionBeClosed($response)) {
                     $response->getBody()->setCascadeClose(false);
                 }
                 
@@ -60,6 +72,23 @@ class Connector
         });
     }
 
+    protected function shouldConnectionBeClosed(HttpResponse $response): bool
+    {
+        if (!$this->keepAliveSupported) {
+            return true;
+        }
+        
+        if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
+            return true;
+        }
+        
+        if (!$response->hasHeader('Content-Length') && 'chunked' !== \strtolower($response->getHeaderLine('Transfer-Encoding'))) {
+            return true;
+        }
+        
+        return false;
+    }
+    
     protected function sendRequest(DuplexStream $stream, HttpRequest $request): \Generator
     {
         static $compression;
@@ -76,7 +105,12 @@ class Connector
         $bodyStream = yield $body->getReadableStream();
         
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        $buffer .= "Connection: keep-alive\r\n";
+        
+        if ($this->keepAliveSupported) {
+            $buffer .= "Connection: keep-alive\r\n";
+        } else {
+            $buffer .= "Connection: close\r\n";
+        }
         
         if (!$nobody) {
             if ($request->getProtocolVersion() == '1.0' && $size === null) {
