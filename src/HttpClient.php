@@ -34,7 +34,7 @@ class HttpClient
             new Connector()
         ];
         
-        $this->pool = new ConnectionPool();
+        $this->pool = new ConnectionPool($this->getProtocols());
     }
         
     public function shutdown(): Awaitable
@@ -46,6 +46,13 @@ class HttpClient
         // TODO: Dispose running requests.
         
         return new AwaitPending($close);
+    }
+    
+    public function getProtocols(): array
+    {
+        return \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
+            return $connector->getProtocols();
+        }, $this->connectors)));
     }
     
     public function setKeepAlive(bool $keepAlive)
