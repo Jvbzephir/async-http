@@ -28,6 +28,8 @@ class HttpClient
     
     protected $connectors;
     
+    protected $pending;
+    
     public function __construct(HttpConnector ...$connectors)
     {
         $this->connectors = $connectors ?: [
@@ -35,6 +37,7 @@ class HttpClient
         ];
         
         $this->pool = new ConnectionPool($this->getProtocols());
+        $this->pending = new \SplObjectStorage();
     }
         
     public function shutdown(): Awaitable
@@ -43,7 +46,15 @@ class HttpClient
             $this->pool->shutdown()
         ];
         
-        // TODO: Dispose running requests.
+        try {
+            foreach ($this->pending as $pending) {
+                if ($pending instanceof Awaitable) {
+                    $pending->cancel(new \RuntimeException('HTTP client shutdown'));
+                }
+            }
+        } finally {
+            $this->pending = new \SplObjectStorage();
+        }
         
         return new AwaitPending($close);
     }
@@ -63,7 +74,9 @@ class HttpClient
     public function send(HttpRequest $request): Awaitable
     {
         return new Coroutine(function () use ($request) {
-            $request = $request->withHeader('User-Agent', $this->userAgent);
+            if (!$request->hasHeader('User-Agent')) {
+                $request = $request->withHeader('User-Agent', $this->userAgent);
+            }
             
             $conn = yield $this->pool->connect($uri = $request->getUri(), $this->keepAlive);
             
@@ -83,7 +96,13 @@ class HttpClient
                 throw new \RuntimeException(\sprintf('No HTTP connector could handle negotiated ALPN protocol "%s"', $alpn));
             }
             
-            $response = yield $connector->send($conn, $request, $this->keepAlive);
+            $this->pending->attach($pending = $connector->send($conn, $request, $this->keepAlive));
+            
+            try {
+                $response = yield $pending;
+            } finally {
+                $this->pending->detach($pending);
+            }
             
             if ($this->keepAlive) {
                 $stream = (yield $response->getBody()->getReadableStream());
