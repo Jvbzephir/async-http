@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\ConnectionPool;
 use KoolKode\Async\Http\HttpRequest;
 
 class Client 
