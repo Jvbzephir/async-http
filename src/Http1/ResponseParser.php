@@ -32,9 +32,13 @@ class ResponseParser extends MessageParser
      */
     public function parseResponse(ReadableStream $stream, bool $dropBody = false): \Generator
     {
-        if (null === ($line = yield $stream->readLine())) {
-            throw new StreamClosedException('Stream closed before HTTP response line was read');
-        }
+        $i = 0;
+        
+        do {
+            if ($i++ > 3 || null === ($line = yield $stream->readLine())) {
+                throw new StreamClosedException('Stream closed before HTTP response line was read');
+            }
+        } while ($line === '');
         
         $m = null;
         
@@ -56,9 +60,7 @@ class ResponseParser extends MessageParser
         
         static $remove = [
             'Content-Encoding',
-            'Content-Length',
             'Trailer',
-            'Transfer-Encoding'
         ];
         
         foreach ($remove as $name) {

@@ -21,9 +21,13 @@ class RequestParser extends MessageParser
 {
     public function parseRequest(ReadableStream $stream): \Generator
     {
-        if (null === ($line = yield $stream->readLine())) {
-            throw new StreamClosedException('Stream closed before HTTP request line was read');
-        }
+        $i = 0;
+        
+        do {
+            if ($i++ > 3 || null === ($line = yield $stream->readLine())) {
+                throw new StreamClosedException('Stream closed before HTTP request line was read');
+            }
+        } while ($line === '');
         
         $m = null;
         

@@ -22,9 +22,8 @@ use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Stream\StreamClosedException;
-use KoolKode\Async\Util\Executor;
-use KoolKode\Async\Deferred;
 use KoolKode\Async\Timeout;
+use KoolKode\Async\Util\Executor;
 
 class Driver
 {
@@ -75,10 +74,10 @@ class Driver
                         
                         if (!$this->keepAliveSupported) {
                             $close = true;
-                        } elseif ($request->getProtocolVersion() == '1.0') {
-                            // HTTP/1.0 does not support keep alive.
+                        } elseif ($request->getProtocolVersion() == '1.0' && !\in_array('keep-alive', $request->getHeaderTokens('Connection'), true)) {
+                            // HTTP/1.0 must explicitly specify keep-alive to use persistent connections.
                             $close = true;
-                        } elseif (\in_array('close', $request->getHeaderTokens('Connection', ','), true)) {
+                        } elseif (\in_array('close', $request->getHeaderTokens('Connection'), true)) {
                             // Close connection if client does not want to use keep alive.
                             $close = true;
                         } elseif (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
@@ -91,15 +90,12 @@ class Driver
                         $request = $request->withoutHeader('Content-Length');
                         $request = $request->withoutHeader('Transfer-Encoding');
                         
-                        $defer = new Deferred();
-                        
-                        $jobs->enqueue($executor->execute(function () use ($stream, $request, $defer, $close) {
-                            yield from $this->processRequest($stream, $request, $defer, $close);
+                        $jobs->enqueue($executor->execute(function () use ($stream, $request, $close) {
+                            yield from $this->processRequest($stream, $request, $close);
                         }));
                         
-                        if (!yield $defer) {
-                            break;
-                        }
+                        // Wait until HTTP request body stream is closed.
+                        yield ((yield $request->getBody()->getReadableStream())->getAwaitable());
                     } catch (StreamClosedException $e) {
                         break;
                     } catch (\Throwable $e) {
@@ -113,27 +109,33 @@ class Driver
                     yield $jobs->dequeue();
                 }
             } finally {
+                while (!$jobs->isEmpty()) {
+                    $jobs->dequeue()->cancel(new StreamClosedException('HTTP connection closed'));
+                }
+                
                 $stream->close();
             }
         });
     }
     
-    protected function processRequest(DuplexStream $stream, HttpRequest $request, Deferred $defer, bool $close): \Generator
+    protected function processRequest(DuplexStream $stream, HttpRequest $request, bool $close): \Generator
     {
         try {
             $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
             $response = $response->withHeader('Server', 'KoolKode Async HTTP Server');
-            $response = $response->withBody(new StringBody('Hello Test Client :)'));
             
-            yield from $this->sendResponse($stream, $request, $response, $defer, $close);
+            if ($request->getMethod() == Http::POST) {
+                $response = $response->withHeader('Content-Type', $request->getHeaderLine('Content-Type'));
+                $response = $response->withBody(new StringBody(yield $request->getBody()->getContents()));
+            } else {
+                $response = $response->withBody(new StringBody('Hello Test Client :)'));
+            }
+            
+            yield from $this->sendResponse($stream, $request, $response, $close);
         } catch (StreamClosedException $e) {
-            if ($defer->isPending()) {
-                $defer->resolve(false);
-            }
+            (yield $request->getBody()->getReadableStream())->close();
         } catch (\Throwable $e) {
-            if ($defer->isPending()) {
-                $defer->resolve(false);
-            }
+            (yield $request->getBody()->getReadableStream())->close();
             
             yield from $this->sendErrorResponse($stream, $request, $e);
         }
@@ -162,17 +164,15 @@ class Driver
         }
         
         try {
-            yield from $this->sendResponse($stream, $request, $response, new Deferred(), true);
+            yield from $this->sendResponse($stream, $request, $response, true);
         } catch (\Throwable $e) {
             fwrite(STDERR, "\n$e\n");
             yield from $this->handleClosedConnection($e);
         }
     }
 
-    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, Deferred $defer, bool $close): \Generator
+    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
-        $response = $this->normalizeResponse($request, $response);
-        
         // Discard remaining request body before sending response.
         $input = yield $request->getBody()->getReadableStream();
         
@@ -180,9 +180,9 @@ class Driver
             while (null !== yield $input->read());
         } finally {
             $input->close();
-            
-            $defer->resolve(true);
         }
+        
+        $response = $this->normalizeResponse($request, $response);
         
         $http11 = ($response->getProtocolVersion() == '1.1');
         $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));
@@ -199,6 +199,9 @@ class Driver
         
         if ($close) {
             $buffer .= "Connection: close\r\n";
+        } else {
+            $buffer .= "Connection: keep-alive\r\n";
+            $buffer .= "Keep-Alive: timeout=30\r\n";
         }
         
         $compress = null;

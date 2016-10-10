@@ -16,6 +16,7 @@ use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
 
 class Connector
@@ -34,6 +35,21 @@ class Connector
                 yield from $this->sendRequest($stream, $request);
                 
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
+                
+                if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
+                    $close = true;
+                } elseif (!$response->hasHeader('Content-Length') && 'chunked' !== \strtolower($response->getHeaderLine('Transfer-Encoding'))) {
+                    $close = true;
+                } else {
+                    $close = false;
+                }
+                
+                if (!$close) {
+                    $response->getBody()->setCascadeClose(false);
+                }
+                
+                $response = $response->withoutHeader('Content-Length');
+                $response = $response->withoutHeader('Transfer-Encoding');
                 
                 return $response;
             } catch (\Throwable $e) {
@@ -60,11 +76,23 @@ class Connector
         $bodyStream = yield $body->getReadableStream();
         
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        
-        $buffer .= "Connection: close\r\n";
+        $buffer .= "Connection: keep-alive\r\n";
         
         if (!$nobody) {
-            // FIXME: HTTP/1.0 requires content length...
+            if ($request->getProtocolVersion() == '1.0' && $size === null) {
+                $tmp = yield LoopConfig::currentFilesystem()->tempStream();
+                
+                try {
+                    $size = yield new CopyBytes($bodyStream, $tmp);
+                } catch (\Throwable $e) {
+                    $tmp->close();
+                    
+                    throw $e;
+                }
+                
+                $bodyStream = $tmp;
+            }
+            
             if ($size === null) {
                 $buffer .= "Transfer-Encoding: chunked\r\n";
             } else {

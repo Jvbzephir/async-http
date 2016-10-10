@@ -34,6 +34,25 @@ class HttpEndpointTest extends AsyncTestCase
             $socket = yield $factory->createSocketStream();
             
             try {
+                $data = json_encode([
+                    'payload' => 'test'
+                ], JSON_UNESCAPED_SLASHES);
+                
+                $request = new HttpRequest('http://' . $factory->getPeer() . '/', Http::POST);
+                $request = $request->withHeader('Content-Type', 'application/json');
+                $request = $request->withBody(new StringBody($data));
+                
+                $response = yield (new Connector())->send($socket, $request);
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals('1.1', $response->getProtocolVersion());
+                $this->assertEquals(Http::OK, $response->getStatusCode());
+                $this->assertEquals('OK', $response->getReasonPhrase());
+                $this->assertEquals('application/json', $response->getHeaderLine('Content-Type'));
+                $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
+                
+                $this->assertEquals($data, yield $response->getBody()->getContents());
+                
                 $request = new HttpRequest('http://' . $factory->getPeer() . '/');
                 $response = yield (new Connector())->send($socket, $request);
                 
@@ -44,8 +63,6 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals('KoolKode Async HTTP Server', $response->getHeaderLine('Server'));
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
-                
-                yield new \KoolKode\Async\Pause(.1);
             } finally {
                 $socket->close();
             }
