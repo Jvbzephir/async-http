@@ -46,6 +46,10 @@ class HttpClient
             $this->pool->shutdown()
         ];
         
+        foreach ($this->connectors as $connector) {
+            $close[] = $connector->shutdown();
+        }
+        
         try {
             foreach ($this->pending as $pending) {
                 if ($pending instanceof Awaitable) {

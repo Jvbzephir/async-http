@@ -21,6 +21,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Success;
 
 class Connector implements HttpConnector
 {
@@ -57,6 +58,14 @@ class Connector implements HttpConnector
             'http/1.1',
             ''
         ], true);
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function shutdown(): Awaitable
+    {
+        return new Success(null);
     }
     
     /**
