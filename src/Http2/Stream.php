@@ -16,9 +16,14 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Http\HttpMessage;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\StreamBody;
+use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\ReadableChannelStream;
+use KoolKode\Async\Stream\StreamClosedException;
+use KoolKode\Async\Util\Channel;
 
 class Stream
 {
@@ -30,37 +35,174 @@ class Stream
     
     protected $defer;
     
+    protected $headers = '';
+    
+    protected $eof = false;
+    
+    protected $channel;
+    
     public function __construct(int $id, Connection $conn)
     {
         $this->id = $id;
         $this->conn = $conn;
+        
         $this->hpack = $conn->getHPack();
+        $this->defer = new Deferred();
     }
     
+    public function close(\Throwable $e = null)
+    {
+        $this->conn->closeStream($this->id);
+        
+        if ($this->defer->isPending()) {
+            $this->defer->fail($e ?? new StreamClosedException('HTTP/2 stream has been closed'));
+        }
+        
+        if ($this->channel !== null) {
+            $this->channel->close($e ?? new StreamClosedException('HTTP/2 stream has been closed'));
+        }
+    }
+
     public function processFrame(Frame $frame)
     {
-        fwrite(STDERR, sprintf("\n[%s] << %s", $this->id, $frame));
+        if ($frame->type === Frame::RST_STREAM) {
+            return $this->close();
+        }
         
         switch ($frame->type) {
-            case Frame::HEADERS:
-                if ($frame->flags & Frame::PADDED) {
-                    $data = \substr($frame->data, 1, -1 * \ord($frame->data[0]));
-                } else {
-                    $data = $frame->data;
-                }
-                
-                if ($frame->flags & Frame::PRIORITY_FLAG) {
-                    $data = \substr($data, 5);
-                }
-                
-                if ($frame->flags & Frame::END_HEADERS) {
-                    fwrite(STDERR, "\n" . json_encode($this->hpack->decode($frame->data)));
-                }
-                break;
-            case Frame::DATA:
-                fwrite(STDERR, "\n" . $frame->data);
-                break;
+            case Frame::GOAWAY:
+                throw new ConnectionException('GOAWAY must be sent to a connection', Frame::PROTOCOL_ERROR);
+            case Frame::PING:
+                throw new ConnectionException('PING frame must not be sent to a stream', Frame::PROTOCOL_ERROR);
+            case Frame::SETTINGS:
+                throw new ConnectionException('SETTINGS frames must not be sent to an open stream', Frame::PROTOCOL_ERROR);
         }
+    }
+
+    public function processHeadersFrame(Frame $frame)
+    {
+        if ($frame->flags & Frame::PADDED) {
+            $data = \substr($frame->data, 1, -1 * \ord($frame->data[0]));
+        } else {
+            $data = $frame->data;
+        }
+        
+        if ($frame->flags & Frame::PRIORITY_FLAG) {
+            $data = \substr($data, 5);
+        }
+        
+        $this->headers .= $data;
+        
+        if ($frame->flags & Frame::END_HEADERS) {
+            if ($frame->flags & Frame::END_STREAM) {
+                $this->eof = true;
+            }
+            
+            $this->resolveMessage();
+        }
+    }
+    
+    public function processContinuationFrame(Frame $frame)
+    {
+        $this->headers .= $frame->data;
+        
+        if ($frame->flags & Frame::END_HEADERS) {
+            $this->resolveMessage();
+        }
+    }
+
+    public function processDataFrame(Frame $frame): \Generator
+    {
+        if ($this->channel === null) {
+            $this->channel = new Channel(128);
+        } elseif ($this->channel->isClosed()) {
+            return;
+        }
+        
+        if ($frame->flags & Frame::PADDED) {
+            yield $this->channel->send(\substr($frame->data, 1, -1 * \ord($frame->data[0])));
+        } else {
+            yield $this->channel->send($frame->data);
+        }
+        
+        if ($frame->flags & Frame::END_STREAM) {
+            $this->channel->close();
+        }
+    }
+
+    protected function resolveMessage()
+    {
+        try {
+            $headers = $this->hpack->decode($this->headers);
+        } finally {
+            $this->headers = '';
+        }
+        
+        $response = new HttpResponse((int) $this->getFirstHeader(':status', $headers));
+        $response = $response->withProtocolVersion('2.0');
+        
+        foreach ($headers as $header) {
+            if (\substr($header[0], 0, 1) !== ':') {
+                $response = $response->withAddedHeader(...$header);
+            }
+        }
+        
+        if (!$this->eof) {            
+            $response = $response->withBody(new StreamBody($this->createBodyStream()));
+        }
+        
+        $this->defer->resolve($response);
+    }
+    
+    protected function getFirstHeader(string $name, array $headers): string
+    {
+        foreach ($headers as $header) {
+            if ($header[0] === $name) {
+                return $header[1];
+            }
+        }
+        
+        return '';
+    }
+    
+    protected function createBodyStream(): ReadableStream
+    {
+        if ($this->channel === null) {
+            $this->channel = new Channel(1000);
+        }
+        
+        return new class($this->channel, $this->conn, $this->id) extends ReadableChannelStream {
+
+            protected $conn;
+
+            protected $id;
+
+            public function __construct(Channel $channel, Connection $conn, int $id)
+            {
+                parent::__construct($channel);
+                
+                $this->conn = $conn;
+                $this->id = $id;
+            }
+            
+            public function __destruct()
+            {
+                $this->close();
+            }
+
+            public function close(): Awaitable
+            {
+                $this->channel->close();
+                
+                $close = parent::close();
+                
+                $close->when(function () {
+                    $this->conn->closeStream($this->id);
+                });
+                
+                return $close;
+            }
+        };
     }
     
     public function sendRequest(HttpRequest $request): Awaitable
@@ -89,9 +231,7 @@ class Stream
             yield from $this->sendHeaders($request, $headers);
             yield from $this->sendBody($bodyStream);
             
-            $defer = new Deferred();
-            
-            return yield $defer;
+            return yield $this->defer;
         });
     }
     

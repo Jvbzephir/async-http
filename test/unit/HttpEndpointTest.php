@@ -11,6 +11,9 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Http1\Connector as Http1Connector;
+use KoolKode\Async\Http\Http2\Connector as Http2Connector;
+use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
@@ -135,17 +138,26 @@ class HttpEndpointTest extends AsyncTestCase
         }
     }
     
-//     public function testHttp2Client()
-//     {
-//         $client = new HttpClient(new \KoolKode\Async\Http\Http2\Connector());
+    public function testHttp2Client()
+    {
+        if (!Socket::isAlpnSupported()) {
+            return $this->markTestSkipped('Test requires SSL ALPN support');
+        }
         
-//         try {
-//             $request = new HttpRequest('https://http2.golang.org/reqinfo');
-//             $response = yield $client->send($request);
+        $client = new HttpClient(new Http2Connector(), new Http1Connector());
+        
+        try {
+            $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT);
+            $request = $request->withBody(new StringBody('Hello World :)'));
             
-//             fwrite(STDERR, yield $response->getBody()->getContents());
-//         } finally {
-//             $client->shutdown();
-//         }
-//     }
+            $response = yield $client->send($request);
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals(Http::OK, $response->getStatusCode());
+            
+            $this->assertEquals('HELLO WORLD :)', yield $response->getBody()->getContents());
+        } finally {
+            $client->shutdown();
+        }
+    }
 }

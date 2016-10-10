@@ -65,16 +65,10 @@ class Connector implements HttpConnector
             if ($this->connections->contains($stream)) {
                 $conn = $this->connections[$stream];
             } else {
-                $this->connections->attach($stream, $conn = new Connection($stream, new HPack($this->hpackContext)));
-                
-                yield $conn->startClient();
+                $this->connections->attach($stream, $conn = yield Connection::connectClient($stream, new HPack($this->hpackContext)));
             }
             
-            $stream = $conn->openStream();
-            
-            yield $stream->sendRequest($request);
-            
-            return new \KoolKode\Async\Http\HttpResponse();
+            return yield $conn->openStream()->sendRequest($request);
         });
     }
 }
