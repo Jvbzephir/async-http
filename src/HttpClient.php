@@ -29,15 +29,12 @@ class HttpClient
     
     protected $connectors;
     
-    protected $pending;
-    
     public function __construct(HttpConnector ...$connectors)
     {
         $this->connectors = $connectors ?: [
             new Connector()
         ];
         
-        $this->pending = new \SplObjectStorage();
         $this->protocols = \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
             return $connector->getProtocols();
         }, $this->connectors)));
@@ -49,16 +46,6 @@ class HttpClient
         
         foreach ($this->connectors as $connector) {
             $close[] = $connector->shutdown();
-        }
-        
-        try {
-            foreach ($this->pending as $pending) {
-                if ($pending instanceof Awaitable) {
-                    $pending->cancel(new \RuntimeException('HTTP client shutdown'));
-                }
-            }
-        } finally {
-            $this->pending = new \SplObjectStorage();
         }
         
         return new AwaitPending($close);
@@ -87,35 +74,20 @@ class HttpClient
             }
             
             $socket = yield $this->connectSocket($request->getUri());
-            
             $meta = $socket->getMetadata();
-            $alpn = \trim($meta['crypto']['alpn_protocol'] ?? '');
-            $connector = null;
             
-            foreach ($this->connectors as $candidate) {
-                if ($candidate->isSupported($alpn, $meta)) {
-                    $connector = $candidate;
-                    
-                    break;
-                }
-            }
-            
-            if ($connector === null) {
+            try {
+                $connector = $this->chooseConnector(\trim($meta['crypto']['alpn_protocol'] ?? ''), $meta);
+            } catch (\Throwable $e) {
                 $socket->close();
                 
-                throw new \RuntimeException(\sprintf('No HTTP connector could handle negotiated ALPN protocol "%s"', $alpn));
+                throw $e;
             }
             
             $context = new HttpConnectorContext();
             $context->stream = $socket;
             
-            $this->pending->attach($pending = $connector->send($context, $request));
-            
-            try {
-                return yield $pending;
-            } finally {
-                $this->pending->detach($pending);
-            }
+            return yield $connector->send($context, $request);
         });
     }
     
@@ -134,5 +106,16 @@ class HttpClient
         }
         
         return $factory->createSocketStream(5, $uri->getScheme() === 'https');
+    }
+    
+    protected function chooseConnector(string $alpn, array $meta): HttpConnector
+    {
+        foreach ($this->connectors as $connector) {
+            if ($connector->isSupported($alpn, $meta)) {
+                return $connector;
+            }
+        }
+        
+        throw new \RuntimeException(\sprintf('No HTTP connector could handle negotiated ALPN protocol "%s"', $alpn));
     }
 }

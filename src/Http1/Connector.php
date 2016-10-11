@@ -12,6 +12,7 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\AwaitPending;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
@@ -32,11 +33,14 @@ class Connector implements HttpConnector
     protected $keepAlive = true;
     
     protected $debug = false;
+    
+    protected $pending;
 
     public function __construct(ResponseParser $parser = null, ConnectionPool $pool = null)
     {
         $this->parser = $parser ?? new ResponseParser();
         $this->pool = new ConnectionPool();
+        $this->pending = new \SplObjectStorage();
     }
     
     public function setKeepAlive(bool $keepAlive)
@@ -75,7 +79,21 @@ class Connector implements HttpConnector
      */
     public function shutdown(): Awaitable
     {
-        return $this->pool->shutdown();
+        $tasks = [];
+        
+        try {
+            foreach ($this->pending as $pending) {
+                $pending->cancel();
+                
+                $tasks[] = $pending;
+            }
+        } finally {
+            $this->pending = new \SplObjectStorage();
+        }
+        
+        $tasks[] = $this->pool->shutdown();
+        
+        return new AwaitPending($tasks);
     }
     
     /**
@@ -101,7 +119,7 @@ class Connector implements HttpConnector
     {
         $stream = $context->stream;
         
-        return new Coroutine(function () use ($stream, $request) {
+        $coroutine = new Coroutine(function () use ($stream, $request) {
             try {
                 $uri = $request->getUri();
                 
@@ -133,6 +151,14 @@ class Connector implements HttpConnector
                 throw $e;
             }
         });
+        
+        $this->pending->attach($coroutine);
+        
+        $coroutine->when(function () use ($coroutine) {
+            $this->pending->detach($coroutine);
+        });
+        
+        return $coroutine;
     }
 
     protected function shouldConnectionBeClosed(HttpResponse $response): bool

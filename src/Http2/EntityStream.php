@@ -36,7 +36,7 @@ class EntityStream extends ReadableChannelStream
         $this->conn = $conn;
         $this->streamId = $streamId;
         $this->windowSize = $windowSize;
-        $this->threshold = \max(4087, $windowSize / 2);
+        $this->threshold = \max(4087, (int) \ceil($windowSize / 2));
     }
 
     public function __destruct()
@@ -46,8 +46,6 @@ class EntityStream extends ReadableChannelStream
 
     public function close(): Awaitable
     {
-        $this->channel->close();
-        
         $close = parent::close();
         
         $close->when(function () {

@@ -101,7 +101,7 @@ class Connection
 
     public function shutdown(): Awaitable
     {
-        if ($this->processor) {
+        if ($this->processor !== null) {
             $this->processor->cancel(new \RuntimeException('Connection shutdown'));
             
             return $this->processor;
@@ -170,6 +170,8 @@ class Connection
     public function closeStream(int $streamId)
     {
         if (isset($this->streams[$streamId])) {
+            $this->streams[$streamId]->close();
+            
             unset($this->streams[$streamId]);
         }
     }
@@ -229,8 +231,6 @@ class Connection
                 }
             }
         } finally {
-            $this->processor = null;
-            
             try {
                 if ($this->outputDefer !== null) {
                     $this->outputDefer->fail(new \RuntimeException('HTTP/2 connection closed'));

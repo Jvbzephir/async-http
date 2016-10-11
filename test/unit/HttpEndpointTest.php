@@ -104,7 +104,7 @@ class HttpEndpointTest extends AsyncTestCase
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
             } finally {
-                $client->shutdown();
+                yield $client->shutdown();
             }
         } finally {
             $server->stop();
@@ -133,35 +133,33 @@ class HttpEndpointTest extends AsyncTestCase
                 
                 $this->assertEquals('', yield $response->getBody()->getContents());
             } finally {
-                $client->shutdown();
+                yield $client->shutdown();
             }
         } finally {
             $server->stop();
         }
     }
     
-//     public function testHttp2Client()
-//     {
-//         if (!Socket::isAlpnSupported()) {
-//             return $this->markTestSkipped('Test requires SSL ALPN support');
-//         }
+    public function testHttp2Client()
+    {
+        if (!Socket::isAlpnSupported()) {
+            return $this->markTestSkipped('Test requires SSL ALPN support');
+        }
         
-//         $client = new HttpClient(new Http2Connector(), new Http1Connector());
+        $client = new HttpClient(new Http2Connector() , new Http1Connector());
         
-//         try {
-//             $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT);
-//             $request = $request->withBody(new StringBody('Hello World :)'));
+        try {
+            $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT);
+            $request = $request->withBody(new StringBody('Hello World :)'));
             
-//             $response = yield $client->send($request);
+            $response = yield $client->send($request);
             
-//             $this->assertTrue($response instanceof HttpResponse);
-//             $this->assertEquals(Http::OK, $response->getStatusCode());
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals(Http::OK, $response->getStatusCode());
             
-//             $this->assertEquals('HELLO WORLD :)', yield $response->getBody()->getContents());
-//         } finally {
-//             yield $client->shutdown();
-//         }
-        
-//         // FIXME: Client shutdown does not work!
-//     }
+            $this->assertEquals('HELLO WORLD :)', yield $response->getBody()->getContents());
+        } finally {
+            $client->shutdown();
+        }
+    }
 }

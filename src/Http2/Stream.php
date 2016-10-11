@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
+use Interop\Async\Loop;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
@@ -67,7 +68,6 @@ class Stream
             $e = new StreamClosedException('HTTP/2 stream has been closed');
         }
         
-        $this->conn->closeStream($this->id);
         $this->defer->fail($e);
         
         if ($this->outputDefer) {
@@ -82,7 +82,7 @@ class Stream
     public function processFrame(Frame $frame)
     {
         if ($frame->type === Frame::RST_STREAM) {
-            return $this->close();
+            return $this->conn->closeStream($this->id);
         }
         
         switch ($frame->type) {
@@ -186,7 +186,9 @@ class Stream
             $response = $response->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id, $this->inputWindow)));
         }
         
-        $this->defer->resolve($response);
+        Loop::defer(function () use ($response) {
+            $this->defer->resolve($response);
+        });
     }
 
     protected function getFirstHeader(string $name, array $headers): string
