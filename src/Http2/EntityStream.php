@@ -21,14 +21,22 @@ class EntityStream extends ReadableChannelStream
 {
     protected $conn;
 
-    protected $id;
+    protected $streamId;
+    
+    protected $windowSize;
+    
+    protected $threshold;
 
-    public function __construct(Channel $channel, Connection $conn, int $id)
+    protected $drained = 0;
+    
+    public function __construct(Channel $channel, Connection $conn, int $streamId, int $windowSize)
     {
         parent::__construct($channel);
         
         $this->conn = $conn;
-        $this->id = $id;
+        $this->streamId = $streamId;
+        $this->windowSize = $windowSize;
+        $this->threshold = \max(4087, $windowSize / 2);
     }
 
     public function __destruct()
@@ -43,9 +51,44 @@ class EntityStream extends ReadableChannelStream
         $close = parent::close();
         
         $close->when(function () {
-            $this->conn->closeStream($this->id);
+            if ($this->drained > 0) {
+                $this->updateWindow();
+            }
+            
+            $this->conn->closeStream($this->streamId);
         });
         
         return $close;
+    }
+
+    protected function readNextChunk(): \Generator
+    {
+        while (null !== ($chunk = yield $this->channel->receive())) {
+            if ($chunk !== '') {
+                break;
+            }
+        }
+        
+        if ($chunk === null) {
+            $this->conn->closeStream($this->streamId);
+        } else {
+            $this->drained += \strlen($chunk);
+            
+            if ($this->drained >= $this->threshold) {
+                $this->updateWindow();
+            }
+        }
+        
+        return $chunk;
+    }
+
+    protected function updateWindow()
+    {
+        $frame = new Frame(Frame::WINDOW_UPDATE, \pack('N', $this->drained));
+        $this->drained = 0;
+        
+        // Enque window update frames, do not await completion to allow for faster reads.
+        $this->conn->writeFrame($frame, 100);
+        $this->conn->writeStreamFrame($this->streamId, $frame, 100);
     }
 }

@@ -45,9 +45,7 @@ class EntityStream extends ReadableStreamDecorator
         $close = parent::close();
         
         $close->when(function () {
-            if ($this->defer->isPending()) {
-                $this->defer->resolve(null);
-            }
+            $this->defer->resolve(null);
         });
         
         return $close;
@@ -55,7 +53,7 @@ class EntityStream extends ReadableStreamDecorator
 
     protected function processChunk(string $chunk): string
     {
-        if ($chunk === '' && $this->defer->isPending()) {
+        if ($chunk === '') {
             $this->defer->resolve(true);
         }
         

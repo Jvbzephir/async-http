@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Executor;
@@ -62,17 +63,24 @@ class Connection
     
     protected $processor;
     
-    protected $nextStreamId = 1;
+    protected $client;
+    
+    protected $nextStreamId;
     
     protected $streams = [];
     
-    public function __construct(DuplexStream $socket, HPack $hpack)
+    protected $outputWindow = self::INITIAL_WINDOW_SIZE;
+    
+    protected $outputDefer;
+    
+    public function __construct(DuplexStream $socket, HPack $hpack, bool $client)
     {
         $this->socket = $socket;
         $this->hpack = $hpack;
+        $this->client = $client;
+        $this->nextStreamId = $client ? 1 : 2;
         
         $this->writer = new Executor();
-        $this->processor = new Coroutine($this->processIncomingFrames());
     }
 
     public function shutdown(): Awaitable
@@ -94,7 +102,7 @@ class Connection
     public static function connectClient(DuplexStream $socket, HPack $hpack): Awaitable
     {
         return new Coroutine(function () use ($socket, $hpack) {
-            $conn = new Connection($socket, $hpack);
+            $conn = new Connection($socket, $hpack, true);
             
             yield $socket->write(self::PREFACE);
             
@@ -103,6 +111,20 @@ class Connection
             
             // Disable connection-level flow control.
             yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
+            
+            list ($stream, $frame) = yield from $conn->readNextFrame();
+            
+            if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
+                throw new \RuntimeException('Failed to establish HTTP/2 connection');
+            }
+            
+            $frames = new \SplQueue();
+            $frames->enqueue([
+                $stream,
+                $frame
+            ]);
+            
+            $conn->processor = new Coroutine($conn->processIncomingFrames($frames));
             
             return $conn;
         });
@@ -124,26 +146,50 @@ class Connection
         }
     }
     
-    protected function processIncomingFrames()
+    protected function readNextFrame(): \Generator
+    {
+        $header = yield $this->socket->readBuffer(9, true);
+        
+        $length = \unpack('N', "\x00" . $header)[1];
+        $type = \ord($header[3]);
+        $stream = \unpack('N', "\x7F\xFF\xFF\xFF" & \substr($header, 5, 4))[1];
+        
+        if ($length > 0) {
+            $frame = new Frame($type, yield $this->socket->readBuffer($length, true), \ord($header[4]));
+        } else {
+            $frame = new Frame($type, '', \ord($header[4]));
+        }
+        
+        return [
+            $stream,
+            $frame
+        ];
+    }
+
+    protected function processIncomingFrames(\SplQueue $frames = null): \Generator
     {
         try {
             while (true) {
-                $header = yield $this->socket->readBuffer(9, true);
-                
-                $length = \unpack('N', "\x00" . $header)[1];
-                $type = \ord($header[3]);
-                $stream = \unpack('N', "\x7F\xFF\xFF\xFF" & \substr($header, 5, 4))[1];
-                
-                if ($length > 0) {
-                    $frame = new Frame($type, yield $this->socket->readBuffer($length, true), \ord($header[4]));
+                if ($frames === null) {
+                    list ($stream, $frame) = yield from $this->readNextFrame();
                 } else {
-                    $frame = new Frame($type, '', \ord($header[4]));
+                    list ($stream, $frame) = $frames->dequeue();
+                    
+                    if ($frames->isEmpty()) {
+                        $frames = null;
+                    }
                 }
                 
                 if ($stream === 0) {
                     switch ($frame->type) {
                         case Frame::PING:
                             yield from $this->processPingFrame($frame);
+                            break;
+                        case Frame::SETTINGS:
+                            yield from $this->processSettingsFrame($frame);
+                            break;
+                        case Frame::WINDOW_UPDATE:
+                            $this->processWindowUpdateFrame($frame);
                             break;
                         default:
                             if ($this->processFrame($frame)) {
@@ -164,6 +210,8 @@ class Connection
             } finally {
                 $this->streams = [];
             }
+            
+            yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
         }
     }
 
@@ -184,15 +232,9 @@ class Connection
                 throw new ConnectionException('PUSH_PROMISE is not supported by this server', Frame::PROTOCOL_ERROR);
             case Frame::RST_STREAM:
                 throw new ConnectionException('RST_STREAM frame must not be sent to connection', Frame::PROTOCOL_ERROR);
-            case Frame::SETTINGS:
-                // TODO: Implement HTTP/2 settings.
-                break;
-            case Frame::WINDOW_UPDATE:
-                // TODO: Implement HTTP/2 flow control.
-                break;
         }
     }
-    
+
     protected function processPingFrame(Frame $frame): \Generator
     {
         if (\strlen($frame->data) !== 8) {
@@ -208,16 +250,71 @@ class Connection
         }
     }
 
+    protected function processSettingsFrame(Frame $frame): \Generator
+    {
+        if ($frame->flags & Frame::ACK) {
+            if ($frame->data !== '') {
+                throw new ConnectionException('ACK SETTINGS frame must not have a length of more than 0 bytes', Frame::FRAME_SIZE_ERROR);
+            }
+            
+            return;
+        }
+        
+        // TODO: Apply HTTP/2 connection settings.
+        
+        yield $this->writeFrame(new Frame(Frame::SETTINGS, '', Frame::ACK), 100);
+    }
+
+    protected function processWindowUpdateFrame(Frame $frame)
+    {
+        $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
+        
+        if ($increment < 1) {
+            throw new ConnectionException('WINDOW_UPDATE increment must be positive and bigger than 0', Frame::PROTOCOL_ERROR);
+        }
+        
+        $this->outputWindow += $increment;
+        
+        if ($this->outputDefer) {
+            $defer = $this->outputDefer;
+            $this->outputDefer = null;
+            
+            $defer->resolve($increment);
+        }
+    }
+
+    public function getOutputWindow(): int
+    {
+        return $this->outputWindow;
+    }
+
+    public function awaitWindowUpdate(): Awaitable
+    {
+        if ($this->outputDefer === null) {
+            $this->outputDefer = new Deferred();
+        }
+        
+        return $this->outputDefer;
+    }
+    
     protected function processStreamFrame(int $stream, Frame $frame): \Generator
     {
+        switch ($frame->type) {
+            case Frame::PRIORITY:
+            case Frame::RST_STREAM:
+                return;
+        }
+        
         if (empty($this->streams[$stream])) {
-            switch ($frame->type) {
-                case Frame::PRIORITY:
-                case Frame::RST_STREAM:
-                    return;
-                default:
-                    throw new ConnectionException(\sprintf('Stream does not exist: "%s"', $stream));
+            if (!$this->client) {
+                switch ($frame->type) {
+                    case Frame::PRIORITY:
+                    case Frame::SETTINGS:
+                        return $this->openStream()->processFrame($frame);
+                }
             }
+            
+            throw new ConnectionException(\sprintf('Stream does not exist: "%s"', $stream));
         }
         
         switch ($frame->type) {
@@ -252,9 +349,13 @@ class Connection
     public function writeStreamFrames(int $stream, array $frames, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream, $frames) {
+            $len = 0;
+            
             foreach ($frames as $frame) {
-                yield $this->socket->write($frame->encode($stream));
+                $len += yield $this->socket->write($frame->encode($stream));
             }
+            
+            return $len;
         }, $priority);
     }
 }

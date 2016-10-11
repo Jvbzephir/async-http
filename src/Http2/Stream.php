@@ -40,6 +40,12 @@ class Stream
     
     protected $channel;
     
+    protected $inputWindow = Connection::INITIAL_WINDOW_SIZE;
+    
+    protected $outputWindow = Connection::INITIAL_WINDOW_SIZE;
+    
+    protected $outputDefer;
+    
     public function __construct(int $id, Connection $conn)
     {
         $this->id = $id;
@@ -49,19 +55,29 @@ class Stream
         $this->defer = new Deferred();
     }
     
+    public function getId(): int
+    {
+        return $this->id;
+    }
+    
     public function close(\Throwable $e = null)
     {
-        $this->conn->closeStream($this->id);
+        if ($e === null) {
+            $e = new StreamClosedException('HTTP/2 stream has been closed');
+        }
         
-        if ($this->defer->isPending()) {
-            $this->defer->fail($e ?? new StreamClosedException('HTTP/2 stream has been closed'));
+        $this->conn->closeStream($this->id);
+        $this->defer->fail($e);
+        
+        if ($this->outputDefer) {
+            $this->outputDefer->fail($e);
         }
         
         if ($this->channel !== null) {
-            $this->channel->close($e ?? new StreamClosedException('HTTP/2 stream has been closed'));
+            $this->channel->close($e);
         }
     }
-
+    
     public function processFrame(Frame $frame)
     {
         if ($frame->type === Frame::RST_STREAM) {
@@ -128,6 +144,21 @@ class Stream
             $this->channel->close();
         }
     }
+    
+    public function processWindowUpdateFrame(Frame $frame)
+    {
+        $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
+        
+        if ($increment < 1) {
+            throw new ConnectionException('WINDOW_UPDATE increment must be positive and bigger than 0', Frame::PROTOCOL_ERROR);
+        }
+        
+        $this->outputWindow += $increment;
+        
+        if ($this->outputDefer) {
+            $this->outputDefer->resolve($increment);
+        }
+    }
 
     protected function resolveMessage()
     {
@@ -151,7 +182,7 @@ class Stream
                 $this->channel = new Channel(1000);
             }
             
-            $response = $response->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id)));
+            $response = $response->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id, $this->inputWindow)));
         }
         
         $this->defer->resolve($response);
@@ -233,10 +264,8 @@ class Stream
         }
         
         $headers = $this->hpack->encode($headerList);
-        $flags = Frame::END_HEADERS;
         
-        // Header size: 9 byte general header (optional: +4 bytes for stream dependency, +1 byte for weight).
-        $chunkSize = 4096 - 9;
+        $chunkSize = 4087;
         
         if (\strlen($headers) > $chunkSize) {
             $parts = \str_split($headers, $chunkSize);
@@ -248,12 +277,11 @@ class Stream
                 $frames[] = new Frame(Frame::CONTINUATION, $parts[$i]);
             }
             
-            $frames[] = new Frame(Frame::CONTINUATION, $parts[\count($parts) - 1], $flags);
+            $frames[] = new Frame(Frame::CONTINUATION, $parts[\count($parts) - 1], Frame::END_HEADERS);
             
-            // Send all frames in one batch to ensure no concurrent writes to the socket take place.
             yield $this->conn->writeStreamFrames($this->id, $frames);
         } else {
-            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, $flags));
+            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, Frame::END_HEADERS));
         }
     }
     
@@ -263,7 +291,29 @@ class Stream
         
         try {
             while (null !== ($chunk = yield $channel->receive())) {
-                yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, $chunk));
+                $len = \strlen($chunk);
+                
+                while (true) {
+                    if ($this->outputWindow < $len) {
+                        try {
+                            yield $this->outputDefer = new Deferred();
+                        } finally {
+                            $this->outputDefer = null;
+                        }
+                        
+                        continue;
+                    }
+                    
+                    if ($this->conn->getOutputWindow() < $len) {
+                        yield $this->conn->awaitWindowUpdate();
+                        
+                        continue;
+                    }
+                    
+                    break;
+                }
+                
+                $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, $chunk));
             }
             
             yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
