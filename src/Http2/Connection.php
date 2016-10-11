@@ -34,7 +34,7 @@ class Connection
      *
      * @var int
      */
-    const INITIAL_WINDOW_SIZE = 65536;
+    const INITIAL_WINDOW_SIZE = 65535;
     
     /**
      * PING frame payload.
@@ -73,6 +73,22 @@ class Connection
     
     protected $outputDefer;
     
+    protected $localSettings = [
+        self::SETTING_ENABLE_PUSH => 0,
+        self::SETTING_MAX_CONCURRENT_STREAMS => 256,
+        self::SETTING_INITIAL_WINDOW_SIZE => 65535,
+        self::SETTING_MAX_FRAME_SIZE => 16384
+    ];
+    
+    protected $remoteSettings = [
+        self::SETTING_HEADER_TABLE_SIZE => 4096,
+        self::SETTING_ENABLE_PUSH => 1,
+        self::SETTING_MAX_CONCURRENT_STREAMS => 100,
+        self::SETTING_INITIAL_WINDOW_SIZE => 65535,
+        self::SETTING_MAX_FRAME_SIZE => 16384,
+        self::SETTING_MAX_HEADER_LIST_SIZE => 16777216
+    ];
+    
     public function __construct(DuplexStream $socket, HPack $hpack, bool $client)
     {
         $this->socket = $socket;
@@ -98,6 +114,15 @@ class Connection
     {
         return $this->hpack;
     }
+
+    public function getRemoteSetting(int $setting): int
+    {
+        if (isset($this->remoteSettings[$setting])) {
+            return $this->remoteSettings[$setting];
+        }
+        
+        throw new \OutOfBoundsException(\sprintf('Remote setting not found: "%s"', $setting));
+    }
     
     public static function connectClient(DuplexStream $socket, HPack $hpack): Awaitable
     {
@@ -106,11 +131,14 @@ class Connection
             
             yield $socket->write(self::PREFACE);
             
-            // Adjust initial window size.
-            yield $conn->writeFrame(new Frame(Frame::SETTINGS, \pack('nN', self::SETTING_INITIAL_WINDOW_SIZE, self::INITIAL_WINDOW_SIZE)));
+            $settings = '';
             
-            // Disable connection-level flow control.
-            yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x7FFFFFFF - self::INITIAL_WINDOW_SIZE)));
+            foreach ($conn->localSettings as $k => $v) {
+                $settings .= \pack('nN', $k, $v);
+            }
+            
+            yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
+            yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
             
             list ($stream, $frame) = yield from $conn->readNextFrame();
             
@@ -133,7 +161,7 @@ class Connection
     public function openStream(): Stream
     {
         try {
-            return $this->streams[$this->nextStreamId] = new Stream($this->nextStreamId, $this);
+            return $this->streams[$this->nextStreamId] = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
         } finally {
             $this->nextStreamId += 2;
         }
@@ -204,14 +232,18 @@ class Connection
             $this->processor = null;
             
             try {
-                foreach ($this->streams as $stream) {
-                    $stream->close();
+                try {
+                    foreach ($this->streams as $stream) {
+                        $stream->close();
+                    }
+                } finally {
+                    $this->streams = [];
                 }
+                
+                yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
             } finally {
-                $this->streams = [];
+                $this->socket->close();
             }
-            
-            yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
         }
     }
 
@@ -260,7 +292,46 @@ class Connection
             return;
         }
         
-        // TODO: Apply HTTP/2 connection settings.
+        if (\strlen($frame->data) % 6) {
+            throw new ConnectionException('SETTINGS frame payload length must be a multiple of 6 ', Frame::FRAME_SIZE_ERROR);
+        }
+        
+        foreach (\str_split($frame->data, 6) as $setting) {
+            list ($key, $value) = \array_values(\unpack('nk/Nv', $setting));
+            
+            switch ($key) {
+                case self::SETTING_ENABLE_PUSH:
+                    if ($value !== 0 && $value !== 1) {
+                        throw new ConnectionException('Invalid enable push setting received', Frame::PROTOCOL_ERROR);
+                    }
+                    
+                    $this->remoteSettings[self::SETTING_ENABLE_PUSH] = $value ? 1 : 0;
+                    break;
+                case self::SETTING_HEADER_TABLE_SIZE:
+                    if ($value < 4096) {
+                        throw new ConnectionException('Header table size must be at least 4096 bytes', Frame::COMPRESSION_ERROR);
+                    }
+                    
+                    $this->remoteSettings[self::SETTING_HEADER_TABLE_SIZE] = $value;
+                    break;
+                case self::SETTING_INITIAL_WINDOW_SIZE:
+                    $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE] = $value;
+                    break;
+                case self::SETTING_MAX_CONCURRENT_STREAMS:
+                    $this->remoteSettings[self::SETTING_MAX_CONCURRENT_STREAMS] = $value;
+                    break;
+                case self::SETTING_MAX_FRAME_SIZE:
+                    if ($value < 16384) {
+                        throw new ConnectionException('Max frame size must be at least 16384 bytes', Frame::PROTOCOL_ERROR);
+                    }
+                    
+                    $this->remoteSettings[self::SETTING_MAX_FRAME_SIZE] = $value;
+                    break;
+                case self::SETTING_MAX_HEADER_LIST_SIZE:
+                    $this->remoteSettings[self::SETTING_MAX_HEADER_LIST_SIZE] = $value;
+                    break;
+            }
+        }
         
         yield $this->writeFrame(new Frame(Frame::SETTINGS, '', Frame::ACK), 100);
     }
@@ -308,8 +379,8 @@ class Connection
         if (empty($this->streams[$stream])) {
             if (!$this->client) {
                 switch ($frame->type) {
-                    case Frame::PRIORITY:
-                    case Frame::SETTINGS:
+                    case Frame::HEADERS:
+                    case Frame::WINDOW_UPDATE:
                         return $this->openStream()->processFrame($frame);
                 }
             }

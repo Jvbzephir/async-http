@@ -41,15 +41,16 @@ class Stream
     protected $channel;
     
     protected $inputWindow = Connection::INITIAL_WINDOW_SIZE;
-    
-    protected $outputWindow = Connection::INITIAL_WINDOW_SIZE;
-    
+
+    protected $outputWindow;
+
     protected $outputDefer;
-    
-    public function __construct(int $id, Connection $conn)
+
+    public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE)
     {
         $this->id = $id;
         $this->conn = $conn;
+        $this->outputWindow = $outputWindow;
         
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();
@@ -265,7 +266,7 @@ class Stream
         
         $headers = $this->hpack->encode($headerList);
         
-        $chunkSize = 4087;
+        $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
         
         if (\strlen($headers) > $chunkSize) {
             $parts = \str_split($headers, $chunkSize);
@@ -287,7 +288,7 @@ class Stream
     
     protected function sendBody(ReadableStream $body): \Generator
     {
-        $channel = $body->channel(4087);
+        $channel = $body->channel(\min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE)));
         
         try {
             while (null !== ($chunk = yield $channel->receive())) {
