@@ -232,6 +232,10 @@ class Connection
             $this->processor = null;
             
             try {
+                if ($this->outputDefer !== null) {
+                    $this->outputDefer->fail(new \RuntimeException('HTTP/2 connection closed'));
+                }
+                
                 try {
                     foreach ($this->streams as $stream) {
                         $stream->close();

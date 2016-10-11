@@ -230,10 +230,31 @@ class Stream
         });
     }
     
+    public function sendResponse(HttpRequest $request, HttpResponse $response): Awaitable
+    {
+        return new Coroutine(function () use ($request, $response) {
+            try {
+                $headers = [
+                    ':status' => [
+                        (string) $response->getStatusCode()
+                    ]
+                ];
+                
+                $bodyStream = yield $response->getBody()->getReadableStream();
+                
+                yield from $this->sendHeaders($response, $headers);
+                yield from $this->sendBody($bodyStream);
+            } finally {
+                $this->conn->closeStream($this->id);
+            }
+        });
+    }
+    
     protected function sendHeaders(HttpMessage $message, array $headers): \Generator
     {
         static $remove = [
             'connection',
+            'content-encoding',
             'content-length',
             'host',
             'keep-alive',
