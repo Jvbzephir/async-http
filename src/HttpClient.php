@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http1\Connector;
+use KoolKode\Async\Http\Http1\EntityStream;
 
 class HttpClient
 {
@@ -111,7 +112,7 @@ class HttpClient
             if ($this->keepAlive) {
                 $stream = (yield $response->getBody()->getReadableStream());
                 
-                if ($stream instanceof BodyStream) {
+                if ($stream instanceof EntityStream) {
                     $stream->getAwaitable()->when(function () use ($uri, $conn) {
                         $this->pool->release($uri, $conn);
                     });

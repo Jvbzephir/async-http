@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Success;
 use KoolKode\Async\Util\Executor;
 
 class Connection
@@ -73,12 +74,16 @@ class Connection
         $this->writer = new Executor();
         $this->processor = new Coroutine($this->processIncomingFrames());
     }
-    
+
     public function shutdown(): Awaitable
     {
-        $this->processor->cancel(new \RuntimeException('Connection shutdown'));
+        if ($this->processor) {
+            $this->processor->cancel(new \RuntimeException('Connection shutdown'));
+            
+            return $this->processor;
+        }
         
-        return $this->processor;
+        return new Success(null);
     }
     
     public function getHPack(): HPack

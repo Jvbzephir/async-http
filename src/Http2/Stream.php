@@ -21,7 +21,6 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
 
@@ -147,13 +146,17 @@ class Stream
             }
         }
         
-        if (!$this->eof) {            
-            $response = $response->withBody(new StreamBody($this->createBodyStream()));
+        if (!$this->eof) {
+            if ($this->channel === null) {
+                $this->channel = new Channel(1000);
+            }
+            
+            $response = $response->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id)));
         }
         
         $this->defer->resolve($response);
     }
-    
+
     protected function getFirstHeader(string $name, array $headers): string
     {
         foreach ($headers as $header) {
@@ -164,47 +167,7 @@ class Stream
         
         return '';
     }
-    
-    protected function createBodyStream(): ReadableStream
-    {
-        if ($this->channel === null) {
-            $this->channel = new Channel(1000);
-        }
-        
-        return new class($this->channel, $this->conn, $this->id) extends ReadableChannelStream {
 
-            protected $conn;
-
-            protected $id;
-
-            public function __construct(Channel $channel, Connection $conn, int $id)
-            {
-                parent::__construct($channel);
-                
-                $this->conn = $conn;
-                $this->id = $id;
-            }
-            
-            public function __destruct()
-            {
-                $this->close();
-            }
-
-            public function close(): Awaitable
-            {
-                $this->channel->close();
-                
-                $close = parent::close();
-                
-                $close->when(function () {
-                    $this->conn->closeStream($this->id);
-                });
-                
-                return $close;
-            }
-        };
-    }
-    
     public function sendRequest(HttpRequest $request): Awaitable
     {
         return new Coroutine(function () use ($request) {

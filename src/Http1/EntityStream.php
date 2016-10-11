@@ -11,14 +11,14 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
-class BodyStream extends ReadableStreamDecorator
+class EntityStream extends ReadableStreamDecorator
 {
     protected $defer;
 

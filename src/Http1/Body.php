@@ -15,7 +15,6 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Http\BodyStream;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
@@ -331,7 +330,7 @@ class Body implements HttpBody
                 $this->stream->close();
             }
             
-            return new BodyStream(new ReadableMemoryStream());
+            return new EntityStream(new ReadableMemoryStream());
         }
         
         if ($this->compression) {
@@ -345,6 +344,6 @@ class Body implements HttpBody
             }
         }
         
-        return new BodyStream($stream, $this->cascadeClose);
+        return new EntityStream($stream, $this->cascadeClose);
     }
 }
