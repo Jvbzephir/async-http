@@ -93,8 +93,12 @@ class Driver implements HttpDriver
                             yield from $this->processRequest($stream, $request, $close);
                         }));
                         
+                        $body = yield $request->getBody()->getReadableStream();
+                        
                         // Wait until HTTP request body stream is closed.
-                        yield ((yield $request->getBody()->getReadableStream())->getAwaitable());
+                        if ($body instanceof EntityStream) {
+                            yield $body->getAwaitable();
+                        }
                     } catch (StreamClosedException $e) {
                         break;
                     } catch (\Throwable $e) {
@@ -135,9 +139,11 @@ class Driver implements HttpDriver
             return true;
         }
         
-        // Eighter content length or chunked encoding required to read request body.
-        if (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
-            return true;
+        if ($request->getMethod() != Http::HEAD) {
+            // Eighter content length or chunked encoding required to read request body.
+            if (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
+                return true;
+            }
         }
         
         return false;

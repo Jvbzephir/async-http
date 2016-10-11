@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Stream\DuplexStream;
 
 interface HttpConnector
 {
@@ -24,5 +23,7 @@ interface HttpConnector
     
     public function shutdown(): Awaitable;
     
-    public function send(DuplexStream $stream, HttpRequest $request, bool $keepAlive = true): Awaitable;
+    public function getConnectorContext(Uri $uri): HttpConnectorContext;
+    
+    public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable;
 }

@@ -11,27 +11,37 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Atomic;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
+use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
-use KoolKode\Async\Success;
 
 class Connector implements HttpConnector
 {
     protected $parser;
     
+    protected $pool;
+    
+    protected $keepAlive = true;
+    
     protected $debug = false;
 
-    public function __construct(ResponseParser $parser = null)
+    public function __construct(ResponseParser $parser = null, ConnectionPool $pool = null)
     {
         $this->parser = $parser ?? new ResponseParser();
+        $this->pool = new ConnectionPool();
+    }
+    
+    public function setKeepAlive(bool $keepAlive)
+    {
+        $this->keepAlive = $keepAlive;
     }
     
     public function setDebug(bool $debug)
@@ -65,25 +75,52 @@ class Connector implements HttpConnector
      */
     public function shutdown(): Awaitable
     {
-        return new Success(null);
+        return $this->pool->shutdown();
     }
     
     /**
      * {@inheritdoc}
      */
-    public function send(DuplexStream $stream, HttpRequest $request, bool $keepAlive = true): Awaitable
+    public function getConnectorContext(Uri $uri): HttpConnectorContext
     {
-        return new Coroutine(function () use ($stream, $request, $keepAlive) {
-            $done = false;
-            
+        $socket = $this->pool->getConnection($uri);
+        $context = new HttpConnectorContext();
+        
+        if ($socket !== null) {
+            $context->connected = true;
+            $context->stream = $socket;
+        }
+        
+        return $context;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
+    {
+        $stream = $context->stream;
+        
+        return new Coroutine(function () use ($stream, $request) {
             try {
-                // Ensure no partial requests are being sent.
-                yield new Atomic(new Coroutine($this->sendRequest($stream, $request, $done, $keepAlive)));
+                $uri = $request->getUri();
+                
+                yield from $this->sendRequest($stream, $request);
                 
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
                 
-                if ($keepAlive && !$this->shouldConnectionBeClosed($response)) {
+                if (!$this->shouldConnectionBeClosed($response)) {
                     $response->getBody()->setCascadeClose(false);
+                    
+                    $body = yield $response->getBody()->getReadableStream();
+                    
+                    if ($body instanceof EntityStream) {
+                        $body->getAwaitable()->when(function () use ($uri, $stream) {
+                            $this->pool->release($uri, $stream);
+                        });
+                    } else {
+                        $this->pool->release($uri, $stream);
+                    }
                 }
                 
                 $response = $response->withoutHeader('Content-Length');
@@ -91,11 +128,7 @@ class Connector implements HttpConnector
                 
                 return $response;
             } catch (\Throwable $e) {
-                if ($done) {
-                    $stream->close();
-                } else {
-                    $done = true;
-                }
+                $stream->close();
                 
                 throw $e;
             }
@@ -104,6 +137,10 @@ class Connector implements HttpConnector
 
     protected function shouldConnectionBeClosed(HttpResponse $response): bool
     {
+        if (!$this->keepAlive) {
+            return true;
+        }
+        
         if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
             return true;
         }
@@ -115,7 +152,7 @@ class Connector implements HttpConnector
         return false;
     }
     
-    protected function sendRequest(DuplexStream $stream, HttpRequest $request, bool & $done, bool $keepAlive): \Generator
+    protected function sendRequest(DuplexStream $stream, HttpRequest $request): \Generator
     {
         static $compression;
         
@@ -123,82 +160,69 @@ class Connector implements HttpConnector
             $compression = \function_exists('inflate_init');
         }
         
-        try {
-            $request = $this->normalizeRequest($request);
-            $body = $request->getBody();
-            $size = yield $body->getSize();
-            $nobody = ($request->getMethod() === Http::HEAD);
+        $request = $this->normalizeRequest($request);
+        $body = $request->getBody();
+        $size = yield $body->getSize();
+        
+        $bodyStream = yield $body->getReadableStream();
+        
+        $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
+        
+        if ($this->keepAlive) {
+            $buffer .= "Connection: keep-alive\r\n";
+        } else {
+            $buffer .= "Connection: close\r\n";
+        }
+        
+        if ($request->getProtocolVersion() == '1.0' && $size === null) {
+            $tmp = yield LoopConfig::currentFilesystem()->tempStream();
             
-            $bodyStream = yield $body->getReadableStream();
-            
-            $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-            
-            if ($keepAlive) {
-                $buffer .= "Connection: keep-alive\r\n";
-            } else {
-                $buffer .= "Connection: close\r\n";
-            }
-            
-            if (!$nobody) {
-                if ($request->getProtocolVersion() == '1.0' && $size === null) {
-                    $tmp = yield LoopConfig::currentFilesystem()->tempStream();
-                    
-                    try {
-                        $size = yield new CopyBytes($bodyStream, $tmp);
-                    } catch (\Throwable $e) {
-                        $tmp->close();
-                        
-                        throw $e;
-                    }
-                    
-                    $bodyStream = $tmp;
-                }
+            try {
+                $size = yield new CopyBytes($bodyStream, $tmp);
+            } catch (\Throwable $e) {
+                $tmp->close();
                 
-                if ($size === null) {
-                    $buffer .= "Transfer-Encoding: chunked\r\n";
-                } else {
-                    $buffer .= "Content-Length: $size\r\n";
-                }
+                throw $e;
             }
             
-            if ($compression) {
-                $buffer .= "Accept-Encoding: gzip, deflate\r\n";
-            }
+            $bodyStream = $tmp;
+        }
+        
+        if ($size === null) {
+            $buffer .= "Transfer-Encoding: chunked\r\n";
+        } else {
+            $buffer .= "Content-Length: $size\r\n";
+        }
+        
+        if ($compression) {
+            $buffer .= "Accept-Encoding: gzip, deflate\r\n";
+        }
+        
+        foreach ($request->getHeaders() as $name => $header) {
+            $name = Http::normalizeHeaderName($name);
             
-            foreach ($request->getHeaders() as $name => $header) {
-                $name = Http::normalizeHeaderName($name);
-                
-                foreach ($header as $value) {
-                    $buffer .= $name . ': ' . $value . "\r\n";
-                }
-            }
-            
-            yield $stream->write($buffer . "\r\n");
-            yield $stream->flush();
-            
-            // TODO: Add support for Expect: 100-continue
-            
-            if ($nobody) {
-                $bodyStream->close();
-            } else {
-                if ($size === null) {
-                    // Align each chunk with length and line breaks to fit into 4 KB payload.
-                    yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
-                        return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
-                    });
-                    
-                    yield $stream->write("0\r\n\r\n");
-                } else {
-                    yield new CopyBytes($bodyStream, $stream, true, $size);
-                }
-                
-                yield $stream->flush();
-            }
-        } finally {
-            if ($done) {
-                $stream->close();
+            foreach ($header as $value) {
+                $buffer .= $name . ': ' . $value . "\r\n";
             }
         }
+        
+        yield $stream->write($buffer . "\r\n");
+        yield $stream->flush();
+        
+        // TODO: Add support for Expect: 100-continue
+        
+        if ($size === null) {
+            // Align each chunk with length and line breaks to fit into 4 KB payload.
+            yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
+            });
+            
+            yield $stream->write("0\r\n\r\n");
+        } else {
+            yield new CopyBytes($bodyStream, $stream, true, $size);
+        }
+        
+        yield $stream->flush();
     }
 
     protected function normalizeRequest(HttpRequest $request): HttpRequest

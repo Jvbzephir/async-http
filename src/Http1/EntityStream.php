@@ -42,13 +42,9 @@ class EntityStream extends ReadableStreamDecorator
 
     public function close(): Awaitable
     {
-        $close = parent::close();
+        $this->defer->resolve(null);
         
-        $close->when(function () {
-            $this->defer->resolve(null);
-        });
-        
-        return $close;
+        return parent::close();
     }
 
     protected function processChunk(string $chunk): string

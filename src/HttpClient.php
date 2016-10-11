@@ -16,16 +16,16 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Http1\Connector;
-use KoolKode\Async\Http\Http1\EntityStream;
+use KoolKode\Async\Socket\Socket;
+use KoolKode\Async\Socket\SocketFactory;
 
 class HttpClient
-{
-    protected $pool;
-    
-    protected $keepAlive = true;
-    
+{    
     protected $userAgent = 'KoolKode HTTP Client';
+    
+    protected $protocols;
     
     protected $connectors;
     
@@ -37,15 +37,15 @@ class HttpClient
             new Connector()
         ];
         
-        $this->pool = new ConnectionPool($this->getProtocols());
         $this->pending = new \SplObjectStorage();
+        $this->protocols = \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
+            return $connector->getProtocols();
+        }, $this->connectors)));
     }
-        
+
     public function shutdown(): Awaitable
     {
-        $close = [
-            $this->pool->shutdown()
-        ];
+        $close = [];
         
         foreach ($this->connectors as $connector) {
             $close[] = $connector->shutdown();
@@ -63,17 +63,10 @@ class HttpClient
         
         return new AwaitPending($close);
     }
-    
+
     public function getProtocols(): array
     {
-        return \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
-            return $connector->getProtocols();
-        }, $this->connectors)));
-    }
-    
-    public function setKeepAlive(bool $keepAlive)
-    {
-        $this->keepAlive = $keepAlive;
+        return $this->protocols;
     }
     
     public function send(HttpRequest $request): Awaitable
@@ -83,9 +76,19 @@ class HttpClient
                 $request = $request->withHeader('User-Agent', $this->userAgent);
             }
             
-            $conn = yield $this->pool->connect($uri = $request->getUri(), $this->keepAlive);
+            $uri = $request->getUri();
             
-            $meta = $conn->getMetadata();
+            foreach ($this->connectors as $connector) {
+                $context = $connector->getConnectorContext($uri);
+                
+                if ($context->connected) {
+                    return yield $connector->send($context, $request);
+                }
+            }
+            
+            $socket = yield $this->connectSocket($request->getUri());
+            
+            $meta = $socket->getMetadata();
             $alpn = \trim($meta['crypto']['alpn_protocol'] ?? '');
             $connector = null;
             
@@ -98,30 +101,38 @@ class HttpClient
             }
             
             if ($connector === null) {
+                $socket->close();
+                
                 throw new \RuntimeException(\sprintf('No HTTP connector could handle negotiated ALPN protocol "%s"', $alpn));
             }
             
-            $this->pending->attach($pending = $connector->send($conn, $request, $this->keepAlive));
+            $context = new HttpConnectorContext();
+            $context->stream = $socket;
+            
+            $this->pending->attach($pending = $connector->send($context, $request));
             
             try {
-                $response = yield $pending;
+                return yield $pending;
             } finally {
                 $this->pending->detach($pending);
             }
-            
-            if ($this->keepAlive) {
-                $stream = (yield $response->getBody()->getReadableStream());
-                
-                if ($stream instanceof EntityStream) {
-                    $stream->getAwaitable()->when(function () use ($uri, $conn) {
-                        $this->pool->release($uri, $conn);
-                    });
-                } else {
-                    $this->pool->release($uri, $conn);
-                }
-            }
-            
-            return $response;
         });
+    }
+    
+    protected function connectSocket(Uri $uri): Awaitable
+    {
+        $host = $uri->getHost();
+        
+        if (Address::isResolved($host)) {
+            $factory = new SocketFactory(new Address($host) . ':' . $uri->getPort(), 'tcp');
+        } else {
+            $factory = new SocketFactory($uri->getHostWithPort(true), 'tcp');
+        }
+        
+        if ($this->protocols && Socket::isAlpnSupported()) {
+            $factory->setOption('ssl', 'alpn_protocols', \implode(',', $this->protocols));
+        }
+        
+        return $factory->createSocketStream(5, $uri->getScheme() === 'https');
     }
 }

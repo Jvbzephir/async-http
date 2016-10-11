@@ -19,6 +19,7 @@ use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 class HttpEndpoint
 {
@@ -68,18 +69,34 @@ class HttpEndpoint
 
     protected function runServer(): \Generator
     {
+        $pending = new \SplObjectStorage();
+        
         try {
-            yield $this->server->listen(function (SocketStream $socket) {
+            yield $this->server->listen(function (SocketStream $socket) use ($pending) {
                 if ($this->isEncrypted()) {
                     $alpn = \trim($socket->getMetadata()['crypto']['alpn_protocol'] ?? '');
                 } else {
                     $alpn = '';
                 }
                 
-                yield $this->http1->handleConnection($socket, $alpn);
+                $pending->attach($request = $this->http1->handleConnection($socket, $alpn));
+                
+                try {
+                    yield $request;
+                } finally {
+                    $pending->detach($request);
+                }
             });
+        } catch (\Throwable $e) {
+            foreach ($pending as $request) {
+                $request->cancel(new StreamClosedException('HTTP server stopped', 0, $e));
+            }
         } finally {
             $this->server = null;
+            
+            foreach ($pending as $request) {
+                $request->cancel(new StreamClosedException('HTTP server stopped', 0, $e));
+            }
         }
     }
 }
