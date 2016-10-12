@@ -89,9 +89,6 @@ class Driver implements HttpDriver
                         
                         $close = $this->shouldConnectionBeClosed($request);
                         
-                        $request = $request->withoutHeader('Content-Length');
-                        $request = $request->withoutHeader('Transfer-Encoding');
-                        
                         $jobs->enqueue($executor->execute(function () use ($stream, $request, $close) {
                             yield from $this->processRequest($stream, $request, $close);
                         }));
@@ -142,27 +139,37 @@ class Driver implements HttpDriver
             return true;
         }
         
-        if ($request->getMethod() != Http::HEAD) {
-            // Eighter content length or chunked encoding required to read request body.
-            if (!$request->hasHeader('Content-Length') && 'chunked' !== \strtolower($request->getHeaderLine('Transfer-Encoding'))) {
-                return true;
-            }
-        }
-        
         return false;
     }
     
     protected function processRequest(GuardedStream $stream, HttpRequest $request, bool $close): \Generator
     {
+        static $remove = [
+            'Connection',
+            'Keep-Alive',
+            'Content-Length',
+            'Transfer-Encoding'
+        ];
+        
         $stream->reference();
         
         try {
+            foreach ($remove as $name) {
+                $request = $request->withoutHeader($name);
+            }
+            
             $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
             $response = $response->withHeader('Server', 'KoolKode HTTP Server');
             
             if ($request->getMethod() == Http::POST) {
                 $response = $response->withHeader('Content-Type', $request->getHeaderLine('Content-Type'));
-                $response = $response->withBody(new StringBody(yield $request->getBody()->getContents()));
+                $response = $response->withBody(new StringBody(yield $request->getBody()->getContents(), true));
+            } elseif ($request->getRequestTarget() == '/api/') {
+                $response = $response->withHeader('Content-Type', 'application/json');
+                $response = $response->withBody(new StringBody(json_encode([
+                    'server' => 'KoolKode HTTP Server',
+                    'time' => (new \DateTime())->format(\DateTime::ISO8601)
+                ], true)));
             } else {
                 $response = $response->withBody(new StringBody('Hello Test Client :)'));
             }
