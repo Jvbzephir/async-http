@@ -89,6 +89,8 @@ class Connection
         self::SETTING_MAX_HEADER_LIST_SIZE => 16777216
     ];
     
+    protected $pings = [];
+    
     public function __construct(DuplexStream $socket, HPack $hpack, bool $client)
     {
         $this->socket = $socket;
@@ -176,6 +178,22 @@ class Connection
         }
     }
     
+    public function ping(): Awaitable
+    {
+        $payload = \random_bytes(9);
+        $defer = new Deferred();
+        
+        $this->writeFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
+            if ($e) {
+                $defer->fail($e);
+            } else {
+                $this->pings[$payload] = $defer;
+            }
+        });
+        
+        return $defer;
+    }
+    
     protected function readNextFrame(): \Generator
     {
         $header = yield $this->socket->readBuffer(9, true);
@@ -237,6 +255,14 @@ class Connection
                 }
                 
                 try {
+                    foreach ($this->pings as $ping) {
+                        $ping->fail(new \RuntimeException('HTTP/2 connection closed'));
+                    }
+                } finally {
+                    $this->pings = [];
+                }
+                
+                try {
                     foreach ($this->streams as $stream) {
                         $stream->close();
                     }
@@ -278,8 +304,12 @@ class Connection
         }
         
         if ($frame->flags & Frame::ACK) {
-            if ($frame->data !== self::PING_PAYLOAD) {
-                throw new ConnectionException('Invalid response to PING received', Frame::PROTOCOL_ERROR);
+            if (isset($this->pings[$frame->data])) {
+                try {
+                    $this->pings[$frame->data]->resolve(true);
+                } finally {
+                    unset($this->pings[$frame->data]);
+                }
             }
         } else {
             yield $this->writeFrame(new Frame(Frame::PING, $frame->data, Frame::ACK), 500);
