@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Socket\SocketStream;
+use KoolKode\Async\Stream\DuplexStream;
 
 class ConnectionPool
 {
@@ -46,18 +46,14 @@ class ConnectionPool
         }
     }
     
-    public function release(Uri $uri, SocketStream $conn)
+    public function release(Uri $uri, DuplexStream $conn)
     {
-        $socket = $conn->getSocket();
+        $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
         
-        if (\is_resource($socket) && !\feof($socket)) {
-            $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
-            
-            if (empty($this->conns[$key])) {
-                $this->conns[$key] = new \SplQueue();
-            }
-            
-            $this->conns[$key]->enqueue($conn);
+        if (empty($this->conns[$key])) {
+            $this->conns[$key] = new \SplQueue();
         }
+        
+        $this->conns[$key]->enqueue($conn);
     }
 }

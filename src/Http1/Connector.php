@@ -22,7 +22,6 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
-use KoolKode\Async\Stream\DuplexStream;
 
 class Connector implements HttpConnector
 {
@@ -83,7 +82,7 @@ class Connector implements HttpConnector
         
         try {
             foreach ($this->pending as $pending) {
-                $pending->cancel();
+                $pending->cancel(new \RuntimeException('HTTP connector closed'));
                 
                 $tasks[] = $pending;
             }
@@ -117,26 +116,36 @@ class Connector implements HttpConnector
      */
     public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
     {
-        $stream = $context->stream;
+        if ($context->stream instanceof GuardedStream) {
+            $stream = $context->stream;
+        } else {
+            $stream = new GuardedStream($context->stream);
+            $stream->reference();
+        }
         
         $coroutine = new Coroutine(function () use ($stream, $request) {
+            $stream->reference();
+            
             try {
                 $uri = $request->getUri();
                 
                 yield from $this->sendRequest($stream, $request);
                 
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
+                $body = $response->getBody();
                 
-                if (!$this->shouldConnectionBeClosed($response)) {
-                    $response->getBody()->setCascadeClose(false);
+                if ($this->shouldConnectionBeClosed($response)) {
+                    $stream->close();
+                } else {
+                    $bodyStream = yield $body->getReadableStream();
                     
-                    $body = yield $response->getBody()->getReadableStream();
-                    
-                    if ($body instanceof EntityStream) {
-                        $body->getAwaitable()->when(function () use ($uri, $stream) {
+                    if ($bodyStream instanceof EntityStream) {
+                        $bodyStream->getAwaitable()->when(function () use ($uri, $stream) {
                             $this->pool->release($uri, $stream);
                         });
                     } else {
+                        $stream->close();
+                        
                         $this->pool->release($uri, $stream);
                     }
                 }
@@ -146,7 +155,7 @@ class Connector implements HttpConnector
                 
                 return $response;
             } catch (\Throwable $e) {
-                $stream->close();
+                yield $stream->close();
                 
                 throw $e;
             }
@@ -178,7 +187,7 @@ class Connector implements HttpConnector
         return false;
     }
     
-    protected function sendRequest(DuplexStream $stream, HttpRequest $request): \Generator
+    protected function sendRequest(GuardedStream $stream, HttpRequest $request): \Generator
     {
         static $compression;
         

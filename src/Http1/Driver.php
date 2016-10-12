@@ -64,6 +64,9 @@ class Driver implements HttpDriver
      */
     public function handleConnection(DuplexStream $stream): Awaitable
     {
+        $stream = new GuardedStream($stream);
+        $stream->reference();
+        
         return new Coroutine(function () use ($stream) {
             $executor = new Executor();
             $jobs = new \SplQueue();
@@ -116,7 +119,7 @@ class Driver implements HttpDriver
                     $jobs->dequeue()->cancel(new StreamClosedException('HTTP connection closed'));
                 }
                 
-                $stream->close();
+                yield $stream->close();
             }
         });
     }
@@ -149,8 +152,10 @@ class Driver implements HttpDriver
         return false;
     }
     
-    protected function processRequest(DuplexStream $stream, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(GuardedStream $stream, HttpRequest $request, bool $close): \Generator
     {
+        $stream->reference();
+        
         try {
             $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
             $response = $response->withHeader('Server', 'KoolKode HTTP Server');
@@ -169,6 +174,8 @@ class Driver implements HttpDriver
             (yield $request->getBody()->getReadableStream())->close();
             
             yield from $this->sendErrorResponse($stream, $request, $e);
+        } finally {
+            $stream->close();
         }
     }
 
@@ -178,27 +185,31 @@ class Driver implements HttpDriver
         yield 1;
     }
 
-    protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, \Throwable $e): \Generator
+    protected function sendErrorResponse(GuardedStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
-        fwrite(STDERR, "\n$e\n");
-        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-        
-        if ($e instanceof StatusException) {
-            try {
-                $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
-            } catch (\Throwable $e) {}
-        }
-        
-        if ($this->debug) {
-            $response = $response->withHeader('Content-Type', 'text/plain');
-            $response = $response->withBody(new StringBody($e->getMessage()));
-        }
+        $stream->reference();
         
         try {
-            yield from $this->sendResponse($stream, $request, $response, true);
-        } catch (\Throwable $e) {
-            fwrite(STDERR, "\n$e\n");
-            yield from $this->handleClosedConnection($e);
+            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+            
+            if ($e instanceof StatusException) {
+                try {
+                    $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
+                } catch (\Throwable $e) {}
+            }
+            
+            if ($this->debug) {
+                $response = $response->withHeader('Content-Type', 'text/plain');
+                $response = $response->withBody(new StringBody($e->getMessage()));
+            }
+            
+            try {
+                yield from $this->sendResponse($stream, $request, $response, true);
+            } catch (\Throwable $e) {
+                yield from $this->handleClosedConnection($e);
+            }
+        } finally {
+            $stream->close();
         }
     }
 

@@ -1,0 +1,81 @@
+<?php
+
+/*
+ * This file is part of KoolKode Async Http.
+ *
+ * (c) Martin Schröder <m.schroeder2007@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace KoolKode\Async\Http\Http1;
+
+use KoolKode\Async\Awaitable;
+use KoolKode\Async\Deferred;
+use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Stream\ReadableStreamDecorator;
+
+class GuardedStream extends ReadableStreamDecorator implements DuplexStream
+{
+    protected $refs = 0;
+    
+    protected $defer;
+    
+    public function __construct(DuplexStream $stream)
+    {
+        parent::__construct($stream);
+        
+        $this->defer = new class() extends Deferred {
+
+            public function cancel(\Throwable $e)
+            {
+                // This defer cannot be cancelled...
+            }
+        };
+    }
+
+    public function reference()
+    {
+        $this->refs++;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function close(): Awaitable
+    {
+        $this->refs--;
+        
+        if ($this->refs < 1) {
+            $this->defer->resolve(null);
+            
+            return parent::close();
+        }
+        
+        return $this->defer;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function flush(): Awaitable
+    {
+        return $this->stream->flush();
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function write(string $data): Awaitable
+    {
+        return $this->stream->write($data);
+    }
+
+    protected function processChunk(string $chunk): string
+    {
+        return $chunk;
+    }
+}
