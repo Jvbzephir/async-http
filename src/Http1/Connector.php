@@ -22,6 +22,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
+use Psr\Log\LoggerInterface;
 
 class Connector implements HttpConnector
 {
@@ -34,10 +35,14 @@ class Connector implements HttpConnector
     protected $debug = false;
     
     protected $pending;
+    
+    protected $logger;
 
-    public function __construct(ResponseParser $parser = null, ConnectionPool $pool = null)
+    public function __construct(ResponseParser $parser = null, LoggerInterface $logger = null)
     {
         $this->parser = $parser ?? new ResponseParser();
+        $this->logger = $logger;
+        
         $this->pool = new ConnectionPool();
         $this->pending = new \SplObjectStorage();
     }
@@ -134,6 +139,16 @@ class Connector implements HttpConnector
                 $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
                 $body = $response->getBody();
                 
+                if ($this->logger) {
+                    $reason = rtrim(' ' . $response->getReasonPhrase());
+                    
+                    if ($reason === '') {
+                        $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                    }
+                    
+                    $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+                }
+                
                 if ($this->shouldConnectionBeClosed($response)) {
                     $stream->close();
                 } else {
@@ -196,9 +211,13 @@ class Connector implements HttpConnector
         }
         
         $request = $this->normalizeRequest($request);
+        
+        if ($this->logger) {
+            $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+        }
+        
         $body = $request->getBody();
         $size = yield $body->getSize();
-        
         $bodyStream = yield $body->getReadableStream();
         
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());

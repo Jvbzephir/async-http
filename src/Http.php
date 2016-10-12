@@ -805,8 +805,6 @@ abstract class Http
      */
     public static function getReason(int $code, string $default = ''): string
     {
-        $code = (int) $code;
-        
         if (isset(static::$reason[$code])) {
             return static::$reason[$code];
         }

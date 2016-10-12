@@ -26,6 +26,7 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
+use Psr\Log\LoggerInterface;
 
 class Stream
 {
@@ -48,12 +49,15 @@ class Stream
     protected $outputWindow;
 
     protected $outputDefer;
+    
+    protected $logger;
 
-    public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE)
+    public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE, LoggerInterface $logger = null)
     {
         $this->id = $id;
         $this->conn = $conn;
         $this->outputWindow = $outputWindow;
+        $this->logger = $logger;
         
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();

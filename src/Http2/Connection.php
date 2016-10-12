@@ -20,6 +20,7 @@ use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
+use Psr\Log\LoggerInterface;
 
 class Connection
 {
@@ -94,13 +95,19 @@ class Connection
     
     protected $incoming;
     
-    public function __construct(DuplexStream $socket, HPack $hpack, bool $client)
+    /**
+     * @var LoggerInterface
+     */
+    protected $logger;
+
+    public function __construct(DuplexStream $socket, HPack $hpack, bool $client, LoggerInterface $logger = null)
     {
         $this->socket = $socket;
         $this->hpack = $hpack;
         $this->client = $client;
-        $this->nextStreamId = $client ? 1 : 2;
+        $this->logger = $logger;
         
+        $this->nextStreamId = $client ? 1 : 2;
         $this->writer = new Executor();
         $this->incoming = new Channel();
     }
@@ -135,12 +142,12 @@ class Connection
         throw new \OutOfBoundsException(\sprintf('Remote setting not found: "%s"', $setting));
     }
     
-    public static function connectClient(DuplexStream $socket, HPack $hpack): Awaitable
+    public static function connectClient(DuplexStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
     {
-        return new Coroutine(function () use ($socket, $hpack) {
+        return new Coroutine(function () use ($socket, $hpack, $logger) {
             yield $socket->write(self::PREFACE);
             
-            $conn = new Connection($socket, $hpack, true);
+            $conn = new Connection($socket, $hpack, true, $logger);
             
             $settings = '';
             
@@ -169,16 +176,16 @@ class Connection
         });
     }
     
-    public static function connectServer(DuplexStream $socket, HPack $hpack): Awaitable
+    public static function connectServer(DuplexStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
     {
-        return new Coroutine(function () use ($socket, $hpack) {
+        return new Coroutine(function () use ($socket, $hpack, $logger) {
             $preface = yield $socket->readBuffer(\strlen(self::PREFACE), true);
             
             if ($preface !== self::PREFACE) {
                 throw new ConnectionException('Did not receive valid HTTP/2 connection preface from client');
             }
             
-            $conn = new Connection($socket, $hpack, false);
+            $conn = new Connection($socket, $hpack, false, $logger);
             
             list ($stream, $frame) = yield from $conn->readNextFrame();
             
@@ -205,11 +212,11 @@ class Connection
     
     public function openStream(): Stream
     {
-        try {
-            return $this->streams[$this->nextStreamId] = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
-        } finally {
-            $this->nextStreamId += 2;
-        }
+        $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
+        
+        $this->nextStreamId += 2;
+        
+        return $this->streams[$stream->getId()] = $stream;
     }
     
     public function nextRequest(): Awaitable
@@ -227,7 +234,7 @@ class Connection
             throw new ConnectionException(\sprintf('Cannot open stream %u because it is still open', $streamId), Frame::PROTOCOL_ERROR);
         }
         
-        $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
+        $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
         
         $stream->getDefer()->when(function (\Throwable $e = null, $val = null) {
             $this->incoming->send($e ?? $val);
@@ -276,6 +283,14 @@ class Connection
             $frame = new Frame($type, yield $this->socket->readBuffer($length, true), \ord($header[4]));
         } else {
             $frame = new Frame($type, '', \ord($header[4]));
+        }
+        
+        if ($this->logger) {
+            if ($stream) {
+                $this->logger->debug("IN [$stream] $frame");
+            } else {
+                $this->logger->debug("IN $frame");
+            }
         }
         
         return [
@@ -516,6 +531,10 @@ class Connection
     public function writeFrame(Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($frame) {
+            if ($this->logger) {
+                $this->logger->debug("OUT $frame");
+            }
+            
             return $this->socket->write($frame->encode(0));
         }, $priority);
     }
@@ -523,6 +542,10 @@ class Connection
     public function writeStreamFrame(int $stream, Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream, $frame) {
+            if ($this->logger) {
+                $this->logger->debug("OUT [$stream] $frame");
+            }
+            
             return $this->socket->write($frame->encode($stream));
         }, $priority);
     }
@@ -533,6 +556,10 @@ class Connection
             $len = 0;
             
             foreach ($frames as $frame) {
+                if ($this->logger) {
+                    $this->logger->debug("OUT [$stream] $frame");
+                }
+                
                 $len += yield $this->socket->write($frame->encode($stream));
             }
             

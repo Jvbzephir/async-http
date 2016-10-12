@@ -16,20 +16,25 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
+use Psr\Log\LoggerInterface;
 
 class Connector implements HttpConnector
 {
-    protected $connections = [];
-    
     protected $hpackContext;
     
-    public function __construct(HPackContext $hpackContext = null)
+    protected $logger;
+ 
+    protected $connections = [];
+    
+    public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
     {
         $this->hpackContext = $hpackContext ?? new HPackContext();
+        $this->logger = $logger;
     }
     
     /**
@@ -93,13 +98,29 @@ class Connector implements HttpConnector
             if ($context instanceof ConnectorContext && $context->conn) {
                 $conn = $context->conn;
             } else {
-                $conn = yield Connection::connectClient($context->stream, new HPack($this->hpackContext));
+                $conn = yield Connection::connectClient($context->stream, new HPack($this->hpackContext), $this->logger);
                 $uri = $request->getUri();
                 
                 $this->connections[\sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true))] = $conn;
             }
             
-            return yield $conn->openStream()->sendRequest($request);
+            if ($this->logger) {
+                $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            }
+            
+            $response = yield $conn->openStream()->sendRequest($request);
+            
+            if ($this->logger) {
+                $reason = rtrim(' ' . $response->getReasonPhrase());
+            
+                if ($reason === '') {
+                    $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                }
+            
+                $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+            }
+            
+            return $response;
         });
     }
 }

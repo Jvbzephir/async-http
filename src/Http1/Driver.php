@@ -25,18 +25,22 @@ use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Executor;
+use Psr\Log\LoggerInterface;
 
 class Driver implements HttpDriver
 {
     protected $parser;
     
+    protected $logger;
+    
     protected $keepAliveSupported = true;
     
     protected $debug = false;
     
-    public function __construct(RequestParser $parser = null)
+    public function __construct(RequestParser $parser = null, LoggerInterface $logger = null)
     {
         $this->parser = $parser ?? new RequestParser();
+        $this->logger = $logger;
     }
     
     public function setKeepAliveSupported(bool $keepAlive)
@@ -153,6 +157,10 @@ class Driver implements HttpDriver
         
         $stream->reference();
         
+        if ($this->logger) {
+            $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+        }
+        
         try {
             foreach ($remove as $name) {
                 $request = $request->withoutHeader($name);
@@ -232,6 +240,16 @@ class Driver implements HttpDriver
         }
         
         $response = $this->normalizeResponse($request, $response);
+        
+        if ($this->logger) {
+            $reason = rtrim(' ' . $response->getReasonPhrase());
+        
+            if ($reason === '') {
+                $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+            }
+        
+            $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+        }
         
         $http11 = ($response->getProtocolVersion() == '1.1');
         $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));
