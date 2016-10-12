@@ -48,6 +48,11 @@ class HttpEndpoint
     {
         $this->factory->setCertificate($file, $allowSelfSigned, $password);
     }
+    
+    public function addDriver(HttpDriver $driver)
+    {
+        $this->drivers[] = $driver;
+    }
 
     public function listen(): Awaitable
     {
@@ -56,6 +61,10 @@ class HttpEndpoint
             
             if ($factory->isEncrypted() && Socket::isAlpnSupported()) {
                 $protocols = [];
+                
+                foreach ($this->drivers as $driver) {
+                    $protocols = \array_merge($protocols, $driver->getProtocols());
+                }
                 
                 $protocols = \array_unique(\array_merge($protocols, $this->http1->getProtocols()));
                 $factory->setOption('ssl', 'alpn_protocols', implode(',', $protocols));
@@ -79,7 +88,21 @@ class HttpEndpoint
                     $alpn = '';
                 }
                 
-                $pending->attach($request = $this->http1->handleConnection($socket, $alpn));
+                $request = null;
+                
+                foreach ($this->drivers as $driver) {
+                    if (\in_array($alpn, $driver->getProtocols(), true)) {
+                        $request = $driver->handleConnection($socket);
+                        
+                        break;
+                    }
+                }
+                
+                if ($request === null) {
+                    $request = $this->http1->handleConnection($socket);
+                }
+                
+                $pending->attach($request);
                 
                 try {
                     yield $request;
@@ -87,15 +110,11 @@ class HttpEndpoint
                     $pending->detach($request);
                 }
             });
-        } catch (\Throwable $e) {
-            foreach ($pending as $request) {
-                $request->cancel(new StreamClosedException('HTTP server stopped', 0, $e));
-            }
         } finally {
             $this->server = null;
             
             foreach ($pending as $request) {
-                $request->cancel(new StreamClosedException('HTTP server stopped', 0, $e));
+                $request->cancel(new StreamClosedException('HTTP server stopped'));
             }
         }
     }

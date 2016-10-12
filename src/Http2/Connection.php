@@ -18,6 +18,7 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Success;
+use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 
 class Connection
@@ -91,6 +92,8 @@ class Connection
     
     protected $pings = [];
     
+    protected $incoming;
+    
     public function __construct(DuplexStream $socket, HPack $hpack, bool $client)
     {
         $this->socket = $socket;
@@ -99,8 +102,14 @@ class Connection
         $this->nextStreamId = $client ? 1 : 2;
         
         $this->writer = new Executor();
+        $this->incoming = new Channel();
     }
 
+    public function isClient(): bool
+    {
+        return $this->client;
+    }
+    
     public function shutdown(): Awaitable
     {
         if ($this->processor !== null) {
@@ -129,9 +138,9 @@ class Connection
     public static function connectClient(DuplexStream $socket, HPack $hpack): Awaitable
     {
         return new Coroutine(function () use ($socket, $hpack) {
-            $conn = new Connection($socket, $hpack, true);
-            
             yield $socket->write(self::PREFACE);
+            
+            $conn = new Connection($socket, $hpack, true);
             
             $settings = '';
             
@@ -145,7 +154,7 @@ class Connection
             list ($stream, $frame) = yield from $conn->readNextFrame();
             
             if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
-                throw new \RuntimeException('Failed to establish HTTP/2 connection');
+                throw new ConnectionException('Failed to establish HTTP/2 connection');
             }
             
             $frames = new \SplQueue();
@@ -160,6 +169,40 @@ class Connection
         });
     }
     
+    public static function connectServer(DuplexStream $socket, HPack $hpack): Awaitable
+    {
+        return new Coroutine(function () use ($socket, $hpack) {
+            $preface = yield $socket->readBuffer(\strlen(self::PREFACE), true);
+            
+            if ($preface !== self::PREFACE) {
+                throw new ConnectionException('Did not receive valid HTTP/2 connection preface from client');
+            }
+            
+            $conn = new Connection($socket, $hpack, false);
+            
+            list ($stream, $frame) = yield from $conn->readNextFrame();
+            
+            if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
+                throw new ConnectionException('Failed to establish HTTP/2 connection');
+            }
+            
+            $conn->processSettingsFrame($frame);
+            
+            $settings = '';
+            
+            foreach ($conn->localSettings as $k => $v) {
+                $settings .= \pack('nN', $k, $v);
+            }
+            
+            yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
+            yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
+            
+            $conn->processor = new Coroutine($conn->processIncomingFrames());
+            
+            return $conn;
+        });
+    }
+    
     public function openStream(): Stream
     {
         try {
@@ -167,6 +210,30 @@ class Connection
         } finally {
             $this->nextStreamId += 2;
         }
+    }
+    
+    public function nextRequest(): Awaitable
+    {
+        return $this->incoming->receive();
+    }
+    
+    protected function openServerStream(int $streamId): Stream
+    {
+        if ($streamId < 1 || 0 === ($streamId % 2)) {
+            throw new ConnectionException('Streams opened by client must use an uneven stream identfier', Frame::PROTOCOL_ERROR);
+        }
+        
+        if (isset($this->streams[$streamId])) {
+            throw new ConnectionException(\sprintf('Cannot open stream %u because it is still open', $streamId), Frame::PROTOCOL_ERROR);
+        }
+        
+        $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
+        
+        $stream->getDefer()->when(function (\Throwable $e = null, $val = null) {
+            $this->incoming->send($e ?? $val);
+        });
+        
+        return $this->streams[$streamId] = $stream;
     }
     
     public function closeStream(int $streamId)
@@ -264,6 +331,8 @@ class Connection
                 } finally {
                     $this->pings = [];
                 }
+                
+                $this->incoming->close(new \RuntimeException('HTTP/2 connection closed'));
                 
                 try {
                     foreach ($this->streams as $stream) {
@@ -407,10 +476,12 @@ class Connection
     
     protected function processStreamFrame(int $stream, Frame $frame): \Generator
     {
-        switch ($frame->type) {
-            case Frame::PRIORITY:
-            case Frame::RST_STREAM:
-                return;
+        if ($frame->type === Frame::PRIORITY) {
+            return;
+        }
+        
+        if ($frame->type === Frame::RST_STREAM) {
+            return $this->closeStream($stream);
         }
         
         if (empty($this->streams[$stream])) {
@@ -418,7 +489,9 @@ class Connection
                 switch ($frame->type) {
                     case Frame::HEADERS:
                     case Frame::WINDOW_UPDATE:
-                        return $this->openStream()->processFrame($frame);
+                        $this->openServerStream($stream);
+                        
+                        return yield from $this->processStreamFrame($stream, $frame);
                 }
             }
             

@@ -17,10 +17,12 @@ use Interop\Async\Loop;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
@@ -60,6 +62,11 @@ class Stream
     public function getId(): int
     {
         return $this->id;
+    }
+    
+    public function getDefer(): Awaitable
+    {
+        return $this->defer;
     }
     
     public function close(\Throwable $e = null)
@@ -169,6 +176,51 @@ class Stream
             $this->headers = '';
         }
         
+        if ($this->conn->isClient()) {
+            $message = $this->resolveResponse($headers);
+        } else {
+            $message = $this->resolveRequest($headers);
+        }
+        
+        if (!$this->eof) {
+            if ($this->channel === null) {
+                $this->channel = new Channel(1000);
+            }
+            
+            $message = $message->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id, $this->inputWindow)));
+        }
+        
+        Loop::defer(function () use ($message) {
+            $this->defer->resolve([
+                $this,
+                $message
+            ]);
+        });
+    }
+
+    protected function resolveRequest(array $headers): HttpRequest
+    {
+        $scheme = $this->getFirstHeader(':scheme', $headers, 'http');
+        $authority = $this->getFirstHeader(':authority', $headers);
+        $method = $this->getFirstHeader(':method', $headers, Http::GET);
+        $path = $this->getFirstHeader(':path', $headers, '/');
+        
+        $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
+        
+        $request = new HttpRequest($uri, $method);
+        $request = $request->withProtocolVersion('2.0');
+        
+        foreach ($headers as $header) {
+            if (\substr($header[0], 0, 1) !== ':') {
+                $request = $request->withAddedHeader(...$header);
+            }
+        }
+        
+        return $request;
+    }
+
+    protected function resolveResponse(array $headers): HttpResponse
+    {
         $response = new HttpResponse((int) $this->getFirstHeader(':status', $headers));
         $response = $response->withProtocolVersion('2.0');
         
@@ -178,20 +230,10 @@ class Stream
             }
         }
         
-        if (!$this->eof) {
-            if ($this->channel === null) {
-                $this->channel = new Channel(1000);
-            }
-            
-            $response = $response->withBody(new StreamBody(new EntityStream($this->channel, $this->conn, $this->id, $this->inputWindow)));
-        }
-        
-        Loop::defer(function () use ($response) {
-            $this->defer->resolve($response);
-        });
+        return $response;
     }
 
-    protected function getFirstHeader(string $name, array $headers): string
+    protected function getFirstHeader(string $name, array $headers, string $default = ''): string
     {
         foreach ($headers as $header) {
             if ($header[0] === $name) {
@@ -199,7 +241,7 @@ class Stream
             }
         }
         
-        return '';
+        return $default;
     }
 
     public function sendRequest(HttpRequest $request): Awaitable
@@ -228,7 +270,7 @@ class Stream
             yield from $this->sendHeaders($request, $headers);
             yield from $this->sendBody($bodyStream);
             
-            return yield $this->defer;
+            return (yield $this->defer)[1];
         });
     }
     
