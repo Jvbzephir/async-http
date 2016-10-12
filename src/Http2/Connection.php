@@ -181,7 +181,10 @@ class Connection
     public function ping(): Awaitable
     {
         $payload = \random_bytes(9);
-        $defer = new Deferred();
+        
+        $defer = new Deferred(function () use ($payload) {
+            unset($this->pings[$payload]);
+        });
         
         $this->writeFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
             if ($e) {
