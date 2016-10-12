@@ -13,10 +13,15 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Util\HuffmanEncoder;
-use KoolKode\Util\HuffmanDecoder;
 use KoolKode\Util\HuffmanCode;
+use KoolKode\Util\HuffmanDecoder;
+use KoolKode\Util\HuffmanEncoder;
 
+/**
+ * Provides shared context that can be used by multiple HPACK coder instances.
+ * 
+ * @author Martin Schröder
+ */
 class HPackContext
 {
     const ENCODING_LITERAL = 0;

@@ -24,6 +24,11 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Implements the HTTP/1.x protocol on the client side.
+ * 
+ * @author Martin Schröder
+ */
 class Connector implements HttpConnector
 {
     protected $parser;
@@ -121,10 +126,10 @@ class Connector implements HttpConnector
      */
     public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
     {
-        if ($context->stream instanceof GuardedStream) {
+        if ($context->stream instanceof PersistentStream) {
             $stream = $context->stream;
         } else {
-            $stream = new GuardedStream($context->stream);
+            $stream = new PersistentStream($context->stream);
             $stream->reference();
         }
         
@@ -202,7 +207,7 @@ class Connector implements HttpConnector
         return false;
     }
     
-    protected function sendRequest(GuardedStream $stream, HttpRequest $request): \Generator
+    protected function sendRequest(PersistentStream $stream, HttpRequest $request): \Generator
     {
         static $compression;
         

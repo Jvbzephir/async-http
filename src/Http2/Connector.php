@@ -23,6 +23,11 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Implements the HTTP/2 protocol on the client side.
+ * 
+ * @author Martin Schröder
+ */
 class Connector implements HttpConnector
 {
     protected $hpackContext;

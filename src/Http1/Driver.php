@@ -27,6 +27,11 @@ use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Implements the HTTP/1.x protocol on the server side.
+ * 
+ * @author Martin Schröder
+ */
 class Driver implements HttpDriver
 {
     protected $parser;
@@ -68,7 +73,7 @@ class Driver implements HttpDriver
      */
     public function handleConnection(DuplexStream $stream): Awaitable
     {
-        $stream = new GuardedStream($stream);
+        $stream = new PersistentStream($stream);
         $stream->reference();
         
         return new Coroutine(function () use ($stream) {
@@ -146,7 +151,7 @@ class Driver implements HttpDriver
         return false;
     }
     
-    protected function processRequest(GuardedStream $stream, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(PersistentStream $stream, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
             'Connection',
@@ -200,7 +205,7 @@ class Driver implements HttpDriver
         yield 1;
     }
 
-    protected function sendErrorResponse(GuardedStream $stream, HttpRequest $request, \Throwable $e): \Generator
+    protected function sendErrorResponse(PersistentStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
         $stream->reference();
         

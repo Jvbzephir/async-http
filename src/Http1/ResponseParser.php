@@ -19,6 +19,11 @@ use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
+/**
+ * Parses an HTTP/1.x response from a readable stream.
+ * 
+ * @author Martin Schröder
+ */
 class ResponseParser extends MessageParser
 {
     /**

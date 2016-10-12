@@ -19,6 +19,11 @@ use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamException;
 
+/**
+ * Base class for HTTP/1.x message parsers.
+ * 
+ * @author Martin Schröder
+ */
 abstract class MessageParser
 {
     protected function parseHeaders(ReadableStream $stream, HttpMessage $message): \Generator

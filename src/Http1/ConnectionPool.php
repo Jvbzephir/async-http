@@ -18,6 +18,11 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStream;
 
+/**
+ * Connection pool used to implement persistent connections in HTTP/1 connector.
+ * 
+ * @author Martin Schröder
+ */
 class ConnectionPool
 {
     protected $conns = [];

@@ -28,6 +28,11 @@ use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Implements an HTTP/2 stream that is multiplexed over a connection.
+ * 
+ * @author Martin Schröder
+ */
 class Stream
 {
     protected $id;

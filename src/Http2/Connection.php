@@ -22,6 +22,11 @@ use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
+ * 
+ * @author Martin Schröder
+ */
 class Connection
 {
     /**

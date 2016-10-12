@@ -18,6 +18,11 @@ use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
+/**
+ * Stream used by HTTP/1 bodies providing an awaitable that is resolved when all body data has been read.
+ * 
+ * @author Martin Schröder
+ */
 class EntityStream extends ReadableStreamDecorator
 {
     protected $defer;
@@ -40,6 +45,9 @@ class EntityStream extends ReadableStreamDecorator
         return $this->defer;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close(): Awaitable
     {
         $this->defer->resolve(null);

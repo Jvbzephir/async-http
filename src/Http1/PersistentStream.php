@@ -18,7 +18,12 @@ use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
-class GuardedStream extends ReadableStreamDecorator implements DuplexStream
+/**
+ * Duplex stream decorator that ensures persistent connections are not closed while they are in use.
+ * 
+ * @author Martin Schröder
+ */
+class PersistentStream extends ReadableStreamDecorator implements DuplexStream
 {
     protected $refs = 0;
     

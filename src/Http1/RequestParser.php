@@ -17,6 +17,11 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
+/**
+ * Parses an HTTP/1.x request from a readable stream.
+ * 
+ * @author Martin Schröder
+ */
 class RequestParser extends MessageParser
 {
     public function parseRequest(ReadableStream $stream): \Generator

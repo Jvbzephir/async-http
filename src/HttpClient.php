@@ -21,14 +21,41 @@ use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
 
+/**
+ * HTTP client that can be configured to use different connectors to support different HTTP versions.
+ * 
+ * @author Martin Schröder
+ */
 class HttpClient
-{    
+{
+    /**
+     * User agent header to be sent when HTTP requests do not specify this header.
+     * 
+     * @var string
+     */
     protected $userAgent = 'KoolKode HTTP Client';
     
+    /**
+     * Lists ALPN protocols supported by registered connectors.
+     * 
+     * @var array
+     */
     protected $protocols;
     
+    /**
+     * Registered HTTP connectors.
+     * 
+     * @var array
+     */
     protected $connectors;
     
+    /**
+     * Create a new HTTP client using the given connectors.
+     * 
+     * Will auto-create an HTTP/1.x connector if no other connector is given. 
+     * 
+     * @param HttpConnector ...$connectors
+     */
     public function __construct(HttpConnector ...$connectors)
     {
         $this->connectors = $connectors ?: [
@@ -50,12 +77,13 @@ class HttpClient
         
         return new AwaitPending($close);
     }
-
-    public function getProtocols(): array
-    {
-        return $this->protocols;
-    }
     
+    /**
+     * Send the given HTTP request and fetch the HTTP response from the server.
+     * 
+     * @param HttpRequest $request The request to be sent (body will be closed after it has been sent).
+     * @return HttpResponse The HTTP response as returned by the target server.
+     */
     public function send(HttpRequest $request): Awaitable
     {
         return new Coroutine(function () use ($request) {

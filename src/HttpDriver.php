@@ -16,9 +16,24 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Stream\DuplexStream;
 
+/**
+ * Contract for an HTTP server driver to be used with an HTTP endpoint.
+ * 
+ * @author Martin Schröder
+ */
 interface HttpDriver
 {
+    /**
+     * Get ALPN protocols supported by the driver.
+     * 
+     * @return array
+     */
     public function getProtocols(): array;
     
+    /**
+     * Handle HTTP request(s) coming in on the given stream.
+     * 
+     * @param DuplexStream $stream
+     */
     public function handleConnection(DuplexStream $stream): Awaitable;
 }

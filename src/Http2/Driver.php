@@ -23,6 +23,11 @@ use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Implements the HTTP/2 protocol on the server side.
+ *
+ * @author Martin Schröder
+ */
 class Driver implements HttpDriver
 {
     protected $hpackContext;

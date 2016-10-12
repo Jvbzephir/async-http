@@ -17,6 +17,11 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Util\Channel;
 
+/**
+ * Implements a readable stream backed by a channel that is filled by an HTTP/2 stream.
+ * 
+ * @author Martin Schröder
+ */
 class EntityStream extends ReadableChannelStream
 {
     protected $conn;
@@ -44,6 +49,9 @@ class EntityStream extends ReadableChannelStream
         $this->close();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close(): Awaitable
     {
         $close = parent::close();

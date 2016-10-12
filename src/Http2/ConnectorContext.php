@@ -15,7 +15,17 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Http\HttpConnectorContext;
 
+/**
+ * Extended connector context that allows reuse of an established HTTP/2 connection.
+ * 
+ * @author Martin Schröder
+ */
 class ConnectorContext extends HttpConnectorContext
 {
+    /**
+     * HTTP/2 connection.
+     * 
+     * @var Connection
+     */
     public $conn;
 }
