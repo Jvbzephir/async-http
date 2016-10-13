@@ -362,7 +362,8 @@ class Stream
     
     protected function sendBody(ReadableStream $body): \Generator
     {
-        $channel = $body->channel(\min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE)));
+        $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
+        $channel = $body->channel($chunkSize);
         
         try {
             while (null !== ($chunk = yield $channel->receive())) {
@@ -388,10 +389,14 @@ class Stream
                     break;
                 }
                 
-                $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, $chunk));
+                $frame = new Frame(Frame::DATA, $chunk, ($len < $chunkSize) ? Frame::END_STREAM : Frame::NOFLAG);
+                
+                $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, $frame);
             }
             
-            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
+            if (!isset($len)) {
+                yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
+            }
         } finally {
             $body->close();
         }
