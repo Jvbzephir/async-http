@@ -156,7 +156,8 @@ class Connection
             yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
             yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
             
-            list ($stream, $frame) = yield from $conn->readNextFrame();
+            $stream = 0;
+            $frame = yield from $conn->readNextFrame($stream);
             
             if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');
@@ -185,7 +186,8 @@ class Connection
             
             $conn = new Connection($socket, $hpack, false, $logger);
             
-            list ($stream, $frame) = yield from $conn->readNextFrame();
+            $stream = 0;
+            $frame = yield from $conn->readNextFrame($stream);
             
             if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');
@@ -269,7 +271,7 @@ class Connection
         return $defer;
     }
     
-    protected function readNextFrame(): \Generator
+    protected function readNextFrame(int & $stream): \Generator
     {
         $header = yield $this->socket->readBuffer(9, true);
         
@@ -291,18 +293,17 @@ class Connection
             }
         }
         
-        return [
-            $stream,
-            $frame
-        ];
+        return $frame;
     }
 
     protected function processIncomingFrames(\SplQueue $frames = null): \Generator
     {
+        $stream = 0;
+        
         try {
             while (true) {
                 if ($frames === null) {
-                    list ($stream, $frame) = yield from $this->readNextFrame();
+                    $frame = yield from $this->readNextFrame($stream);
                 } else {
                     list ($stream, $frame) = $frames->dequeue();
                     
