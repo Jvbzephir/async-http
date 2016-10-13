@@ -171,6 +171,10 @@ class Connection
             
             $conn->processor = new Coroutine($conn->processIncomingFrames($frames));
             
+            if ($logger) {
+                $logger->info("Performed HTTP/2 client handshake");
+            }
+            
             return $conn;
         });
     }
@@ -206,6 +210,10 @@ class Connection
             
             $conn->processor = new Coroutine($conn->processIncomingFrames());
             
+            if ($logger) {
+                $logger->info("Performed HTTP/2 server handshake");
+            }
+            
             return $conn;
         });
     }
@@ -213,6 +221,10 @@ class Connection
     public function openStream(): Stream
     {
         $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
+        
+        if ($this->logger) {
+            $this->logger->debug("New stream created: {$this->nextStreamId}");
+        }
         
         $this->nextStreamId += 2;
         
@@ -240,6 +252,10 @@ class Connection
             $this->incoming->send($e ?? $val);
         });
         
+        if ($this->logger) {
+            $this->logger->debug("Accepted stream initiated by client: {$streamId}");
+        }
+        
         return $this->streams[$streamId] = $stream;
     }
     
@@ -249,6 +265,10 @@ class Connection
             $this->streams[$streamId]->close();
             
             unset($this->streams[$streamId]);
+            
+            if ($this->logger) {
+                $this->logger->debug("Closed stream: {$streamId}");
+            }
         }
     }
     
