@@ -28,16 +28,17 @@ class PersistentStream extends ReadableStreamDecorator implements DuplexStream
     protected $refs = 0;
     
     protected $defer;
-    
+
     public function __construct(DuplexStream $stream)
     {
         parent::__construct($stream);
         
         $this->defer = new class() extends Deferred {
 
-            public function cancel(\Throwable $e)
+            public function cancel(\Throwable $e): array
             {
                 // This defer cannot be cancelled...
+                return [];
             }
         };
     }

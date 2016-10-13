@@ -86,6 +86,10 @@ class Driver implements HttpDriver
                         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
                         $request->getBody()->setCascadeClose(false);
                         
+                        if ($this->logger) {
+                            $this->logger->debug("Persistent / pipelined HTTP request received");
+                        }
+                        
                         if ($request->getProtocolVersion() == '1.1') {
                             if (!$request->hasHeader('Host')) {
                                 throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');

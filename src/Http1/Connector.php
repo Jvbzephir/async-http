@@ -12,7 +12,6 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
@@ -22,6 +21,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
+use KoolKode\Async\Stream\DuplexStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -33,7 +33,7 @@ class Connector implements HttpConnector
 {
     protected $parser;
     
-    protected $pool;
+    protected $conns = [];
     
     protected $keepAlive = true;
     
@@ -48,7 +48,6 @@ class Connector implements HttpConnector
         $this->parser = $parser ?? new ResponseParser();
         $this->logger = $logger;
         
-        $this->pool = new ConnectionPool();
         $this->pending = new \SplObjectStorage();
     }
     
@@ -88,21 +87,23 @@ class Connector implements HttpConnector
      */
     public function shutdown(): Awaitable
     {
-        $tasks = [];
-        
-        try {
-            foreach ($this->pending as $pending) {
-                $pending->cancel(new \RuntimeException('HTTP connector closed'));
-                
-                $tasks[] = $pending;
+        return new Coroutine(function () {
+            try {
+                foreach ($this->pending as $pending) {
+                    foreach ($pending->cancel(new \RuntimeException('HTTP connector closed')) as $task) {
+                        yield $task;
+                    }
+                }
+            } finally {
+                $this->pending = new \SplObjectStorage();
             }
-        } finally {
-            $this->pending = new \SplObjectStorage();
-        }
-        
-        $tasks[] = $this->pool->shutdown();
-        
-        return new AwaitPending($tasks);
+            
+            foreach ($this->conns as $conn) {
+                while (!$conn->isEmpty()) {
+                    yield $conn->dequeue()->close();
+                }
+            }
+        });
     }
     
     /**
@@ -110,7 +111,7 @@ class Connector implements HttpConnector
      */
     public function getConnectorContext(Uri $uri): HttpConnectorContext
     {
-        $socket = $this->pool->getConnection($uri);
+        $socket = $this->getConnection($uri);
         $context = new HttpConnectorContext();
         
         if ($socket !== null) {
@@ -161,12 +162,12 @@ class Connector implements HttpConnector
                     
                     if ($bodyStream instanceof EntityStream) {
                         $bodyStream->getAwaitable()->when(function () use ($uri, $stream) {
-                            $this->pool->release($uri, $stream);
+                            $this->releaseConnection($uri, $stream);
                         });
                     } else {
                         $stream->close();
                         
-                        $this->pool->release($uri, $stream);
+                        $this->releaseConnection($uri, $stream);
                     }
                 }
                 
@@ -188,6 +189,36 @@ class Connector implements HttpConnector
         });
         
         return $coroutine;
+    }
+    
+    protected function getConnection(Uri $uri)
+    {
+        $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+        
+        if (isset($this->conns[$key])) {
+            if (!$this->conns[$key]->isEmpty()) {
+                if ($this->logger) {
+                    $this->logger->debug("Reusing persistent connection: $key");
+                }
+                
+                return $this->conns[$key]->dequeue();
+            }
+        }
+    }
+
+    protected function releaseConnection(Uri $uri, DuplexStream $conn)
+    {
+        $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+        
+        if (empty($this->conns[$key])) {
+            $this->conns[$key] = new \SplQueue();
+        }
+        
+        $this->conns[$key]->enqueue($conn);
+        
+        if ($this->logger) {
+            $this->logger->debug("Released persistent connection: $key");
+        }
     }
 
     protected function shouldConnectionBeClosed(HttpResponse $response): bool
