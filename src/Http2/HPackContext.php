@@ -34,26 +34,13 @@ class HPackContext
 
     protected $encodings = [];
     
-    protected $huffmanCode;
-    
-    protected $huffmanEncoder;
+    protected $encoder;
 
-    protected $huffmanDecoder;
+    protected $decoder;
     
-    protected static $defaultContext;
-
     public function __construct(bool $compressionEnabled = true)
     {
         $this->compressionEnabled = $compressionEnabled;
-    }
-    
-    public static function getDefaultContext(): HPackContext
-    {
-        if (static::$defaultContext === NULL) {
-            static::$defaultContext = new static();
-        }
-        
-        return static::$defaultContext;
     }
 
     public function isCompressionEnabled(): bool
@@ -84,31 +71,35 @@ class HPackContext
         
         $this->encodings[$name] = $encoding;
     }
-    
+
     public function getHuffmanEncoder(): HuffmanEncoder
     {
-        if ($this->huffmanEncoder === NULL) {
-            if ($this->huffmanCode === NULL) {
-                $this->huffmanCode = $this->createHuffmanCode();
-            }
-            
-            $this->huffmanEncoder = new HuffmanEncoder($this->huffmanCode);
+        static $encoder;
+        
+        if ($this->encoder) {
+            return $this->encoder;
         }
         
-        return $this->huffmanEncoder;
+        if ($encoder === null) {
+            $encoder = new HuffmanEncoder($this->createHuffmanCode());
+        }
+        
+        return $this->encoder = $encoder;
     }
 
     public function getHuffmanDecoder(): HuffmanDecoder
     {
-        if ($this->huffmanDecoder === NULL) {
-            if ($this->huffmanCode === NULL) {
-                $this->huffmanCode = $this->createHuffmanCode();
-            }
-            
-            $this->huffmanDecoder = new HuffmanDecoder($this->huffmanCode, true);
+        static $decoder;
+        
+        if ($this->decoder) {
+            return $this->decoder;
         }
         
-        return $this->huffmanDecoder;
+        if ($decoder === null) {
+            $decoder = new HuffmanDecoder($this->createHuffmanCode(), true);
+        }
+        
+        return $this->decoder = $decoder;
     }
 
     /**
@@ -118,10 +109,14 @@ class HPackContext
      */
     protected function createHuffmanCode(): HuffmanCode
     {
-        $huffman = new HuffmanCode();
+        static $huffman;
         
-        foreach (HPack::HUFFMAN_CODE as $i => $code) {
-            $huffman->addCode(($i > 255) ? '' : \chr($i), $code, HPack::HUFFMAN_CODE_LENGTHS[$i]);
+        if ($huffman === null) {
+            $huffman = new HuffmanCode();
+            
+            foreach (HPack::HUFFMAN_CODE as $i => $code) {
+                $huffman->addCode(($i > 255) ? '' : \chr($i), $code, HPack::HUFFMAN_CODE_LENGTHS[$i]);
+            }
         }
         
         return $huffman;

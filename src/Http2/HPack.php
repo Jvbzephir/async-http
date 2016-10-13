@@ -13,6 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
+use KoolKode\Util\HuffmanDecoder;
+use KoolKode\Util\HuffmanEncoder;
+
 /**
  * HPACK implementation.
  * 
@@ -82,15 +85,31 @@ class HPack
      * @var HPackContext
      */
     protected $context;
+    
+    /**
+     * Huffman encoder.
+     * 
+     * @var HuffmanEncoder
+     */
+    protected $encoder;
+    
+    /**
+     * Canonical huffman decoder.
+     * 
+     * @var HuffmanDecoder
+     */
+    protected $decoder;
 
     /**
      * Create a new HPACK encoder / decoder.
      * 
      * @param HuffmanDecoder $decoder
      */
-    public function __construct(HPackContext $context = NULL)
+    public function __construct(HPackContext $context, HuffmanEncoder $encoder = null, HuffmanDecoder $decoder = null)
     {
-        $this->context = $context ?? HPackContext::getDefaultContext();
+        $this->context = $context;
+        $this->encoder = $encoder ?? $context->getHuffmanEncoder();
+        $this->decoder = $decoder ?? $context->getHuffmanDecoder();
     }
 
     /**
@@ -227,7 +246,7 @@ class HPack
     protected function encodeString(string $input): string
     {
         if ($this->context->isCompressionEnabled()) {
-            $input = $this->context->getHuffmanEncoder()->encode($input);
+            $input = $this->encoder->encode($input);
             
             if (\strlen($input) < 0x7F) {
                 return \chr(\strlen($input) | 0x80) . $input;
@@ -421,7 +440,7 @@ class HPack
         
         try {
             if ($huffman) {
-                return $this->context->getHuffmanDecoder()->decode(\substr($encoded, $offset, $len));
+                return $this->decoder->decode(\substr($encoded, $offset, $len));
             }
             
             return \substr($encoded, $offset, $len);
