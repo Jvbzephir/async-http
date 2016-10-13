@@ -145,9 +145,9 @@ class HPack
         $result = '';
         
         foreach ($headers as list ($k, $v)) {
-            $index = self::STATIC_TABLE_LOOKUP[$k . ':' . $v] ?? NULL;
+            $index = self::STATIC_TABLE_LOOKUP[$k . ':' . $v] ?? null;
             
-            if ($index !== NULL) {
+            if ($index !== null) {
                 // Indexed Header Field
                 if ($index < 0x7F) {
                     $result .= \chr($index | 0x80);
@@ -158,7 +158,7 @@ class HPack
                 continue;
             }
             
-            $index = self::STATIC_TABLE_LOOKUP[$k] ?? NULL;
+            $index = self::STATIC_TABLE_LOOKUP[$k] ?? null;
             $encoding = $this->context->getEncodingType($k);
             
             if ($this->useIndexing && $encoding === HPackContext::ENCODING_INDEXED) {
@@ -189,7 +189,7 @@ class HPack
                     $this->encoderTableSize -= 32 + \strlen($name) + \strlen($value);
                 }
                 
-                if ($index !== NULL) {
+                if ($index !== null) {
                     // Literal Header Field with Incremental Indexing — Indexed Name
                     if ($index < 0x40) {
                         $result .= \chr($index | 0x40);
@@ -200,7 +200,7 @@ class HPack
                     // Literal Header Field with Incremental Indexing — New Name
                     $result .= "\x40" . $this->encodeString($k);
                 }
-            } elseif ($index !== NULL) {
+            } elseif ($index !== null) {
                 // Literal Header Field without Indexing / never indexed — Indexed Name
                 if ($index < 0x10) {
                     $result .= \chr($index | (($encoding === HPackContext::ENCODING_NEVER_INDEXED) ? 0x10 : 0x00));
@@ -375,9 +375,9 @@ class HPack
      * 
      * @param int $maxSize
      */
-    protected function resizeDynamicTable(int $maxSize = NULL)
+    protected function resizeDynamicTable(int $maxSize = null)
     {
-        if ($maxSize !== NULL) {
+        if ($maxSize !== null) {
             $this->decoderTableMaxSize = $maxSize;
         }
         
