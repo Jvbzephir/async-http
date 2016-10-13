@@ -43,13 +43,6 @@ class Connection
      */
     const INITIAL_WINDOW_SIZE = 65535;
     
-    /**
-     * PING frame payload.
-     *
-     * @var string
-     */
-    const PING_PAYLOAD = 'KoolKode';
-    
     const SETTING_HEADER_TABLE_SIZE = 0x01;
     
     const SETTING_ENABLE_PUSH = 0x02;
@@ -259,7 +252,7 @@ class Connection
     
     public function ping(): Awaitable
     {
-        $payload = \random_bytes(9);
+        $payload = \random_bytes(8);
         
         $defer = new Deferred(function () use ($payload) {
             unset($this->pings[$payload]);
