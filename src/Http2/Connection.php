@@ -169,7 +169,7 @@ class Connection
                 $frame
             ]);
             
-            $conn->processor = new Coroutine($conn->processIncomingFrames($frames));
+            $conn->processor = new Coroutine($conn->processIncomingFrames($frames), true);
             
             if ($logger) {
                 $logger->info("Performed HTTP/2 client handshake");
@@ -208,7 +208,7 @@ class Connection
             yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
             yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
             
-            $conn->processor = new Coroutine($conn->processIncomingFrames());
+            $conn->processor = new Coroutine($conn->processIncomingFrames(), true);
             
             if ($logger) {
                 $logger->info("Performed HTTP/2 server handshake");

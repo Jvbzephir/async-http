@@ -14,7 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 /**
- * Implementation of a PSR-7 HTTP response.
+ * Models an HTTP response.
  * 
  * @author Martin Schröder
  */

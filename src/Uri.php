@@ -14,7 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 /**
- * Imutable PSR-7 HTTP URI implementation, calling mutators (setters) will create and return a new URI object with the changes being applied.
+ * Immutable URI implementation.
  * 
  * @author Martin Schröder
  */
