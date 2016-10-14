@@ -113,11 +113,7 @@ class Stream
 
     public function processHeadersFrame(Frame $frame)
     {
-        if ($frame->flags & Frame::PADDED) {
-            $data = \substr($frame->data, 1, -1 * \ord($frame->data[0]));
-        } else {
-            $data = $frame->data;
-        }
+        $data = $frame->getPayload();
         
         if ($frame->flags & Frame::PRIORITY_FLAG) {
             $data = \substr($data, 5);
@@ -151,11 +147,7 @@ class Stream
             return;
         }
         
-        if ($frame->flags & Frame::PADDED) {
-            yield $this->channel->send(\substr($frame->data, 1, -1 * \ord($frame->data[0])));
-        } else {
-            yield $this->channel->send($frame->data);
-        }
+        yield $this->channel->send($frame->getPayload());
         
         if ($frame->flags & Frame::END_STREAM) {
             $this->channel->close();

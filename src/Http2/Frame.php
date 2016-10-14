@@ -346,4 +346,18 @@ class Frame
     {
         return \substr(\pack('NccN', \strlen($this->data), $this->type, $this->flags, $stream), 1) . $this->data;
     }
+    
+    /**
+     * Get frame payload (data with padding removed).
+     * 
+     * @return string
+     */
+    public function getPayload(): string
+    {
+        if ($this->flags & self::PADDED) {
+            return \substr($this->data, 1, -1 * \ord($this->data[0]));
+        }
+        
+        return $this->data;
+    }
 }
