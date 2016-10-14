@@ -40,7 +40,7 @@ class HPackDecoder
             $this->current = $this->byte;
         }
     }
-    
+
     public function getByte(): int
     {
         return $this->current;
@@ -64,18 +64,6 @@ class HPackDecoder
 
     public function readNextByte(int $consumed)
     {
-        static $masks = [
-            0 => 0b00000000,
-            1 => 0b00000001,
-            2 => 0b00000011,
-            3 => 0b00000111,
-            4 => 0b00001111,
-            5 => 0b00011111,
-            6 => 0b00111111,
-            7 => 0b01111111,
-            8 => 0b11111111
-        ];
-        
         if ($this->finished) {
             return;
         }
@@ -84,26 +72,26 @@ class HPackDecoder
             return $this->current;
         }
         
-        $this->current = (($this->current << $consumed) & 0xFF);
+        $this->current = ($this->current << $consumed) & 0xFF;
         
         if ($this->bitsRemaining >= $consumed) {
-            $this->current |= (($this->byte >> ($this->bitsRemaining - $consumed)) & $masks[$consumed]);
             $this->bitsRemaining -= $consumed;
+            $this->current |= $this->byte >> $this->bitsRemaining;
             
             return $this->current;
         }
         
         if ($this->bitsRemaining) {
-            $this->current |= (($this->byte & $masks[$this->bitsRemaining]) << ($consumed - $this->bitsRemaining));
             $consumed -= $this->bitsRemaining;
+            $this->current |= ($this->byte & (1 << $this->bitsRemaining) - 1) << $consumed;
         }
         
         if (isset($this->input[++$this->byteOffset])) {
             $this->byte = \ord($this->input[$this->byteOffset]);
             $this->bitsRemaining = 8 - $consumed;
-            $this->current |= ($this->byte >> $this->bitsRemaining);
+            $this->current |= $this->byte >> $this->bitsRemaining;
         } elseif (!$this->finished) {
-            $this->current |= $masks[$consumed];
+            $this->current |= (1 << $consumed) - 1;
             $this->finished = true;
         }
         

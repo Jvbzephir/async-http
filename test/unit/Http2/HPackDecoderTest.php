@@ -35,8 +35,6 @@ class HPackDecoderTest extends \PHPUnit_Framework_TestCase
         $level = 0;
         $decoded = '';
         
-        echo "\n\n";
-        
         while (true) {
             $byte = $reader->readNextByte($consumed);
             
