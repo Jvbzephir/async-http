@@ -19,6 +19,14 @@ class HPackDecoderTest extends \PHPUnit_Framework_TestCase
 {    
     public function testCanDecodeUsingTable()
     {
+        static $lens;
+        
+        if ($lens === null) {
+            for ($i = 0; $i < 256; $i++) {
+                $lens[\chr($i)] = HPack::HUFFMAN_CODE_LENGTHS[$i];
+            }
+        }
+        
         $input = '1100011 00101 101000 101000 00111 010100 1110010 00111 101100 101000 100100 1111111000';
         $str = '';
         
@@ -49,19 +57,19 @@ class HPackDecoderTest extends \PHPUnit_Framework_TestCase
             if ($entry === null) {
                 $entry = $table[$byte] ?? null;
             } else {
-                $entry = $entry[2][$byte] ?? null;
+                $entry = $entry[$byte] ?? null;
             }
             
             if ($entry === null) {
                 throw new \RuntimeException(\sprintf('Failed to decode byte: %08b (missing decoder table entry)', $byte));
             }
             
-            if (isset($entry[2])) {
+            if (\is_array($entry)) {
                 $consumed = 8;
                 $level++;
             } else {
-                $consumed = $entry[1] % 8;
-                $decoded .= $entry[0];
+                $consumed = $lens[$entry] % 8;
+                $decoded .= $entry;
                 
                 $entry = null;
                 $level = 0;

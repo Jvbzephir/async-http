@@ -123,13 +123,15 @@ class HPackDecoder
         $space = \str_repeat('    ', $indent);
         
         foreach ($table as $k => $data) {
-            $code .= \sprintf("%s0x%02X => [\"\x%02X\", %u", $space, $k, $data[0], $data[1]);
+            $code .= \sprintf('%s0x%02X => ', $space, $k);
             
             if (isset($data[2])) {
-                $code .= ', ' . static::dumpTable($data[2], $indent);
+                $code .= static::dumpTable($data[2], $indent);
+            } else {
+                $code .= sprintf('"\x%02X"', $data[0]);
             }
             
-            $code .= "],\n";
+            $code .= ",\n";
         }
         
         $code = \rtrim($code, ",\n") . "\n";
