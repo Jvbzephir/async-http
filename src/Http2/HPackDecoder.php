@@ -98,21 +98,21 @@ class HPackDecoder
             $consumed -= $this->bitsRemaining;
         }
         
-        if (isset($this->input[$this->byteOffset + 1])) {
-            $this->byte = \ord($this->input[++$this->byteOffset]);
+        if (isset($this->input[++$this->byteOffset])) {
+            $this->byte = \ord($this->input[$this->byteOffset]);
             $this->bitsRemaining = 8 - $consumed;
             $this->current |= ($this->byte >> $this->bitsRemaining);
         } elseif (!$this->finished) {
             $this->current |= $masks[$consumed];
-            $this->bitsRemaining = 0;
             $this->finished = true;
-            
-            return $this->current;
         }
         
         return $this->current;
     }
     
+    /**
+     * @codeCoverageIgnore
+     */
     public static function regenerateDecoderTable()
     {
         $table = static::generateDecoderTable();
@@ -124,6 +124,9 @@ class HPackDecoder
         \file_put_contents(\dirname(__DIR__, 2) . '/generated/hpack.decoder.php', $code);
     }
 
+    /**
+     * @codeCoverageIgnore
+     */
     private static function dumpTable(array $table, int $indent = 0): string
     {
         $code = "[\n";
@@ -147,6 +150,9 @@ class HPackDecoder
         return $code;
     }
 
+    /**
+     * @codeCoverageIgnore
+     */
     private static function generateDecoderTable(): array
     {
         $table = [];
@@ -188,6 +194,9 @@ class HPackDecoder
         return $table;
     }
 
+    /**
+     * @codeCoverageIgnore
+     */
     private static function populateDecoderTable(array & $table, int $symbol, int $code, int $len, int $level)
     {
         if ($len > 8 * $level) {
