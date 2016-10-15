@@ -78,4 +78,74 @@ class HPackDecoderTest extends \PHPUnit_Framework_TestCase
         
         $this->assertEquals('Hello World!', $decoded);
     }
+    
+    public function testEncoder()
+    {
+        $symbols = [
+            'A' => 0b100,
+            'B' => 0b110,
+            'C' => 0b1110,
+            'D' => 0b1011100011
+        ];
+        
+        $lens = [
+            'A' => 3,
+            'B' => 3,
+            'C' => 4,
+            'D' => 10
+        ];
+        
+        $input = 'ACDC';
+        $encoded = '';
+        
+        $byte = 0;
+        $remaining = 8;
+        
+        for ($size = \strlen($input), $i = 0; $i < $size; $i++) {
+            $code = $symbols[$input[$i]];
+            $slen = $lens[$input[$i]];
+            
+            $code = $code << (32 - $slen);
+            $shift = 24;
+            
+            while ($slen) {
+                $len = \min($slen, 8);
+                $slen -= $len;
+                
+                while (true) {
+                    $byte |= (($code >> $shift) & 0xFF) >> (8 - $remaining);
+                    
+                    
+                    if ($len <= $remaining) {
+                        $remaining -= $len;
+                        $shift -= $len;
+                        $len = 0;
+                        
+                        if ($remaining) {
+                            break;
+                        }
+                    } else {
+                        $shift -= $remaining;
+                        $len -= $remaining;
+                    }
+                    
+                    $encoded .= \chr($byte);
+                    $byte = 0;
+                    $remaining = 8;
+                }
+            }
+        }
+        
+        if ($remaining < 8) {
+            $encoded .= \chr($byte | (1 << $remaining) - 1);
+        }
+        
+        $bytes = array_map('ord', str_split($encoded, 1));
+        
+        $this->assertEquals([
+            0b10011101,
+            0b01110001,
+            0b11110111
+        ], $bytes);
+    }
 }
