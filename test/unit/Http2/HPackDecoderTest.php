@@ -79,6 +79,73 @@ class HPackDecoderTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('Hello World!', $decoded);
     }
     
+    public function testEncoder2()
+    {
+        $symbols = [
+            'A' => 0b100,
+            'B' => 0b110,
+            'C' => 0b1110,
+            'D' => 0b1011100011
+        ];
+        
+        $lens = [
+            'A' => 3,
+            'B' => 3,
+            'C' => 4,
+            'D' => 10
+        ];
+        
+        $table = [];
+        $pad = 32;
+        
+        foreach ($symbols as $i => $code) {
+            $len = $lens[$i];
+            $code = $code << ($pad - $len);
+            
+            for ($j = 0; $j < $len; $j += 8) {
+                $table[$i][] = [
+                    ($code >> ($pad - 8 - $j) & 0xFF) << 8,
+                    \min(8, $len - $j)
+                ];
+            }
+        }
+        
+        $input = 'ACDC';
+        $encoded = '';
+        
+        $offset = 0;
+        $buffer = 0;
+        
+        for ($size = \strlen($input), $i = 0; $i < $size; $i++) {
+            foreach ($table[$input[$i]] as list ($code, $len)) {
+                $buffer |= $code >> $offset;
+                $offset += $len;
+                
+                if ($offset > 7) {
+                    $offset -= 8;
+                    $encoded .= \chr($buffer >> 8 & 0xFF);
+                    $buffer <<= 8;
+                }
+            }
+        }
+        
+        if ($offset > 0) {
+            $encoded .= \chr(($buffer >> 8 & 0xFF) | (1 << (8 - $offset)) - 1);
+        }
+        
+        $bytes = array_map('ord', str_split($encoded, 1));
+        
+        $this->assertEquals([
+            0b10011101,
+            0b01110001,
+            0b11110111
+        ], $bytes);
+        
+//         echo "\n\n", implode(' ', array_map(function ($char) {
+//             return sprintf('%08b', ord($char));
+//         }, str_split($encoded, 1))), "\n\n";
+    }
+    
     public function testEncoder()
     {
         $symbols = [
