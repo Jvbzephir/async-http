@@ -94,6 +94,30 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
         
         $message->withHeader($name, $value);
     }
+    
+    public function testCanTokenizeHeader()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Tokens', 'fOo, Bar', 'baZ');
+        
+        $this->assertEquals([
+            'foo',
+            'bar',
+            'baz'
+        ], $message->getHeaderTokens('Tokens'));
+    }
+    
+    public function testCanTokenizeHeaderUsingSeparator()
+    {
+        $message = new HttpResponse();
+        $message = $message->withHeader('Tokens', 'foo; bar', 'baz');
+        
+        $this->assertEquals([
+            'foo',
+            'bar',
+            'baz'
+        ], $message->getHeaderTokens('Tokens', ';'));
+    }
 
     public function testCanUseBody()
     {

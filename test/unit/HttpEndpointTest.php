@@ -17,8 +17,7 @@ use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
- * @covers \KoolKode\Async\Http\HttpEndpoint
- * @covers \KoolKode\Async\Http\HttpServer
+ * @coversNothing
  */
 class HttpEndpointTest extends AsyncTestCase
 {
