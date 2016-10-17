@@ -294,18 +294,6 @@ class Frame
     }
 
     /**
-     * Dump frame without spamming binary data.
-     */
-    public function __debugInfo(): array
-    {
-        $debug = \get_object_vars($this);
-        $debug['name'] = $this->getTypeName();
-        $debug['data'] = \sprintf('%u bytes', \strlen($debug['data']));
-        
-        return $debug;
-    }
-
-    /**
      * Get a human-readable label that represents the frame type.
      */
     public function getTypeName(): string
@@ -324,16 +312,16 @@ class Frame
             case self::PRIORITY:
                 return 'PRIORITY';
             case self::PUSH_PROMISE:
-                return 'PUSH PROMISE';
+                return 'PUSH_PROMISE';
             case self::RST_STREAM:
-                return 'RST STREAM';
+                return 'RST_STREAM';
             case self::SETTINGS:
                 return 'SETTINGS';
             case self::WINDOW_UPDATE:
-                return 'WINDOW UPDATE';
+                return 'WINDOW_UPDATE';
         }
         
-        return '*UNKNOWN*';
+        return 'UNKNOWN';
     }
 
     /**
