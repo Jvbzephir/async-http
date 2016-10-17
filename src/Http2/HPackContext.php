@@ -13,10 +13,6 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Util\HuffmanCode;
-use KoolKode\Util\HuffmanDecoder;
-use KoolKode\Util\HuffmanEncoder;
-
 /**
  * Provides shared context that can be used by multiple HPACK coder instances.
  * 
@@ -30,13 +26,11 @@ class HPackContext
     
     const ENCODING_NEVER_INDEXED = 2;
     
-    protected $compressionEnabled;
-
     protected $encodings = [];
-    
-    protected $encoder;
 
-    protected $decoder;
+    protected $compressionEnabled;
+    
+    protected $compressor;
     
     public function __construct(bool $compressionEnabled = true)
     {
@@ -71,54 +65,13 @@ class HPackContext
         
         $this->encodings[$name] = $encoding;
     }
-
-    public function getHuffmanEncoder(): HuffmanEncoder
+    
+    public function getCompressor(): HPackCompressor
     {
-        static $encoder;
-        
-        if ($this->encoder) {
-            return $this->encoder;
+        if ($this->compressor === null) {
+            $this->compressor = new HPackCompressor();
         }
         
-        if ($encoder === null) {
-            $encoder = new HuffmanEncoder($this->createHuffmanCode());
-        }
-        
-        return $this->encoder = $encoder;
-    }
-
-    public function getHuffmanDecoder(): HuffmanDecoder
-    {
-        static $decoder;
-        
-        if ($this->decoder) {
-            return $this->decoder;
-        }
-        
-        if ($decoder === null) {
-            $decoder = new HuffmanDecoder($this->createHuffmanCode(), true);
-        }
-        
-        return $this->decoder = $decoder;
-    }
-
-    /**
-     * Create Huffman code used by HPACK.
-     *
-     * @return HuffmanCode
-     */
-    protected function createHuffmanCode(): HuffmanCode
-    {
-        static $huffman;
-        
-        if ($huffman === null) {
-            $huffman = new HuffmanCode();
-            
-            foreach (HPack::HUFFMAN_CODE as $i => $code) {
-                $huffman->addCode(($i > 255) ? '' : \chr($i), $code, HPack::HUFFMAN_CODE_LENGTHS[$i]);
-            }
-        }
-        
-        return $huffman;
+        return $this->compressor;
     }
 }

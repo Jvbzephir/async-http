@@ -84,7 +84,6 @@ class HPackCompressor
         $decoded = \str_repeat("\x00", (int) \ceil($size / 8 * 5 + 1));
         
         $entry = null;
-        $level = 0;
         
         $len = 0;
         $byte = 0;
@@ -104,13 +103,11 @@ class HPackCompressor
                 
                 if (\is_array($entry)) {
                     $len = 8;
-                    $level++;
                 } else {
                     $len = $lens[$entry];
                     $decoded[$byte++] = $entry;
                     
                     $entry = null;
-                    $level = 0;
                 }
                 
                 $available -= $len;
