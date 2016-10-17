@@ -95,10 +95,10 @@ class HPack
      * 
      * @param HuffmanDecoder $decoder
      */
-    public function __construct(HPackContext $context)
+    public function __construct(HPackContext $context, HPackCompressor $compressor = null)
     {
         $this->context = $context;
-        $this->compressor = $context->getCompressor();
+        $this->compressor = $compressor ?? new HPackCompressor();
     }
 
     /**
@@ -234,21 +234,13 @@ class HPack
      */
     protected function encodeString(string $input): string
     {
-        if ($this->context->isCompressionEnabled()) {
-            $input = $this->compressor->compress($input);
-            
-            if (\strlen($input) < 0x7F) {
-                return \chr(\strlen($input) | 0x80) . $input;
-            }
-            
-            return "\xFF" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
-        }
+        $input = $this->compressor->compress($input);
         
         if (\strlen($input) < 0x7F) {
-            return \chr(\strlen($input)) . $input;
+            return \chr(\strlen($input) | 0x80) . $input;
         }
         
-        return "\x7F" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
+        return "\xFF" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
     }
 
     /**

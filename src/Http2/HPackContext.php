@@ -27,26 +27,7 @@ class HPackContext
     const ENCODING_NEVER_INDEXED = 2;
     
     protected $encodings = [];
-
-    protected $compressionEnabled;
     
-    protected $compressor;
-    
-    public function __construct(bool $compressionEnabled = true)
-    {
-        $this->compressionEnabled = $compressionEnabled;
-    }
-
-    public function isCompressionEnabled(): bool
-    {
-        return $this->compressionEnabled;
-    }
-    
-    public function setCompressionEnabled(bool $compressionEnabled)
-    {
-        $this->compressionEnabled = $compressionEnabled;
-    }
-
     public function getEncodingType(string $name): int
     {
         return $this->encodings[$name] ?? self::ENCODING_LITERAL;
@@ -64,14 +45,5 @@ class HPackContext
         }
         
         $this->encodings[$name] = $encoding;
-    }
-    
-    public function getCompressor(): HPackCompressor
-    {
-        if ($this->compressor === null) {
-            $this->compressor = new HPackCompressor();
-        }
-        
-        return $this->compressor;
     }
 }
