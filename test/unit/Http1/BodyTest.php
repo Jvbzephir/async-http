@@ -22,6 +22,7 @@ use KoolKode\Async\Http\StreamBody;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Body
+ * @covers \KoolKode\Async\Http\Http1\EntityStream
  */
 class BodyTest extends AsyncTestCase
 {
@@ -45,7 +46,18 @@ class BodyTest extends AsyncTestCase
         
         $stream = yield $body->getReadableStream();
         
+        $this->assertTrue($stream instanceof EntityStream);
         $this->assertEquals(3, yield $body->getSize());
+        
+        $resolved = false;
+        
+        $stream->getAwaitable()->when(function ($e = null, $v = null) use (& $resolved) {
+            if (!$e) {
+                $resolved = true;
+            }
+        });
+        
+        $this->assertFalse($resolved);
         
         try {
             $this->assertEquals('Tes', yield $stream->read());
@@ -54,6 +66,7 @@ class BodyTest extends AsyncTestCase
         }
         
         $this->assertFalse($input->isClosed());
+        $this->assertTrue($resolved);
     }
     
     public function testDetectsInvalidContentLength()

@@ -26,9 +26,16 @@ use KoolKode\Async\Stream\StreamException;
  */
 abstract class MessageParser
 {
+    protected $maxHeaderSize = 131072;
+    
+    public function setMaxHeaderSize(int $size)
+    {
+        $this->maxHeaderSize = $size;
+    }
+    
     protected function parseHeaders(ReadableStream $stream, HttpMessage $message): \Generator
     {
-        $remaining = 131072;
+        $remaining = $this->maxHeaderSize;
         
         try {
             while (null !== ($line = yield $stream->readLine($remaining))) {
