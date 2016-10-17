@@ -115,7 +115,18 @@ class HPackCompressor
             } while ($available > 7);
         }
         
-        while ($available > 0) {
+        if ($available > 0) {
+            return \substr($decoded, 0, $byte) . $this->decompressTrailer($table, $lens, $buffer, $available, $entry);
+        }
+        
+        return \substr($decoded, 0, $byte);
+    }
+    
+    protected function decompressTrailer(array $table, array $lens, int $buffer, int $available, array $entry = null)
+    {
+        $decoded = '';
+        
+        do {
             $trailer = ($buffer >> 8 & 0xFF);
             
             if ($entry === null) {
@@ -128,10 +139,10 @@ class HPackCompressor
                 break;
             }
             
-            $decoded[$byte++] = $entry;
+            $decoded .= $entry;
             $available -= $len;
             $buffer <<= $len;
-        }
+        } while ($available > 0);
         
         if ($available > 0) {
             $trailer = ($buffer >> 8 & 0xFF) >> (8 - $available);
@@ -150,7 +161,7 @@ class HPackCompressor
             }
         }
         
-        return \substr($decoded, 0, $byte);
+        return $decoded;
     }
 
     protected function generateDecompressionTables(): array
