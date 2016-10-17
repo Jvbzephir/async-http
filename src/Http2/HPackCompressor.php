@@ -13,8 +13,21 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
+/**
+ * Implementation of a canonical Huffman encoder / decoder as used by HPACK.
+ * 
+ * @author Martin Schröder
+ */
 class HPackCompressor
 {
+    /**
+     * Compress input using Huffman encoding.
+     * 
+     * Output will be padded with bits set to 1.
+     * 
+     * @param string $input
+     * @return string
+     */
     public function compress(string $input): string
     {
         static $table;
@@ -49,7 +62,14 @@ class HPackCompressor
         
         return \substr($encoded, 0, $byte);
     }
-
+    
+    /**
+     * Generate lookup table used during compression.
+     * 
+     * Huffman codes are split into 8 bit chunks to facilitate easy concatenation of output bytes.
+     * 
+     * @return array
+     */
     protected function generateCompressionTable(): array
     {
         static $pad = 32;
@@ -71,6 +91,12 @@ class HPackCompressor
         return $table;
     }
 
+    /**
+     * Decompress the given Huffman-encoded input.
+     * 
+     * @param string $input
+     * @return string
+     */
     public function decompress(string $input): string
     {
         static $table;
@@ -122,7 +148,12 @@ class HPackCompressor
         return \substr($decoded, 0, $byte);
     }
     
-    protected function decompressTrailer(array $table, array $lens, int $buffer, int $available, array $entry = null)
+    /**
+     * Decompress the last chunk of compressed data and strip padding as needed.
+     * 
+     * @return string Decoded remaining data.
+     */
+    protected function decompressTrailer(array $table, array $lens, int $buffer, int $available, array $entry = null): string
     {
         $decoded = '';
         
@@ -164,6 +195,11 @@ class HPackCompressor
         return $decoded;
     }
 
+    /**
+     * Generate the lookup table being used to decode input bytes.
+     * 
+     * @return array
+     */
     protected function generateDecompressionTables(): array
     {
         $table = [];
@@ -202,6 +238,9 @@ class HPackCompressor
         ];
     }
 
+    /**
+     * Populate a branch of the lookup table with Huffman-encoded bytes.
+     */
     protected function populateDecompressionTable(array & $table, int $i, int $code, int $len, int $level)
     {
         $char = ($i > 255) ? '' : \chr($i);
