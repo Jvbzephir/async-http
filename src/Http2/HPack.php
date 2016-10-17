@@ -145,11 +145,7 @@ class HPack
             
             if ($index !== null) {
                 // Indexed Header Field
-                if ($index < 0x7F) {
-                    $result .= \chr($index | 0x80);
-                } else {
-                    $result .= "\xFF" . $this->encodeInt($index - 0x7F);
-                }
+                $result .= \chr($index | 0x80);
                 
                 continue;
             }
