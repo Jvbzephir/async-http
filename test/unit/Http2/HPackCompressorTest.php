@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http\Http2;
 
 /**
  * @covers \KoolKode\Async\Http\Http2\HPackCompressor
- *
  */
 class HPackCompressorTest extends \PHPUnit_Framework_TestCase
 {

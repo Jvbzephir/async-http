@@ -89,15 +89,17 @@ class HPack
      * @var HPackCompressor
      */
     protected $compressor;
+    
+    protected $compressStrings = true;
 
     /**
      * Create a new HPACK encoder / decoder.
      * 
      * @param HuffmanDecoder $decoder
      */
-    public function __construct(HPackContext $context, HPackCompressor $compressor = null)
+    public function __construct(HPackContext $context = null, HPackCompressor $compressor = null)
     {
-        $this->context = $context;
+        $this->context = $context ?? new HPackContext();
         $this->compressor = $compressor ?? new HPackCompressor();
     }
 
@@ -109,6 +111,11 @@ class HPack
     public function setUseIndexing(bool $useIndexing)
     {
         $this->useIndexing = $useIndexing;
+    }
+    
+    public function setCompressStrings(bool $compress)
+    {
+        $this->compressStrings = $compress;
     }
 
     /**
@@ -213,7 +220,7 @@ class HPack
      * @param int $int
      * @return string
      */
-    protected function encodeInt(int $int): string
+    public function encodeInt(int $int): string
     {
         $result = '';
         $i = 0;
@@ -232,15 +239,22 @@ class HPack
      * @param string $input
      * @return string
      */
-    protected function encodeString(string $input): string
+    public function encodeString(string $input): string
     {
-        $input = $this->compressor->compress($input);
-        
+        if ($this->compressStrings) {
+            $input = $this->compressor->compress($input);
+            
+            if (\strlen($input) < 0x7F) {
+                return \chr(\strlen($input) | 0x80) . $input;
+            }
+            
+            return "\xFF" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
+        }
         if (\strlen($input) < 0x7F) {
-            return \chr(\strlen($input) | 0x80) . $input;
+            return \chr(\strlen($input)) . $input;
         }
         
-        return "\xFF" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
+        return "\x7F" . $this->encodeInt(\strlen($input) - 0x7F) . $input;
     }
 
     /**
@@ -375,7 +389,7 @@ class HPack
      * @param int $offset
      * @return int
      */
-    protected function decodeInt(string $encoded, int & $offset): int
+    public function decodeInt(string $encoded, int & $offset): int
     {
         $byte = \ord($encoded[$offset++]);
         $int = $byte & 0x7F;
@@ -405,7 +419,7 @@ class HPack
      * 
      * @throws \RuntimeException
      */
-    protected function decodeString(string $encoded, int $encodedLength, int & $offset): string
+    public function decodeString(string $encoded, int $encodedLength, int & $offset): string
     {
         $len = \ord($encoded[$offset++]);
         $huffman = ($len & 0x80) ? true : false;
