@@ -65,7 +65,19 @@ class HttpEndpointTest extends AsyncTestCase
     public function testClient()
     {
         $endpoint = new HttpEndpoint();
-        $server = yield $endpoint->listen();
+        
+        $server = yield $endpoint->listen(function (HttpRequest $request) {
+            $response = new HttpResponse();
+            
+            if ($request->getMethod() === Http::POST) {
+                $response = $response->withHeader('Content-Type', 'application/json');
+                $response = $response->withBody(new StringBody(yield $request->getBody()->getContents()));
+            } else {
+                $response = $response->withBody(new StringBody('Hello Test Client :)'));
+            }
+            
+            return $response;
+        });
         
         $this->assertTrue($server instanceof HttpServer);
         
@@ -113,7 +125,10 @@ class HttpEndpointTest extends AsyncTestCase
     public function testHttp1HeadRequest()
     {
         $endpoint = new HttpEndpoint();
-        $server = yield $endpoint->listen();
+        
+        $server = yield $endpoint->listen(function (HttpRequest $request) {
+            return new HttpResponse();
+        });
         
         $this->assertTrue($server instanceof HttpServer);
         

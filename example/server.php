@@ -13,7 +13,10 @@ declare(strict_types = 1);
 
 use Interop\Async\Loop;
 use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
+use KoolKode\Async\Http\StringBody;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 
@@ -33,12 +36,18 @@ Loop::setErrorHandler(function (\Throwable $e) {
 });
 
 Loop::execute(function () use ($logger) {
-    $endpoint = new HttpEndpoint('0.0.0.0:8888');
+    $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $logger);
     $endpoint->setCertificate(__DIR__ . '/localhost.pem');
     
     $endpoint->addDriver(new Http2Driver(null, $logger));
     
-    $endpoint->listen();
+    $endpoint->listen(function (HttpRequest $request) {
+        $response = new HttpResponse();
+        $response = $response->withHeader('Content-Type', 'text/plain');
+        $response = $response->withBody(new StringBody(sprintf('ACTION: %s:%u', __FILE__, __LINE__)));
+        
+        return $response;
+    });
     
     echo "HTTPS server listening on port 8888\n\n";
 });

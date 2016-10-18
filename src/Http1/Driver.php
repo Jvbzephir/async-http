@@ -71,12 +71,12 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(DuplexStream $stream): Awaitable
+    public function handleConnection(DuplexStream $stream, callable $action): Awaitable
     {
         $stream = new PersistentStream($stream);
         $stream->reference();
         
-        return new Coroutine(function () use ($stream) {
+        return new Coroutine(function () use ($stream, $action) {
             $executor = new Executor();
             $jobs = new \SplQueue();
             
@@ -102,8 +102,8 @@ class Driver implements HttpDriver
                         
                         $close = $this->shouldConnectionBeClosed($request);
                         
-                        $jobs->enqueue($executor->execute(function () use ($stream, $request, $close) {
-                            yield from $this->processRequest($stream, $request, $close);
+                        $jobs->enqueue($executor->execute(function () use ($stream, $action, $request, $close) {
+                            yield from $this->processRequest($stream, $action, $request, $close);
                         }));
                         
                         $body = yield $request->getBody()->getReadableStream();
@@ -155,7 +155,7 @@ class Driver implements HttpDriver
         return false;
     }
     
-    protected function processRequest(PersistentStream $stream, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(PersistentStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
             'Connection',
@@ -175,21 +175,24 @@ class Driver implements HttpDriver
                 $request = $request->withoutHeader($name);
             }
             
-            $response = new HttpResponse(Http::OK, [], $request->getProtocolVersion());
-            $response = $response->withHeader('Server', 'KoolKode HTTP Server');
+            $response = $action($request);
             
-            if ($request->getMethod() == Http::POST) {
-                $response = $response->withHeader('Content-Type', $request->getHeaderLine('Content-Type'));
-                $response = $response->withBody(new StringBody(yield $request->getBody()->getContents(), true));
-            } elseif ($request->getRequestTarget() == '/api/') {
-                $response = $response->withHeader('Content-Type', 'application/json');
-                $response = $response->withBody(new StringBody(json_encode([
-                    'server' => 'KoolKode HTTP Server',
-                    'time' => (new \DateTime())->format(\DateTime::ISO8601)
-                ], true)));
-            } else {
-                $response = $response->withBody(new StringBody('Hello Test Client :)'));
+            if ($response instanceof \Generator) {
+                $response = yield from $response;
             }
+            
+            if (!$response instanceof HttpResponse) {
+                if ($this->logger) {
+                    $type = \is_object($response) ? \get_class($response) : \gettype($response);
+                    
+                    $this->logger->error(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                }
+                
+                $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+            }
+            
+            $response = $response->withProtocolVersion($request->getProtocolVersion());
+            $response = $response->withHeader('Server', 'KoolKode HTTP Server');
             
             yield from $this->sendResponse($stream, $request, $response, $close);
         } catch (StreamClosedException $e) {

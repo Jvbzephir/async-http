@@ -20,6 +20,7 @@ use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
+use Psr\Log\LoggerInterface;
 
 class HttpEndpoint
 {
@@ -28,15 +29,19 @@ class HttpEndpoint
     protected $server;
     
     protected $drivers = [];
-
-    protected $http1;
     
-    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost')
+    protected $http1;
+
+    protected $logger;
+    
+    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', LoggerInterface $logger = null)
     {
+        $this->logger = $logger;
+        
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
         
-        $this->http1 = new Driver();
+        $this->http1 = new Driver(null, $logger);
     }
 
     public function isEncrypted(): bool
@@ -54,9 +59,9 @@ class HttpEndpoint
         $this->drivers[] = $driver;
     }
 
-    public function listen(): Awaitable
+    public function listen(callable $action): Awaitable
     {
-        return new Coroutine(function () {
+        return new Coroutine(function () use ($action) {
             $factory = clone $this->factory;
             
             if ($factory->isEncrypted() && Socket::isAlpnSupported()) {
@@ -72,16 +77,16 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            return new HttpServer($this, $this->server, new Coroutine($this->runServer()));
+            return new HttpServer($this, $this->server, new Coroutine($this->runServer($action)));
         });
     }
 
-    protected function runServer(): \Generator
+    protected function runServer(callable $action): \Generator
     {
         $pending = new \SplObjectStorage();
         
         try {
-            yield $this->server->listen(function (SocketStream $socket) use ($pending) {
+            yield $this->server->listen(function (SocketStream $socket) use ($pending, $action) {
                 if ($this->isEncrypted()) {
                     $alpn = \trim($socket->getMetadata()['crypto']['alpn_protocol'] ?? '');
                 } else {
@@ -92,14 +97,14 @@ class HttpEndpoint
                 
                 foreach ($this->drivers as $driver) {
                     if (\in_array($alpn, $driver->getProtocols(), true)) {
-                        $request = $driver->handleConnection($socket);
+                        $request = $driver->handleConnection($socket, $action);
                         
                         break;
                     }
                 }
                 
                 if ($request === null) {
-                    $request = $this->http1->handleConnection($socket);
+                    $request = $this->http1->handleConnection($socket, $action);
                 }
                 
                 $pending->attach($request);

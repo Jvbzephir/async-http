@@ -34,6 +34,7 @@ interface HttpDriver
      * Handle HTTP request(s) coming in on the given stream.
      * 
      * @param DuplexStream $stream
+     * @param callable $action
      */
-    public function handleConnection(DuplexStream $stream): Awaitable;
+    public function handleConnection(DuplexStream $stream, callable $action): Awaitable;
 }

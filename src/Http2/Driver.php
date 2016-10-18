@@ -19,7 +19,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use Psr\Log\LoggerInterface;
 
@@ -57,14 +56,14 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(DuplexStream $stream): Awaitable
+    public function handleConnection(DuplexStream $stream, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($stream) {
+        return new Coroutine(function () use ($stream, $action) {
             $conn = yield Connection::connectServer($stream, new HPack($this->hpackContext), $this->logger);
             
             try {
                 while (null !== ($received = yield $conn->nextRequest())) {
-                    new Coroutine($this->processRequest($conn, ...$received), true);
+                    new Coroutine($this->processRequest($conn, $action, ...$received), true);
                 }
             } finally {
                 yield $conn->shutdown();
@@ -72,23 +71,30 @@ class Driver implements HttpDriver
         });
     }
 
-    protected function processRequest(Connection $conn, Stream $stream, HttpRequest $request): \Generator
+    protected function processRequest(Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
         if ($this->logger) {
             $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
-        $response = new HttpResponse();
+        $response = $action($request);
+        
+        if ($response instanceof \Generator) {
+            $response = yield from $response;
+        }
+        
+        if (!$response instanceof HttpResponse) {
+            if ($this->logger) {
+                $type = \is_object($response) ? \get_class($response) : \gettype($response);
+            
+                $this->logger->error(\sprintf('Expecting HTTP response, server action returned %s', $type));
+            }
+            
+            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+        }
+        
         $response = $response->withProtocolVersion($request->getProtocolVersion());
-        
-        $response = $response->withHeader('Content-Type', 'application/json');
         $response = $response->withHeader('Server', 'KoolKode HTTP Server');
-        
-        $response = $response->withBody(new StringBody(json_encode([
-            'message' => 'Hello HTTP/2 client :)',
-            'time' => (new \DateTime())->format(\DateTime::ISO8601),
-            'bootstrap' => str_replace('\\', '/', get_included_files()[0])
-        ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)));
         
         if ($this->logger) {
             $reason = rtrim(' ' . $response->getReasonPhrase());
