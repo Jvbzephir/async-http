@@ -334,8 +334,6 @@ class Connector implements HttpConnector
         }
         
         if ($size === null) {
-            $len = \strlen($chunk);
-            
             yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
             
             if ($len === 4089) {
@@ -349,7 +347,7 @@ class Connector implements HttpConnector
         } elseif ($size > 0) {
             yield $stream->write($chunk);
             
-            if (\strlen($chunk) === 4096) {
+            if ($len === 4096) {
                 yield new CopyBytes($bodyStream, $stream, true, $size);
             }
         }
