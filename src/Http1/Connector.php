@@ -37,6 +37,8 @@ class Connector implements HttpConnector
     
     protected $keepAlive = true;
     
+    protected $expectContinue = true;
+    
     protected $debug = false;
     
     protected $pending;
@@ -54,6 +56,11 @@ class Connector implements HttpConnector
     public function setKeepAlive(bool $keepAlive)
     {
         $this->keepAlive = $keepAlive;
+    }
+    
+    public function setExpectContinue($expect)
+    {
+        $this->expectContinue = $expect;
     }
     
     public function setDebug(bool $debug)
@@ -140,9 +147,9 @@ class Connector implements HttpConnector
             try {
                 $uri = $request->getUri();
                 
-                yield from $this->sendRequest($stream, $request);
+                $line = yield from $this->sendRequest($stream, $request);
                 
-                $response = yield from $this->parser->parseResponse($stream, $request->getMethod() === Http::HEAD);
+                $response = yield from $this->parser->parseResponse($stream, $line, $request->getMethod() === Http::HEAD);
                 $body = $response->getBody();
                 
                 if ($this->logger) {
@@ -278,6 +285,12 @@ class Connector implements HttpConnector
             $bodyStream = $tmp;
         }
         
+        $chunk = yield $bodyStream->readBuffer(($size === null) ? 4089 : 4096);
+        
+        if ($chunk === null) {
+            $size = 0;
+        }
+        
         if ($size === null) {
             $buffer .= "Transfer-Encoding: chunked\r\n";
         } else {
@@ -296,20 +309,45 @@ class Connector implements HttpConnector
             }
         }
         
+        $expect = false;
+        
+        if ($this->expectContinue && $chunk !== null && $request->getProtocolVersion() == '1.1') {
+            $expect = true;
+            $buffer .= "Expect: 100-continue\r\n";
+        }
+        
         yield $stream->write($buffer . "\r\n");
         yield $stream->flush();
         
-        // TODO: Add support for Expect: 100-continue
+        if ($expect) {
+            if (!\preg_match("'^HTTP/1\\.1\s+100(?:$|\s)'i", ($line = yield $stream->readLine()))) {
+                try {
+                    return $line;
+                } finally {
+                    $bodyStream->close();
+                }
+            }
+        }
         
         if ($size === null) {
-            // Align each chunk with length and line breaks to fit into 4 KB payload.
-            yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
-                return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
-            });
+            $len = \strlen($chunk);
+            
+            yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+            
+            if ($len === 4089) {
+                // Align each chunk with length and line breaks to fit into 4 KB payload.
+                yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                    return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
+                });
+            }
             
             yield $stream->write("0\r\n\r\n");
-        } else {
-            yield new CopyBytes($bodyStream, $stream, true, $size);
+        } elseif ($size > 0) {
+            yield $stream->write($chunk);
+            
+            if (\strlen($chunk) === 4096) {
+                yield new CopyBytes($bodyStream, $stream, true, $size);
+            }
         }
         
         yield $stream->flush();
@@ -322,6 +360,7 @@ class Connector implements HttpConnector
             'Connection',
             'Content-Encoding',
             'Content-Length',
+            'Expect',
             'Keep-Alive',
             'Trailer',
             'Transfer-Encoding'

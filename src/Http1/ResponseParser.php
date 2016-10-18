@@ -30,20 +30,23 @@ class ResponseParser extends MessageParser
      * Parse the next HTTP response from the given stream.
      * 
      * @param ReadableStream $stream
+     * @param string $line HTTP response line (mighty already be received while checking for 100 continue).
      * @param bool $dropBody Drop response body (needed when the response is caused by a HEAD request).
      * @return HttpResponse
      * 
      * @throws StreamClosedException When no HTTP response line could be parsed.
      */
-    public function parseResponse(ReadableStream $stream, bool $dropBody = false): \Generator
+    public function parseResponse(ReadableStream $stream, string $line = null, bool $dropBody = false): \Generator
     {
-        $i = 0;
-        
-        do {
-            if ($i++ > 3 || null === ($line = yield $stream->readLine())) {
-                throw new StreamClosedException('Stream closed before HTTP response line was read');
-            }
-        } while ($line === '');
+        if ($line === null) {
+            $i = 0;
+            
+            do {
+                if ($i++ > 3 || null === ($line = yield $stream->readLine())) {
+                    throw new StreamClosedException('Stream closed before HTTP response line was read');
+                }
+            } while ($line === '');
+        }
         
         $m = null;
         

@@ -12,11 +12,11 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\FileBody;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
-use KoolKode\Async\Http\StringBody;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 
@@ -43,8 +43,8 @@ Loop::execute(function () use ($logger) {
     
     $endpoint->listen(function (HttpRequest $request) {
         $response = new HttpResponse();
-        $response = $response->withHeader('Content-Type', 'text/plain');
-        $response = $response->withBody(new StringBody(sprintf('ACTION: %s:%u', __FILE__, __LINE__)));
+        $response = $response->withHeader('Content-Type', 'text/plain; charset="utf-8"');
+        $response = $response->withBody(new FileBody(__FILE__));
         
         return $response;
     });

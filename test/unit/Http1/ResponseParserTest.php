@@ -39,6 +39,22 @@ class ResponseParserTest extends AsyncTestCase
         $this->assertEquals('No Content', $response->getReasonPhrase());
     }
     
+    public function testCanParseResponseWithPreDefinedStatusLine()
+    {
+        $stream = new ReadableMemoryStream(implode('', [
+            "Content-Length: 0\r\n",
+            "\r\n"
+        ]));
+        
+        $response = yield from (new ResponseParser())->parseResponse($stream, "HTTP/1.0 303 See Other");
+        
+        $this->assertTrue($response instanceof HttpResponse);
+        $this->assertEquals('1.0', $response->getProtocolVersion());
+        $this->assertEquals(Http::SEE_OTHER, $response->getStatusCode());
+        $this->assertEquals('See Other', $response->getReasonPhrase());
+        $this->assertEquals('0', $response->getHeaderLine('Content-Length'));
+    }
+    
     public function testCanParseResponseHeader()
     {
         $stream = new ReadableMemoryStream(implode('', [
