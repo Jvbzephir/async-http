@@ -339,7 +339,7 @@ class Driver implements HttpDriver
                 yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                 
                 if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                    yield new CopyBytes($bodyStream, $stream, false, null, 4089, function (string $chunk) {
                         return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
                     });
                 }
@@ -349,7 +349,7 @@ class Driver implements HttpDriver
                 yield $stream->write($chunk);
                 
                 if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $stream, true, $size - $len);
+                    yield new CopyBytes($bodyStream, $stream, false, $size - $len);
                 }
             }
             
