@@ -39,8 +39,6 @@ class Connector implements HttpConnector
     
     protected $expectContinue = true;
     
-    protected $debug = false;
-    
     protected $pending;
     
     protected $logger;
@@ -63,11 +61,6 @@ class Connector implements HttpConnector
         $this->expectContinue = $expect;
     }
     
-    public function setDebug(bool $debug)
-    {
-        $this->debug = $debug;
-    }
-
     /**
      * {@inheritdoc}
      */
@@ -234,7 +227,7 @@ class Connector implements HttpConnector
             return true;
         }
         
-        if (!\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
+        if ($response->getProtocolVersion() === '1.0' && !\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
             return true;
         }
         
