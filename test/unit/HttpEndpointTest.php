@@ -21,46 +21,46 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class HttpEndpointTest extends AsyncTestCase
 {
-    public function provideKeepAliveMode()
-    {
-        yield [false];
-        yield [true];
-    }
+//     public function provideKeepAliveMode()
+//     {
+//         yield [false];
+//         yield [true];
+//     }
     
-    /**
-     * @dataProvider provideKeepAliveMode
-     */
-    public function testConnect(bool $keepAlive)
-    {
-        $connector = new Http1Connector();
-        $connector->setKeepAlive($keepAlive);
+//     /**
+//      * @dataProvider provideKeepAliveMode
+//      */
+//     public function testConnect(bool $keepAlive)
+//     {
+//         $connector = new Http1Connector();
+//         $connector->setKeepAlive($keepAlive);
         
-        $client = new HttpClient($connector);
+//         $client = new HttpClient($connector);
         
-        try {
-            $request = new HttpRequest('https://httpbin.org/user-agent');
-            $response = yield $client->send($request);
+//         try {
+//             $request = new HttpRequest('https://httpbin.org/user-agent');
+//             $response = yield $client->send($request);
             
-            $this->assertTrue($response instanceof HttpResponse);
-            $this->assertEquals(Http::OK, $response->getStatusCode());
+//             $this->assertTrue($response instanceof HttpResponse);
+//             $this->assertEquals(Http::OK, $response->getStatusCode());
             
-            $this->assertEquals([
-                'user-agent' => 'KoolKode HTTP Client'
-            ], json_decode(yield $response->getBody()->getContents(), true));
+//             $this->assertEquals([
+//                 'user-agent' => 'KoolKode HTTP Client'
+//             ], json_decode(yield $response->getBody()->getContents(), true));
             
-            $request = new HttpRequest('https://httpbin.org/user-agent');
-            $response = yield $client->send($request);
+//             $request = new HttpRequest('https://httpbin.org/user-agent');
+//             $response = yield $client->send($request);
             
-            $this->assertTrue($response instanceof HttpResponse);
-            $this->assertEquals(Http::OK, $response->getStatusCode());
+//             $this->assertTrue($response instanceof HttpResponse);
+//             $this->assertEquals(Http::OK, $response->getStatusCode());
             
-            $this->assertEquals([
-                'user-agent' => 'KoolKode HTTP Client'
-            ], json_decode(yield $response->getBody()->getContents(), true));
-        } finally {
-            $client->shutdown();
-        }
-    }
+//             $this->assertEquals([
+//                 'user-agent' => 'KoolKode HTTP Client'
+//             ], json_decode(yield $response->getBody()->getContents(), true));
+//         } finally {
+//             $client->shutdown();
+//         }
+//     }
     
     public function testClient()
     {
