@@ -336,7 +336,7 @@ class Connector implements HttpConnector
         if ($size === null) {
             yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
             
-            if ($len === 4089) {
+            if ($len === $clen) {
                 // Align each chunk with length and line breaks to fit into 4 KB payload.
                 yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
                     return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
@@ -347,8 +347,8 @@ class Connector implements HttpConnector
         } elseif ($size > 0) {
             yield $stream->write($chunk);
             
-            if ($len === 4096) {
-                yield new CopyBytes($bodyStream, $stream, true, $size);
+            if ($len === $clen) {
+                yield new CopyBytes($bodyStream, $stream, true, $size - $len);
             }
         }
         

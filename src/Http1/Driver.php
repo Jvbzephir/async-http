@@ -276,13 +276,6 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        if ($close) {
-            $buffer .= "Connection: close\r\n";
-        } else {
-            $buffer .= "Connection: keep-alive\r\n";
-            $buffer .= "Keep-Alive: timeout=30\r\n";
-        }
-        
         $compress = null;
         
         if (!$nobody && $size !== 0) {
@@ -291,13 +284,43 @@ class Driver implements HttpDriver
         
         $bodyStream = yield $body->getReadableStream();
         
-        // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
-        if (!$nobody && ($http11 || $size !== null)) {
+        if ($compress !== null) {
+            $bodyStream = new ReadableDeflateStream($bodyStream, $compress);
+        }
+        
+        if ($nobody || $size === 0) {
+            $chunk = null;
+            $size = 0;
+            $len = 0;
+        } else {
+            $clen = ($size === null) ? 4089 : 4096;
+            $chunk = yield $bodyStream->readBuffer($clen);
+            $len = \strlen($chunk);
+        }
+        
+        if ($chunk === null) {
+            $size = 0;
+        } elseif ($len < $clen) {
+            $size = $len;
+        }
+        
+        if ($http11) {
             if ($size === null) {
                 $buffer .= "Transfer-Encoding: chunked\r\n";
             } else {
                 $buffer .= "Content-Length: $size\r\n";
             }
+        } elseif ($size !== null) {
+            // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
+            $buffer .= "Content-Length: $size\r\n";
+            $close = true;
+        }
+        
+        if ($close) {
+            $buffer .= "Connection: close\r\n";
+        } else {
+            $buffer .= "Connection: keep-alive\r\n";
+            $buffer .= "Keep-Alive: timeout=30\r\n";
         }
         
         foreach ($response->getHeaders() as $name => $header) {
@@ -311,25 +334,28 @@ class Driver implements HttpDriver
         yield $stream->write($buffer . "\r\n");
         yield $stream->flush();
         
-        if ($compress !== null) {
-            $bodyStream = new ReadableDeflateStream($bodyStream, $compress);
-        }
-        
-        if ($nobody) {
-            $bodyStream->close();
-        } else {
+        try {
             if ($size === null) {
-                // Align each chunk with length and line breaks to fit into 4 KB payload.
-                yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
-                    return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
-                });
+                yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+                
+                if ($len === $clen) {
+                    yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                        return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
+                    });
+                }
                 
                 yield $stream->write("0\r\n\r\n");
-            } else {
-                yield new CopyBytes($bodyStream, $stream, true, $size);
+            } elseif ($size) {
+                yield $stream->write($chunk);
+                
+                if ($len === $clen) {
+                    yield new CopyBytes($bodyStream, $stream, true, $size - $len);
+                }
             }
             
             yield $stream->flush();
+        } finally {
+            $bodyStream->close();
         }
     }
 
