@@ -285,10 +285,14 @@ class Connector implements HttpConnector
             $bodyStream = $tmp;
         }
         
-        $chunk = yield $bodyStream->readBuffer(($size === null) ? 4089 : 4096);
+        $clen = ($size === null) ? 4089 : 4096;
+        $chunk = yield $bodyStream->readBuffer($clen);
+        $len = \strlen($chunk);
         
         if ($chunk === null) {
             $size = 0;
+        } elseif ($len < $clen) {
+            $size = $len;
         }
         
         if ($size === null) {
