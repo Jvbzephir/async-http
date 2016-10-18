@@ -27,6 +27,55 @@ class HPackContext
     const ENCODING_NEVER_INDEXED = 2;
     
     protected $encodings = [];
+
+    public static function createClientContext(): HPackContext
+    {
+        static $indexed = [
+            'accept',
+            'accept-charset',
+            'accept-encoding',
+            'accept-language',
+            'cache-control',
+            'content-type',
+            'dnt',
+            'host',
+            'pragma',
+            'user-agent',
+            'x-requested-with'
+        ];
+        
+        $context = new HPackContext();
+        
+        foreach ($indexed as $name) {
+            $context->encodings[$name] = self::ENCODING_INDEXED;
+        }
+        
+        return $context;
+    }
+
+    public static function createServerContext(): HPackContext
+    {
+        static $indexed = [
+            'cache-control',
+            'content-encoding',
+            'content-type',
+            'p3p',
+            'server',
+            'vary',
+            'x-frame-options',
+            'x-xss-protection',
+            'x-content-type-options',
+            'x-ua-compatible'
+        ];
+        
+        $context = new HPackContext();
+        
+        foreach ($indexed as $name) {
+            $context->encodings[$name] = self::ENCODING_INDEXED;
+        }
+        
+        return $context;
+    }
     
     public function getEncodingType(string $name): int
     {

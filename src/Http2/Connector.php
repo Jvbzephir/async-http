@@ -38,7 +38,7 @@ class Connector implements HttpConnector
     
     public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
     {
-        $this->hpackContext = $hpackContext ?? new HPackContext();
+        $this->hpackContext = $hpackContext ?? HPackContext::createClientContext();
         $this->logger = $logger;
     }
     

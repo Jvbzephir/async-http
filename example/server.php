@@ -14,7 +14,6 @@ declare(strict_types = 1);
 use Interop\Async\Loop;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
-use KoolKode\Async\Http\Http2\HPackContext;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 
@@ -37,26 +36,7 @@ Loop::execute(function () use ($logger) {
     $endpoint = new HttpEndpoint('0.0.0.0:8888');
     $endpoint->setCertificate(__DIR__ . '/localhost.pem');
     
-    $indexed = [
-        'cache-control',
-        'content-encoding',
-        'content-type',
-        'p3p',
-        'server',
-        'vary',
-        'x-frame-options',
-        'x-xss-protection',
-        'x-content-type-options',
-        'x-ua-compatible'
-    ];
-    
-    $hpack = new HPackContext();
-    
-    foreach ($indexed as $name) {
-        $hpack->setEncodingType($name, HPackContext::ENCODING_INDEXED);
-    }
-    
-    $endpoint->addDriver(new Http2Driver($hpack, $logger));
+    $endpoint->addDriver(new Http2Driver(null, $logger));
     
     $endpoint->listen();
     

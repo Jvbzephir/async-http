@@ -38,7 +38,7 @@ class Driver implements HttpDriver
     
     public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
     {
-        $this->hpackContext = $hpackContext ?? new HPackContext();
+        $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
         $this->logger = $logger;
         
         $this->connections = new \SplObjectStorage();
@@ -82,6 +82,8 @@ class Driver implements HttpDriver
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         
         $response = $response->withHeader('Content-Type', 'application/json');
+        $response = $response->withHeader('Server', 'KoolKode HTTP Server');
+        
         $response = $response->withBody(new StringBody(json_encode([
             'message' => 'Hello HTTP/2 client :)',
             'time' => (new \DateTime())->format(\DateTime::ISO8601),
