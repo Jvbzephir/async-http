@@ -22,6 +22,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -265,17 +266,7 @@ class Connector implements HttpConnector
         }
         
         if ($request->getProtocolVersion() == '1.0' && $size === null) {
-            $tmp = yield LoopConfig::currentFilesystem()->tempStream();
-            
-            try {
-                $size = yield new CopyBytes($bodyStream, $tmp);
-            } catch (\Throwable $e) {
-                $tmp->close();
-                
-                throw $e;
-            }
-            
-            $bodyStream = $tmp;
+            $bodyStream = yield from $this->bufferBody($bodyStream, $size);
         }
         
         $clen = ($size === null) ? 4089 : 4096;
@@ -377,5 +368,20 @@ class Connector implements HttpConnector
         }
         
         return $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
+    }
+    
+    protected function bufferBody(ReadableStream $stream, int & $size = null): \Generator
+    {
+        $tmp = yield LoopConfig::currentFilesystem()->tempStream();
+        
+        try {
+            $size = yield new CopyBytes($stream, $tmp);
+        } catch (\Throwable $e) {
+            $tmp->close();
+            
+            throw $e;
+        }
+        
+        return $tmp;
     }
 }
