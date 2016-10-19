@@ -25,20 +25,24 @@ use KoolKode\Async\Stream\ReadableStreamDecorator;
  */
 class PersistentStream extends ReadableStreamDecorator implements DuplexStream
 {
-    protected $refs = 0;
+    protected $refs;
     
     protected $defer;
 
-    public function __construct(DuplexStream $stream, int $refs = 0)
+    public function __construct(DuplexStream $stream, int $refs = 1)
     {
         parent::__construct($stream);
         
         $this->refs = $refs;
         $this->defer = new class() extends Deferred {
 
+            /**
+             * This defer must not be cancelled.
+             * 
+             * @codeCoverageIgnore
+             */
             public function cancel(\Throwable $e): array
             {
-                // This defer cannot be cancelled...
                 return [];
             }
         };

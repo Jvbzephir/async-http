@@ -25,6 +25,7 @@ use KoolKode\Async\Test\SocketStreamTester;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Driver
+ * @covers \KoolKode\Async\Http\Http1\EntityStream
  */
 class DriverTest extends AsyncTestCase
 {
@@ -229,6 +230,89 @@ class DriverTest extends AsyncTestCase
         });
     }
     
+    public function testSupportsExpectContinue()
+    {
+        $payload = str_repeat('A', 746);
+        
+        yield new SocketStreamTester(function (DuplexStream $stream) use ($payload) {
+            yield $stream->write(implode("\r\n", [
+                'POST /api HTTP/1.1',
+                'Host: localhost',
+                'Expect: 100-continue',
+                'Content-Type: text/plain',
+                'Content-Length: ' . strlen($payload),
+                '',
+                ''
+            ]));
+            
+            $this->assertEquals('HTTP/1.1 100 Continue', yield $stream->readLine());
+            
+            yield $stream->write($payload);
+            
+            $response = yield from (new ResponseParser())->parseResponse($stream);
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::OK, $response->getStatusCode());
+            $this->assertEquals($payload, yield $response->getBody()->getContents());
+        }, function (DuplexStream $stream) use ($payload) {
+            $driver = new Driver();
+            $driver->setDebug(true);
+            
+            yield $driver->handleConnection($stream, function (HttpRequest $request) use ($payload) {
+                $this->assertEquals(Http::POST, $request->getMethod());
+                $this->assertEquals('/api', $request->getRequestTarget());
+                $this->assertEquals('1.1', $request->getProtocolVersion());
+                $this->assertEquals('localhost', $request->getHeaderLine('Host'));
+                
+                $this->assertEquals($payload, yield $request->getBody()->getContents());
+                
+                $response = new HttpResponse();
+                $response = $response->withHeader('Content-Type', 'text/plain');
+                $response = $response->withBody(new StringBody($payload));
+                
+                return $response;
+            });
+        });
+    }
+    
+    public function testWillNotRequestBodyIfNotNeeded()
+    {
+        yield new SocketStreamTester(function (DuplexStream $stream) {
+            yield $stream->write(implode("\r\n", [
+                'POST /api HTTP/1.1',
+                'Host: localhost',
+                'Expect: 100-continue',
+                'Content-Type: text/plain',
+                'Content-Length: 123',
+                '',
+                ''
+            ]));
+            
+            $response = yield from (new ResponseParser())->parseResponse($stream);
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::SEE_OTHER, $response->getStatusCode());
+            $this->assertEquals('http://localhost/api/1.0', $response->getHeaderLine('Location'));
+        }, function (DuplexStream $stream) {
+            $driver = new Driver();
+            $driver->setDebug(true);
+            
+            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+                $this->assertEquals(Http::POST, $request->getMethod());
+                $this->assertEquals('/api', $request->getRequestTarget());
+                $this->assertEquals('1.1', $request->getProtocolVersion());
+                $this->assertEquals('localhost', $request->getHeaderLine('Host'));
+                
+                $response = new HttpResponse(Http::SEE_OTHER);
+                $response = $response->withHeader('Location', 'http://localhost/api/1.0');
+                
+                return $response;
+            });
+        });
+    }
+    
     public function testErrorResponse()
     {
         yield new SocketStreamTester(function (DuplexStream $stream) {
@@ -280,6 +364,31 @@ class DriverTest extends AsyncTestCase
             yield $driver->handleConnection($stream, function (HttpRequest $request) {
                 throw new StatusException(Http::PRECONDITION_FAILED, 'Failed to check condition');
             });
+        });
+    }
+    
+    public function testDetectsMissingHostHeaderInHttp11Request()
+    {
+        yield new SocketStreamTester(function (DuplexStream $stream) {
+            yield $stream->write(implode("\r\n", array_merge([
+                'GET / HTTP/1.1',
+                'Content-Length: 0',
+                '',
+                ''
+            ])));
+            
+            $response = yield from (new ResponseParser())->parseResponse($stream);
+            $response->getBody()->setCascadeClose(false);
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::BAD_REQUEST, $response->getStatusCode());
+            $this->assertEquals('Missing HTTP Host header', yield $response->getBody()->getContents());
+        }, function (DuplexStream $stream) {
+            $driver = new Driver();
+            $driver->setDebug(true);
+            
+            yield $driver->handleConnection($stream, function () {});
         });
     }
 }

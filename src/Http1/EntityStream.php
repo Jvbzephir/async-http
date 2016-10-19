@@ -17,21 +17,27 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
+use KoolKode\Async\Stream\WritableStream;
 
 /**
  * Stream used by HTTP/1 bodies providing an awaitable that is resolved when all body data has been read.
+ * 
+ * The entity stream will automatically send HTTP/1.1 100 Continue where expected.
  * 
  * @author Martin Schröder
  */
 class EntityStream extends ReadableStreamDecorator
 {
     protected $defer;
+    
+    protected $expectContinue;
 
-    public function __construct(ReadableStream $stream, bool $cascadeClose = true)
+    public function __construct(ReadableStream $stream, bool $cascadeClose = true, WritableStream & $expectContinue = null)
     {
         parent::__construct($stream);
         
         $this->cascadeClose = $cascadeClose;
+        $this->expectContinue = & $expectContinue;
         $this->defer = new Deferred();
     }
     
@@ -53,6 +59,18 @@ class EntityStream extends ReadableStreamDecorator
         $this->defer->resolve(null);
         
         return parent::close();
+    }
+
+    protected function readNextChunk(): \Generator
+    {
+        if ($this->expectContinue) {
+            $expect = $this->expectContinue;
+            $this->expectContinue = null;
+            
+            yield $expect->write("HTTP/1.1 100 Continue\r\n");
+        }
+        
+        return yield $this->stream->read($this->bufferSize);
     }
 
     protected function processChunk(string $chunk): string

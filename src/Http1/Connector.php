@@ -132,7 +132,6 @@ class Connector implements HttpConnector
             $stream = $context->stream;
         } else {
             $stream = new PersistentStream($context->stream);
-            $stream->reference();
         }
         
         $coroutine = new Coroutine(function () use ($stream, $request) {

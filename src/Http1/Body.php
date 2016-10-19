@@ -251,7 +251,7 @@ class Body implements HttpBody
      * 
      * @param WritableStream $stream
      */
-    public function setExpectContinue(WritableStream $stream)
+    public function setExpectContinue(WritableStream $stream = null)
     {
         $this->expectContinue = $stream;
     }
@@ -287,7 +287,7 @@ class Body implements HttpBody
     {
         return new Coroutine(function () {
             if ($this->decodedStream === null) {
-                $this->decodedStream = yield from $this->createInputStream();
+                $this->decodedStream = $this->createInputStream();
             }
             
             return $this->decodedStream;
@@ -301,7 +301,7 @@ class Body implements HttpBody
     {
         return new Coroutine(function () {
             if ($this->decodedStream === null) {
-                $this->decodedStream = yield from $this->createInputStream();
+                $this->decodedStream = $this->createInputStream();
             }
             
             return yield new ReadContents($this->decodedStream);
@@ -310,15 +310,9 @@ class Body implements HttpBody
 
     /**
      * Create the input stream being used to read decoded body data from the remote peer.
-     * 
-     * @return ReadableStream
      */
-    protected function createInputStream(): \Generator
+    protected function createInputStream(): EntityStream
     {
-        if ($this->expectContinue) {
-            yield $this->expectContinue->write("HTTP/1.1 100 Continue\r\n");
-        }
-        
         if ($this->chunked) {
             $stream = new ChunkDecodedStream($this->stream);
         } elseif ($this->length > 0) {
@@ -330,7 +324,7 @@ class Body implements HttpBody
                 $this->stream->close();
             }
             
-            return new EntityStream(new ReadableMemoryStream());
+            return new EntityStream(new ReadableMemoryStream(), true, $this->expectContinue);
         }
         
         if ($this->compression) {
@@ -344,6 +338,6 @@ class Body implements HttpBody
             }
         }
         
-        return new EntityStream($stream, $this->cascadeClose);
+        return new EntityStream($stream, $this->cascadeClose, $this->expectContinue);
     }
 }

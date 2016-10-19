@@ -47,7 +47,7 @@ abstract class MessageParser
                 $parts = \explode(':', $line, 2);
                 
                 if (!isset($parts[1])) {
-                    throw new \RuntimeException('Malformed HTTP header received');
+                    throw new \RuntimeException(\sprintf('Malformed HTTP header received: "%s"', $line));
                 }
                 
                 $message = $message->withAddedHeader(\trim($parts[0]), \trim($parts[1]));

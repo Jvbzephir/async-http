@@ -24,7 +24,7 @@ use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
-use KoolKode\Async\Util\Executor;
+use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -73,64 +73,55 @@ class Driver implements HttpDriver
      */
     public function handleConnection(DuplexStream $stream, callable $action): Awaitable
     {
-        $stream = new PersistentStream($stream, 1);
-        
         return new Coroutine(function () use ($stream, $action) {
-            $executor = new Executor();
-            $jobs = new \SplQueue();
+            $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream) {
+                yield from $this->parseIncomingRequests($stream, $channel);
+            });
             
             try {
-                do {
-                    try {
-                        $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
-                        $request->getBody()->setCascadeClose(false);
-                        
-                        if ($request->getProtocolVersion() == '1.1') {
-                            if (!$request->hasHeader('Host')) {
-                                throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
-                            }
-                            
-                            if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
-                                $request->getBody()->setExpectContinue($stream);
-                            }
-                        }
-                        
-                        $close = $this->shouldConnectionBeClosed($request);
-                        
-                        $jobs->enqueue($executor->execute(function () use ($stream, $action, $request, $close) {
-                            yield from $this->processRequest($stream, $action, $request, $close);
-                        }));
-                        
-                        $body = yield $request->getBody()->getReadableStream();
-                        
-                        // Wait until HTTP request body stream is closed.
-                        if ($body instanceof EntityStream) {
-                            yield $body->getAwaitable();
-                        }
-                    } catch (StreamClosedException $e) {
+                while (null !== ($next = yield $pipeline->receive())) {
+                    if (!yield from $this->processRequest($stream, $action, ...$next)) {
                         break;
-                    } catch (\Throwable $e) {
-                        if (isset($request)) {
-                            yield from $this->sendErrorResponse($stream, $request, $e);
-                        }
-                        
-                        break;
-                    } finally {
-                        $request = null;
                     }
-                } while (!$close);
-                
-                while (!$jobs->isEmpty()) {
-                    yield $jobs->dequeue();
                 }
+                
+                $pipeline->close();
+            } catch (\Throwable $e) {
+                $pipeline->close($e);
             } finally {
-                while (!$jobs->isEmpty()) {
-                    $jobs->dequeue()->cancel(new StreamClosedException('HTTP connection closed'));
-                }
-                
-                yield $stream->close();
+                $stream->close();
             }
         });
+    }
+
+    protected function parseIncomingRequests(DuplexStream $stream, Channel $pipeline): \Generator
+    {
+        try {
+            do {
+                $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
+                $request->getBody()->setCascadeClose(false);
+                
+                if ($request->getProtocolVersion() == '1.1') {
+                    if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+                        $request->getBody()->setExpectContinue($stream);
+                    }
+                }
+                
+                $close = $this->shouldConnectionBeClosed($request);
+                $body = yield $request->getBody()->getReadableStream();
+                
+                yield $pipeline->send([
+                    $request,
+                    $close
+                ]);
+                
+                yield $body->getAwaitable();
+            } while (!$close);
+            
+            $pipeline->close();
+        } catch (\Throwable $e) {
+            $pipeline->close($e);
+        }
     }
     
     protected function shouldConnectionBeClosed(HttpRequest $request): bool
@@ -154,7 +145,7 @@ class Driver implements HttpDriver
         return false;
     }
     
-    protected function processRequest(PersistentStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(DuplexStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
             'Connection',
@@ -163,13 +154,15 @@ class Driver implements HttpDriver
             'Transfer-Encoding'
         ];
         
-        $stream->reference();
-        
         if ($this->logger) {
             $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
         try {
+            if ($request->getProtocolVersion() == '1.1' && !$request->hasHeader('Host')) {
+                throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
+            }
+            
             foreach ($remove as $name) {
                 $request = $request->withoutHeader($name);
             }
@@ -189,70 +182,54 @@ class Driver implements HttpDriver
             $response = $response->withProtocolVersion($request->getProtocolVersion());
             $response = $response->withHeader('Server', 'KoolKode HTTP Server');
             
-            yield from $this->sendResponse($stream, $request, $response, $close);
+            return yield from $this->sendResponse($stream, $request, $response, $close);
         } catch (\Throwable $e) {
-            (yield $request->getBody()->getReadableStream())->close();
-            
-            if (!$e instanceof StreamClosedException) {
-                yield from $this->sendErrorResponse($stream, $request, $e);
-            }
-        } finally {
-            $stream->close();
+            return yield from $this->sendErrorResponse($stream, $request, $e);
         }
     }
 
-    protected function handleClosedConnection(\Throwable $e): \Generator
+    protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
-        // TODO: Client dropped connection, cleanup pending awaitables and log this event.
-        yield 1;
-    }
-
-    protected function sendErrorResponse(PersistentStream $stream, HttpRequest $request, \Throwable $e): \Generator
-    {
-        $stream->reference();
+        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
         
-        try {
-            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-            
-            if ($e instanceof StatusException) {
-                $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
-            }
-            
-            if ($this->debug) {
-                $response = $response->withHeader('Content-Type', 'text/plain');
-                $response = $response->withBody(new StringBody($e->getMessage()));
-            }
-            
-            try {
-                yield from $this->sendResponse($stream, $request, $response, true);
-            } catch (\Throwable $e) {
-                yield from $this->handleClosedConnection($e);
-            }
-        } finally {
-            $stream->close();
+        if ($e instanceof StatusException) {
+            $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
         }
+        
+        if ($this->debug) {
+            $response = $response->withHeader('Content-Type', 'text/plain');
+            $response = $response->withBody(new StringBody($e->getMessage()));
+        }
+        
+        return yield from $this->sendResponse($stream, $request, $response, true);
     }
-
-    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    
+    protected function discardRequestBody(Body $body)
     {
-        // Discard remaining request body before sending response.
-        $input = yield $request->getBody()->getReadableStream();
+        $body->setExpectContinue(null);
+        
+        $input = yield $body->getReadableStream();
         
         try {
             while (null !== yield $input->read());
         } finally {
             $input->close();
         }
+    }
+
+    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    {
+        new Coroutine($this->discardRequestBody($request->getBody()));
         
         $response = $this->normalizeResponse($request, $response);
         
         if ($this->logger) {
             $reason = \rtrim(' ' . $response->getReasonPhrase());
-        
+            
             if ($reason === '') {
                 $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
             }
-        
+            
             $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
         }
         
@@ -306,8 +283,7 @@ class Driver implements HttpDriver
         } elseif ($size !== null) {
             $buffer .= "Content-Length: $size\r\n";
         } else {
-            // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
-            $stream->close();
+            $close = true;
         }
         
         if ($close) {
@@ -351,6 +327,8 @@ class Driver implements HttpDriver
         } finally {
             $bodyStream->close();
         }
+        
+        return !$close;
     }
 
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse

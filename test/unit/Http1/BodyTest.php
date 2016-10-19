@@ -156,8 +156,8 @@ class BodyTest extends AsyncTestCase
         $stream = yield $body->getReadableStream();
         
         try {
-            $this->assertEquals("HTTP/1.1 100 Continue\r\n", $expect->getContents());
             $this->assertEquals('Foo', yield new ReadContents($stream));
+            $this->assertEquals("HTTP/1.1 100 Continue\r\n", $expect->getContents());
         } finally {
             $stream->close();
         }

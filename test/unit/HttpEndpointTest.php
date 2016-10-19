@@ -21,47 +21,6 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class HttpEndpointTest extends AsyncTestCase
 {
-//     public function provideKeepAliveMode()
-//     {
-//         yield [false];
-//         yield [true];
-//     }
-    
-//     /**
-//      * @dataProvider provideKeepAliveMode
-//      */
-//     public function testConnect(bool $keepAlive)
-//     {
-//         $connector = new Http1Connector();
-//         $connector->setKeepAlive($keepAlive);
-        
-//         $client = new HttpClient($connector);
-        
-//         try {
-//             $request = new HttpRequest('https://httpbin.org/user-agent');
-//             $response = yield $client->send($request);
-            
-//             $this->assertTrue($response instanceof HttpResponse);
-//             $this->assertEquals(Http::OK, $response->getStatusCode());
-            
-//             $this->assertEquals([
-//                 'user-agent' => 'KoolKode HTTP Client'
-//             ], json_decode(yield $response->getBody()->getContents(), true));
-            
-//             $request = new HttpRequest('https://httpbin.org/user-agent');
-//             $response = yield $client->send($request);
-            
-//             $this->assertTrue($response instanceof HttpResponse);
-//             $this->assertEquals(Http::OK, $response->getStatusCode());
-            
-//             $this->assertEquals([
-//                 'user-agent' => 'KoolKode HTTP Client'
-//             ], json_decode(yield $response->getBody()->getContents(), true));
-//         } finally {
-//             $client->shutdown();
-//         }
-//     }
-    
     public function testClient()
     {
         $endpoint = new HttpEndpoint();
