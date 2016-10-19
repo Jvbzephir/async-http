@@ -24,7 +24,6 @@ use KoolKode\Async\Test\SocketStreamTester;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Connector
- * @covers \KoolKode\Async\Http\Http1\PersistentStream
  */
 class ConnectorTest extends AsyncTestCase
 {
@@ -67,8 +66,8 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) {
-            $socket = new PersistentStream($socket, 2);
             $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
             
             $this->assertTrue($request instanceof HttpRequest);
             $this->assertEquals(Http::GET, $request->getMethod());
@@ -118,8 +117,8 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) {
-            $socket = new PersistentStream($socket, 2);
             $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
             
             $this->assertTrue($request instanceof HttpRequest);
             $this->assertEquals(Http::POST, $request->getMethod());
@@ -173,8 +172,8 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) use ($payload) {
-            $socket = new PersistentStream($socket, 2);
             $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
             
             $this->assertTrue($request instanceof HttpRequest);
             $this->assertEquals($payload, yield $request->getBody()->getContents());
@@ -212,8 +211,8 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) use ($payload) {
-            $socket = new PersistentStream($socket, 2);
             $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
             
             $this->assertTrue($request instanceof HttpRequest);
             $this->assertEquals($payload, yield $request->getBody()->getContents());
@@ -254,10 +253,9 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) {
-            $socket = new PersistentStream($socket, 10);
-            
             for ($i = 0; $i < 3; $i++) {
                 $request = yield from (new RequestParser())->parseRequest($socket);
+                $request->getBody()->setCascadeClose(false);
                 
                 $this->assertTrue($request instanceof HttpRequest);
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -268,6 +266,7 @@ class ConnectorTest extends AsyncTestCase
                 yield $socket->write(implode("\r\n", [
                     'HTTP/1.1 200 OK',
                     'Connection: keep-alive',
+                    'Keep-Alive: timeout=60, max=3',
                     'Content-Length: 15',
                     '',
                     'Hello Client :)'
@@ -303,8 +302,8 @@ class ConnectorTest extends AsyncTestCase
                 $connector->shutdown();
             }
         }, function (DuplexStream $socket) use ($payload) {
-            $socket = new PersistentStream($socket, 2);
             $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
             
             $this->assertTrue($request instanceof HttpRequest);
             $this->assertEquals('100-continue', $request->getHeaderLine('Expect'));

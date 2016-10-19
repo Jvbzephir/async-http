@@ -25,8 +25,6 @@ use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerInterface;
 
-// TODO: Implement keep-alive timeout...
-
 /**
  * Implements the HTTP/1.x protocol on the client side.
  * 
@@ -39,6 +37,8 @@ class Connector implements HttpConnector
     protected $conns = [];
     
     protected $keepAlive = true;
+    
+    protected $maxLifetime = 15;
     
     protected $expectContinue = true;
     
@@ -103,7 +103,7 @@ class Connector implements HttpConnector
             
             foreach ($this->conns as $conn) {
                 while (!$conn->isEmpty()) {
-                    yield $conn->dequeue()->close();
+                    (yield $conn->dequeue())[0]->close();
                 }
             }
         });
@@ -114,12 +114,13 @@ class Connector implements HttpConnector
      */
     public function getConnectorContext(Uri $uri): HttpConnectorContext
     {
-        $socket = $this->getConnection($uri);
-        $context = new HttpConnectorContext();
+        list ($socket, $remaining) = $this->getConnection($uri);
+        $context = new ConnectorContext();
         
-        if ($socket !== null) {
+        if ($socket !== null && $remaining) {
             $context->connected = true;
             $context->socket = $socket;
+            $context->remaining = $remaining;
         }
         
         return $context;
@@ -130,18 +131,46 @@ class Connector implements HttpConnector
      */
     public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
     {
-        $stream = new PersistentStream($context->socket);
-        
-        $coroutine = new Coroutine(function () use ($stream, $request) {
-            $stream->reference();
-            
+        $coroutine = new Coroutine(function () use ($context, $request) {
             try {
-                $uri = $request->getUri();
+                $line = yield from $this->sendRequest($context->socket, $request);
                 
-                $line = yield from $this->sendRequest($stream, $request);
+                $response = yield from $this->parser->parseResponse($context->socket, $line, $request->getMethod() === Http::HEAD);
                 
-                $response = yield from $this->parser->parseResponse($stream, $line, $request->getMethod() === Http::HEAD);
-                $body = $response->getBody();
+                if (!$this->shouldConnectionBeClosed($response)) {
+                    $ttl = $this->maxLifetime;
+                    $max = 100;
+                    
+                    if ($response->hasHeader('Keep-Alive')) {
+                        $m = null;
+                        
+                        if (\preg_match("'timeout\s*=\s*([1-9][0-9]*)\s*(?:$|,)'i", $response->getHeaderLine('Keep-Alive'), $m)) {
+                            $ttl = (int) $m[1];
+                        }
+                        
+                        if (\preg_match("'max\s*=\s*([1-9][0-9]*)\s*(?:$|,)'i", $response->getHeaderLine('Keep-Alive'), $m)) {
+                            $max = \min($max, (int) $m[1]);
+                        }
+                    }
+                    
+                    $remaining = ($context->remaining ?? $max) - 1;
+                    
+                    $uri = $request->getUri();
+                    $body = $response->getBody();
+                    
+                    if ($body instanceof Body) {
+                        $body->setCascadeClose(false);
+                        
+                        (yield $body->getReadableStream())->getAwaitable()->when(function () use ($uri, $context, $ttl, $remaining) {
+                            $this->releaseConnection($uri, $context->socket, \min($this->maxLifetime, $ttl), $remaining);
+                        });
+                    } else {
+                        $this->releaseConnection($uri, $context->socket, $this->maxLifetime, $remaining);
+                    }
+                }
+                
+                $response = $response->withoutHeader('Content-Length');
+                $response = $response->withoutHeader('Transfer-Encoding');
                 
                 if ($this->logger) {
                     $reason = \rtrim(' ' . $response->getReasonPhrase());
@@ -153,28 +182,9 @@ class Connector implements HttpConnector
                     $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
                 }
                 
-                if ($this->shouldConnectionBeClosed($response)) {
-                    $stream->close();
-                } else {
-                    $bodyStream = yield $body->getReadableStream();
-                    
-                    if ($bodyStream instanceof EntityStream) {
-                        $bodyStream->getAwaitable()->when(function () use ($uri, $stream) {
-                            $this->releaseConnection($uri, $stream->getStream());
-                        });
-                    } else {
-                        $stream->close();
-                        
-                        $this->releaseConnection($uri, $stream->getStream());
-                    }
-                }
-                
-                $response = $response->withoutHeader('Content-Length');
-                $response = $response->withoutHeader('Transfer-Encoding');
-                
                 return $response;
             } catch (\Throwable $e) {
-                yield $stream->close();
+                $context->socket->close();
                 
                 throw $e;
             }
@@ -192,6 +202,7 @@ class Connector implements HttpConnector
     protected function getConnection(Uri $uri)
     {
         $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+        $time = \time();
         
         if (isset($this->conns[$key])) {
             while (!$this->conns[$key]->isEmpty()) {
@@ -199,11 +210,14 @@ class Connector implements HttpConnector
                     $this->logger->debug("Reusing persistent connection: $key");
                 }
                 
-                $conn = $this->conns[$key]->dequeue();
+                list ($conn, $expires, $remaining) = $this->conns[$key]->dequeue();
                 $socket = $conn->getSocket();
                 
-                if (\is_resource($socket) && !\feof($socket)) {
-                    return $conn;
+                if ($expires > $time && \is_resource($socket) && !\feof($socket)) {
+                    return [
+                        $conn,
+                        $remaining
+                    ];
                 }
             }
             
@@ -211,23 +225,31 @@ class Connector implements HttpConnector
         }
     }
 
-    protected function releaseConnection(Uri $uri, SocketStream $conn)
+    protected function releaseConnection(Uri $uri, SocketStream $conn, int $ttl, int $remaining)
     {
         $socket = $conn->getSocket();
         
-        if (\is_resource($socket) && !\feof($socket)) {
+        if ($remaining > 0 && $ttl > 0 && \is_resource($socket) && !\feof($socket)) {
             $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
             
             if (empty($this->conns[$key])) {
                 $this->conns[$key] = new \SplQueue();
             }
             
-            $this->conns[$key]->enqueue($conn);
+            $this->conns[$key]->enqueue([
+                $conn,
+                \time() + $ttl,
+                $remaining
+            ]);
             
             if ($this->logger) {
                 $this->logger->debug("Released persistent connection: $key");
             }
+            
+            return;
         }
+        
+        $conn->close();
     }
 
     protected function shouldConnectionBeClosed(HttpResponse $response): bool
@@ -247,7 +269,7 @@ class Connector implements HttpConnector
         return false;
     }
     
-    protected function sendRequest(PersistentStream $stream, HttpRequest $request): \Generator
+    protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
     {
         static $compression;
         
@@ -267,6 +289,10 @@ class Connector implements HttpConnector
         
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
         $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
+        
+        if ($this->keepAlive) {
+            $buffer .= \sprintf("Keep-Alive: timeout=%u\r\n", $this->maxLifetime);
+        }
         
         if ($request->getProtocolVersion() == '1.0' && $size === null) {
             $bodyStream = yield from $this->bufferBody($bodyStream, $size);
