@@ -17,7 +17,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Http\TestLogger;
-use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -25,7 +24,6 @@ use KoolKode\Async\Test\SocketStreamTester;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Connector
- * @covers \KoolKode\Async\Http\Http1\EntityStream
  * @covers \KoolKode\Async\Http\Http1\PersistentStream
  */
 class ConnectorTest extends AsyncTestCase
@@ -50,7 +48,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setKeepAlive(false);
             
             try {
-                $request = new HttpRequest(Uri::parse('http://localhost/api?test=yes'));
+                $request = new HttpRequest('http://localhost/api?test=yes');
                 $request = $request->withProtocolVersion('1.0');
                 
                 $context = $connector->getConnectorContext($request->getUri());
@@ -98,7 +96,7 @@ class ConnectorTest extends AsyncTestCase
                     'message' => 'Hello World :)'
                 ];
                 
-                $request = new HttpRequest(Uri::parse('http://localhost/api'), Http::POST);
+                $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withHeader('Content-Type', 'application/json');
                 $request = $request->withBody(new StringBody(json_encode($payload)));
                 
@@ -159,7 +157,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setExpectContinue(false);
             
             try {
-                $request = new HttpRequest(Uri::parse('http://localhost/api'), Http::POST);
+                $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withProtocolVersion('1.0');
                 $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
@@ -199,7 +197,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setExpectContinue(false);
             
             try {
-                $request = new HttpRequest(Uri::parse('http://localhost/api'), Http::POST);
+                $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
                 $context = $connector->getConnectorContext($request->getUri());
@@ -238,7 +236,7 @@ class ConnectorTest extends AsyncTestCase
             
             try {
                 for ($i = 0; $i < 3; $i++) {
-                    $request = new HttpRequest(Uri::parse('http://localhost/api'));
+                    $request = new HttpRequest('http://localhost/api');
                     $request = $request->withProtocolVersion('2.0');
                     
                     $context = $connector->getConnectorContext($request->getUri());
@@ -288,7 +286,7 @@ class ConnectorTest extends AsyncTestCase
             $connector = new Connector();
             
             try {
-                $request = new HttpRequest(Uri::parse('http://localhost/api'), Http::POST);
+                $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withBody(new StringBody($payload));
                 
                 $context = $connector->getConnectorContext($request->getUri());

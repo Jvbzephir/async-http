@@ -25,7 +25,6 @@ use KoolKode\Async\Test\SocketStreamTester;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Driver
- * @covers \KoolKode\Async\Http\Http1\EntityStream
  */
 class DriverTest extends AsyncTestCase
 {
