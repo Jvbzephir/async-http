@@ -38,6 +38,21 @@ class RequestParserTest extends AsyncTestCase
         $this->assertEquals('1.0', $request->getProtocolVersion());
     }
     
+    public function testDetectsAsteriskForm()
+    {
+        $stream = new ReadableMemoryStream(implode('', [
+            "OPTIONS * HTTP/1.1\r\n",
+            "\r\n"
+        ]));
+        
+        $request = yield from (new RequestParser())->parseRequest($stream);
+        
+        $this->assertTrue($request instanceof HttpRequest);
+        $this->assertEquals(Http::OPTIONS, $request->getMethod());
+        $this->assertEquals('*', $request->getRequestTarget());
+        $this->assertEquals('1.1', $request->getProtocolVersion());
+    }
+    
     public function testDetectsInvalidNumberOfNewLinesBeforeRequestLine()
     {
         $stream = new ReadableMemoryStream("\r\n\r\n\r\n\r\n");

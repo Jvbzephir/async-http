@@ -73,8 +73,7 @@ class Driver implements HttpDriver
      */
     public function handleConnection(DuplexStream $stream, callable $action): Awaitable
     {
-        $stream = new PersistentStream($stream);
-        $stream->reference();
+        $stream = new PersistentStream($stream, 1);
         
         return new Coroutine(function () use ($stream, $action) {
             $executor = new Executor();
@@ -85,10 +84,6 @@ class Driver implements HttpDriver
                     try {
                         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
                         $request->getBody()->setCascadeClose(false);
-                        
-                        if ($this->logger) {
-                            $this->logger->debug("Persistent / pipelined HTTP request received");
-                        }
                         
                         if ($request->getProtocolVersion() == '1.1') {
                             if (!$request->hasHeader('Host')) {
@@ -115,9 +110,13 @@ class Driver implements HttpDriver
                     } catch (StreamClosedException $e) {
                         break;
                     } catch (\Throwable $e) {
-                        yield from $this->sendErrorResponse($stream, $request, $e);
+                        if (isset($request)) {
+                            yield from $this->sendErrorResponse($stream, $request, $e);
+                        }
                         
                         break;
+                    } finally {
+                        $request = null;
                     }
                 } while (!$close);
                 
@@ -182,25 +181,21 @@ class Driver implements HttpDriver
             }
             
             if (!$response instanceof HttpResponse) {
-                if ($this->logger) {
-                    $type = \is_object($response) ? \get_class($response) : \gettype($response);
-                    
-                    $this->logger->error(\sprintf('Expecting HTTP response, server action returned %s', $type));
-                }
+                $type = \is_object($response) ? \get_class($response) : \gettype($response);
                 
-                $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+                throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
             }
             
             $response = $response->withProtocolVersion($request->getProtocolVersion());
             $response = $response->withHeader('Server', 'KoolKode HTTP Server');
             
             yield from $this->sendResponse($stream, $request, $response, $close);
-        } catch (StreamClosedException $e) {
-            (yield $request->getBody()->getReadableStream())->close();
         } catch (\Throwable $e) {
             (yield $request->getBody()->getReadableStream())->close();
             
-            yield from $this->sendErrorResponse($stream, $request, $e);
+            if (!$e instanceof StreamClosedException) {
+                yield from $this->sendErrorResponse($stream, $request, $e);
+            }
         } finally {
             $stream->close();
         }
@@ -220,9 +215,7 @@ class Driver implements HttpDriver
             $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
             
             if ($e instanceof StatusException) {
-                try {
-                    $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
-                } catch (\Throwable $e) {}
+                $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
             }
             
             if ($this->debug) {
@@ -311,9 +304,10 @@ class Driver implements HttpDriver
                 $buffer .= "Content-Length: $size\r\n";
             }
         } elseif ($size !== null) {
-            // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
             $buffer .= "Content-Length: $size\r\n";
-            $close = true;
+        } else {
+            // HTTP/1.0 responses of unknown size are delimited by EOF / connection closed at the client's side.
+            $stream->close();
         }
         
         if ($close) {
@@ -335,7 +329,7 @@ class Driver implements HttpDriver
         yield $stream->flush();
         
         try {
-            if ($size === null) {
+            if ($http11 && $size === null) {
                 yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                 
                 if ($len === $clen) {
@@ -345,11 +339,11 @@ class Driver implements HttpDriver
                 }
                 
                 yield $stream->write("0\r\n\r\n");
-            } elseif ($size) {
+            } elseif ($chunk !== null) {
                 yield $stream->write($chunk);
                 
                 if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $stream, false, $size - $len);
+                    yield new CopyBytes($bodyStream, $stream, false, ($size === null) ? null : ($size - $len));
                 }
             }
             
@@ -383,28 +377,22 @@ class Driver implements HttpDriver
     {
         static $available;
         
-        if ($available === null) {
-            $available = \function_exists('deflate_init');
-        }
-        
-        if (!$available) {
-            return '';
-        }
-        
         static $map = [
             'gzip' => \ZLIB_ENCODING_GZIP,
             'x-gzip' => \ZLIB_ENCODING_GZIP,
             'deflate' => \ZLIB_ENCODING_DEFLATE
         ];
         
-        $accept = $request->getHeaderTokens('Accept-Encoding');
-        
-        foreach ($accept as $key) {
-            if (isset($map[$key])) {
-                $compress = $map[$key];
-                $size = null;
-                
-                return \sprintf("Content-Encoding: %s\r\n", $key);
+        if ($available ?? ($available = \function_exists('deflate_init'))) {
+            $accept = $request->getHeaderTokens('Accept-Encoding');
+            
+            foreach ($accept as $key) {
+                if (isset($map[$key])) {
+                    $compress = $map[$key];
+                    $size = null;
+                    
+                    return \sprintf("Content-Encoding: %s\r\n", $key);
+                }
             }
         }
         
