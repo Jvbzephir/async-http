@@ -87,8 +87,12 @@ class Connector implements HttpConnector
         $context = new ConnectorContext();
         
         if (isset($this->connections[$key])) {
-            $context->connected = true;
-            $context->conn = $this->connections[$key];
+            if ($this->connections[$key]->isAlive()) {
+                $context->connected = true;
+                $context->conn = $this->connections[$key];
+            } else {
+                unset($this->connections[$key]);
+            }
         }
         
         return $context;
@@ -103,7 +107,7 @@ class Connector implements HttpConnector
             if ($context instanceof ConnectorContext && $context->conn) {
                 $conn = $context->conn;
             } else {
-                $conn = yield Connection::connectClient($context->stream, new HPack($this->hpackContext), $this->logger);
+                $conn = yield Connection::connectClient($context->socket, new HPack($this->hpackContext), $this->logger);
                 $uri = $request->getUri();
                 
                 $this->connections[\sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true))] = $conn;

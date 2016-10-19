@@ -113,7 +113,7 @@ class HttpClient
             }
             
             $context = new HttpConnectorContext();
-            $context->stream = $socket;
+            $context->socket = $socket;
             
             return yield $connector->send($context, $request);
         });

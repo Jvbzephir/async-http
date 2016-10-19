@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
@@ -29,7 +30,7 @@ class PersistentStream extends ReadableStreamDecorator implements DuplexStream
     
     protected $defer;
 
-    public function __construct(DuplexStream $stream, int $refs = 1)
+    public function __construct(SocketStream $stream, int $refs = 1)
     {
         parent::__construct($stream);
         
@@ -46,6 +47,11 @@ class PersistentStream extends ReadableStreamDecorator implements DuplexStream
                 return [];
             }
         };
+    }
+    
+    public function getStream(): SocketStream
+    {
+        return $this->stream;
     }
 
     public function reference()

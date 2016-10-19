@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 
 /**
  * Extendable context object that is used to allow for persistent connections etc.
@@ -30,9 +30,9 @@ class HttpConnectorContext
     public $connected = false;
     
     /**
-     * Stream resource to be used to send an HTTP request.
+     * Socket being used to transmit HTTP messages.
      * 
-     * @var DuplexStream
+     * @var SocketStream
      */
-    public $stream;
+    public $socket;
 }

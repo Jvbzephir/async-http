@@ -53,7 +53,7 @@ class ConnectorTest extends AsyncTestCase
                 
                 $context = $connector->getConnectorContext($request->getUri());
                 $context->connected = true;
-                $context->stream = $socket;
+                $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
                 
@@ -102,7 +102,7 @@ class ConnectorTest extends AsyncTestCase
                 
                 $context = $connector->getConnectorContext($request->getUri());
                 $context->connected = true;
-                $context->stream = $socket;
+                $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
                 
@@ -163,7 +163,7 @@ class ConnectorTest extends AsyncTestCase
                 
                 $context = $connector->getConnectorContext($request->getUri());
                 $context->connected = true;
-                $context->stream = $socket;
+                $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
                 
@@ -202,7 +202,7 @@ class ConnectorTest extends AsyncTestCase
                 
                 $context = $connector->getConnectorContext($request->getUri());
                 $context->connected = true;
-                $context->stream = $socket;
+                $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
                 
@@ -242,7 +242,7 @@ class ConnectorTest extends AsyncTestCase
                     $context = $connector->getConnectorContext($request->getUri());
                     
                     if (!$context->connected) {
-                        $context->stream = $socket;
+                        $context->socket = $socket;
                     }
                     
                     $response = yield $connector->send($context, $request);
@@ -275,7 +275,7 @@ class ConnectorTest extends AsyncTestCase
             }
         });
         
-        $this->assertCount(11, $logger);
+        $this->assertCount(10, $logger);
     }
     
     public function testFinalResponseBeforeExpectContinue()
@@ -291,7 +291,7 @@ class ConnectorTest extends AsyncTestCase
                 
                 $context = $connector->getConnectorContext($request->getUri());
                 $context->connected = true;
-                $context->stream = $socket;
+                $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
                 

@@ -21,9 +21,11 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerInterface;
+
+// TODO: Implement keep-alive timeout...
 
 /**
  * Implements the HTTP/1.x protocol on the client side.
@@ -117,7 +119,7 @@ class Connector implements HttpConnector
         
         if ($socket !== null) {
             $context->connected = true;
-            $context->stream = $socket;
+            $context->socket = $socket;
         }
         
         return $context;
@@ -128,11 +130,7 @@ class Connector implements HttpConnector
      */
     public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
     {
-        if ($context->stream instanceof PersistentStream) {
-            $stream = $context->stream;
-        } else {
-            $stream = new PersistentStream($context->stream);
-        }
+        $stream = new PersistentStream($context->socket);
         
         $coroutine = new Coroutine(function () use ($stream, $request) {
             $stream->reference();
@@ -162,12 +160,12 @@ class Connector implements HttpConnector
                     
                     if ($bodyStream instanceof EntityStream) {
                         $bodyStream->getAwaitable()->when(function () use ($uri, $stream) {
-                            $this->releaseConnection($uri, $stream);
+                            $this->releaseConnection($uri, $stream->getStream());
                         });
                     } else {
                         $stream->close();
                         
-                        $this->releaseConnection($uri, $stream);
+                        $this->releaseConnection($uri, $stream->getStream());
                     }
                 }
                 
@@ -196,28 +194,39 @@ class Connector implements HttpConnector
         $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
         
         if (isset($this->conns[$key])) {
-            if (!$this->conns[$key]->isEmpty()) {
+            while (!$this->conns[$key]->isEmpty()) {
                 if ($this->logger) {
                     $this->logger->debug("Reusing persistent connection: $key");
                 }
                 
-                return $this->conns[$key]->dequeue();
+                $conn = $this->conns[$key]->dequeue();
+                $socket = $conn->getSocket();
+                
+                if (\is_resource($socket) && !\feof($socket)) {
+                    return $conn;
+                }
             }
+            
+            unset($this->conns[$key]);
         }
     }
 
-    protected function releaseConnection(Uri $uri, DuplexStream $conn)
+    protected function releaseConnection(Uri $uri, SocketStream $conn)
     {
-        $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+        $socket = $conn->getSocket();
         
-        if (empty($this->conns[$key])) {
-            $this->conns[$key] = new \SplQueue();
-        }
-        
-        $this->conns[$key]->enqueue($conn);
-        
-        if ($this->logger) {
-            $this->logger->debug("Released persistent connection: $key");
+        if (\is_resource($socket) && !\feof($socket)) {
+            $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+            
+            if (empty($this->conns[$key])) {
+                $this->conns[$key] = new \SplQueue();
+            }
+            
+            $this->conns[$key]->enqueue($conn);
+            
+            if ($this->logger) {
+                $this->logger->debug("Released persistent connection: $key");
+            }
         }
     }
 

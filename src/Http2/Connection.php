@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
@@ -98,7 +98,7 @@ class Connection
      */
     protected $logger;
 
-    public function __construct(DuplexStream $socket, HPack $hpack, bool $client, LoggerInterface $logger = null)
+    public function __construct(SocketStream $socket, HPack $hpack, bool $client, LoggerInterface $logger = null)
     {
         $this->socket = $socket;
         $this->hpack = $hpack;
@@ -108,6 +108,13 @@ class Connection
         $this->nextStreamId = $client ? 1 : 2;
         $this->writer = new Executor();
         $this->incoming = new Channel();
+    }
+    
+    public function isAlive(): bool
+    {
+        $socket = $this->socket->getSocket();
+        
+        return \is_resource($socket) && !\feof($this->socket);
     }
 
     public function isClient(): bool
@@ -140,7 +147,7 @@ class Connection
         throw new \OutOfBoundsException(\sprintf('Remote setting not found: "%s"', $setting));
     }
     
-    public static function connectClient(DuplexStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
+    public static function connectClient(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
     {
         return new Coroutine(function () use ($socket, $hpack, $logger) {
             yield $socket->write(self::PREFACE);
@@ -179,7 +186,7 @@ class Connection
         });
     }
     
-    public static function connectServer(DuplexStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
+    public static function connectServer(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
     {
         return new Coroutine(function () use ($socket, $hpack, $logger) {
             $preface = yield $socket->readBuffer(\strlen(self::PREFACE), true);
