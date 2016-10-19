@@ -22,7 +22,6 @@ use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
-use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
@@ -34,25 +33,57 @@ use Psr\Log\LoggerInterface;
  */
 class Driver implements HttpDriver
 {
+    /**
+     * HTTP request parser being used to parse incoming requests.
+     * 
+     * @var RequestParser
+     */
     protected $parser;
     
-    protected $logger;
-    
+    /**
+     * Support HTTP keep-alive connections?
+     * 
+     * @var bool
+     */
     protected $keepAliveSupported = true;
     
+    /**
+     * Turn on debug mode (returns readable error messages).
+     * 
+     * @var bool
+     */
     protected $debug = false;
     
+    /**
+     * Logger instance.
+     * 
+     * @var LoggerInterface
+     */
+    protected $logger;
+    
+    /**
+     * Create a new HTTP/1 driver.
+     * 
+     * @param RequestParser $parser HTTP request parser.
+     * @param LoggerInterface $logger Optional logger instance.
+     */
     public function __construct(RequestParser $parser = null, LoggerInterface $logger = null)
     {
         $this->parser = $parser ?? new RequestParser();
         $this->logger = $logger;
     }
     
+    /**
+     * Toggle support for HTTP keep-alive connections.
+     */
     public function setKeepAliveSupported(bool $keepAlive)
     {
         $this->keepAliveSupported = $keepAlive;
     }
     
+    /**
+     * Toggle debug mode setting.
+     */
     public function setDebug(bool $debug)
     {
         $this->debug = $debug;
@@ -74,26 +105,34 @@ class Driver implements HttpDriver
     public function handleConnection(DuplexStream $stream, callable $action): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
-            $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream) {
-                yield from $this->parseIncomingRequests($stream, $channel);
-            });
-            
             try {
-                while (null !== ($next = yield $pipeline->receive())) {
-                    if (!yield from $this->processRequest($stream, $action, ...$next)) {
-                        break;
-                    }
-                }
+                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream) {
+                    yield from $this->parseIncomingRequests($stream, $channel);
+                });
                 
-                $pipeline->close();
-            } catch (\Throwable $e) {
-                $pipeline->close($e);
+                try {
+                    while (null !== ($next = yield $pipeline->receive())) {
+                        if (!yield from $this->processRequest($stream, $action, ...$next)) {
+                            break;
+                        }
+                    }
+                    
+                    $pipeline->close();
+                } catch (\Throwable $e) {
+                    $pipeline->close($e);
+                }
             } finally {
                 $stream->close();
             }
         });
     }
-
+    
+    /**
+     * Coroutine that parses incoming requests and queues them into the request pipeline.
+     * 
+     * @param DuplexStream $stream Stream being used to transmit HTTP messages.
+     * @param Channel $pipeline HTTP request pipeline.
+     */
     protected function parseIncomingRequests(DuplexStream $stream, Channel $pipeline): \Generator
     {
         try {
@@ -124,6 +163,9 @@ class Driver implements HttpDriver
         }
     }
     
+    /**
+     * Check if the HTTP message stream should be closed after the given request has been processed.
+     */
     protected function shouldConnectionBeClosed(HttpRequest $request): bool
     {
         if (!$this->keepAliveSupported) {
@@ -145,6 +187,9 @@ class Driver implements HttpDriver
         return false;
     }
     
+    /**
+     * Dispatch the given HTTP request to the given action.
+     */
     protected function processRequest(DuplexStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
@@ -188,6 +233,9 @@ class Driver implements HttpDriver
         }
     }
 
+    /**
+     * Send an HTTP error response (will contain some useful data in debug mode).
+     */
     protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
         $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
@@ -204,7 +252,10 @@ class Driver implements HttpDriver
         return yield from $this->sendResponse($stream, $request, $response, true);
     }
     
-    protected function discardRequestBody(Body $body)
+    /**
+     * Coroutine that discards the remainder of the given HTTP request body.
+     */
+    protected function discardRequestBody(Body $body): \Generator
     {
         $body->setExpectContinue(null);
         
@@ -217,6 +268,9 @@ class Driver implements HttpDriver
         }
     }
 
+    /**
+     * Coroutine that sends the given HTTP response to the connected client.
+     */
     protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
         new Coroutine($this->discardRequestBody($request->getBody()));
@@ -331,6 +385,9 @@ class Driver implements HttpDriver
         return !$close;
     }
 
+    /**
+     * Normalize HTTP response object prior to being sent to the client.
+     */
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse
     {
         static $remove = [
@@ -351,7 +408,10 @@ class Driver implements HttpDriver
         return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
     }
 
-    protected function enableCompression(HttpRequest $request, & $compress, & $size): string
+    /**
+     * Enable HTTP body compression if available on the server and supported by the client.
+     */
+    protected function enableCompression(HttpRequest $request, int & $compress = null, int & $size = null): string
     {
         static $available;
         
