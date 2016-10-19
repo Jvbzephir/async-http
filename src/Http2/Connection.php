@@ -179,7 +179,7 @@ class Connection
             $conn->processor = new Coroutine($conn->processIncomingFrames($frames), true);
             
             if ($logger) {
-                $logger->info("Performed HTTP/2 client handshake");
+                $logger->debug("Performed HTTP/2 client handshake");
             }
             
             return $conn;
@@ -218,7 +218,7 @@ class Connection
             $conn->processor = new Coroutine($conn->processIncomingFrames(), true);
             
             if ($logger) {
-                $logger->info("Performed HTTP/2 server handshake");
+                $logger->debug("Performed HTTP/2 server handshake");
             }
             
             return $conn;
@@ -383,7 +383,13 @@ class Connection
                     $this->streams = [];
                 }
                 
-                yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
+                try {
+                    yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
+                } finally {
+                    if ($this->logger) {
+                        $this->logger->debug('Client disconnected');
+                    }
+                }
             } finally {
                 $this->socket->close();
             }

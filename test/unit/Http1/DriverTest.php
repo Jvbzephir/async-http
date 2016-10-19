@@ -176,7 +176,7 @@ class DriverTest extends AsyncTestCase
             });
         });
         
-        $this->assertCount(2, $logger);
+        $this->assertCount(4, $logger);
     }
     
     public function testKeepHttp11Alive()

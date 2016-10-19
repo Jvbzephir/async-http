@@ -20,7 +20,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
@@ -102,9 +102,13 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(DuplexStream $stream, callable $action): Awaitable
+    public function handleConnection(SocketStream $stream, callable $action): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
+            if ($this->logger) {
+                $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
+            }
+            
             try {
                 $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream) {
                     yield from $this->parseIncomingRequests($stream, $channel);
@@ -122,6 +126,10 @@ class Driver implements HttpDriver
                     $pipeline->close($e);
                 }
             } finally {
+                if ($this->logger) {
+                    $this->logger->debug('Client disconnected');
+                }
+                
                 $stream->close();
             }
         });
@@ -133,7 +141,7 @@ class Driver implements HttpDriver
      * @param DuplexStream $stream Stream being used to transmit HTTP messages.
      * @param Channel $pipeline HTTP request pipeline.
      */
-    protected function parseIncomingRequests(DuplexStream $stream, Channel $pipeline): \Generator
+    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline): \Generator
     {
         try {
             do {
@@ -190,7 +198,7 @@ class Driver implements HttpDriver
     /**
      * Dispatch the given HTTP request to the given action.
      */
-    protected function processRequest(DuplexStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(SocketStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
             'Connection',
@@ -236,7 +244,7 @@ class Driver implements HttpDriver
     /**
      * Send an HTTP error response (will contain some useful data in debug mode).
      */
-    protected function sendErrorResponse(DuplexStream $stream, HttpRequest $request, \Throwable $e): \Generator
+    protected function sendErrorResponse(SocketStream $stream, HttpRequest $request, \Throwable $e): \Generator
     {
         $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
         
@@ -271,7 +279,7 @@ class Driver implements HttpDriver
     /**
      * Coroutine that sends the given HTTP response to the connected client.
      */
-    protected function sendResponse(DuplexStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    protected function sendResponse(SocketStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
         new Coroutine($this->discardRequestBody($request->getBody()));
         

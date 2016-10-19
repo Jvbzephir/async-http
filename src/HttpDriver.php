@@ -14,7 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 
 /**
  * Contract for an HTTP server driver to be used with an HTTP endpoint.
@@ -33,8 +33,8 @@ interface HttpDriver
     /**
      * Handle HTTP request(s) coming in on the given stream.
      * 
-     * @param DuplexStream $stream
+     * @param SocketStream $stream
      * @param callable $action
      */
-    public function handleConnection(DuplexStream $stream, callable $action): Awaitable;
+    public function handleConnection(SocketStream $stream, callable $action): Awaitable;
 }

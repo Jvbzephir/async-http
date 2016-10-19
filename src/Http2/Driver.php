@@ -19,7 +19,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -56,9 +56,13 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(DuplexStream $stream, callable $action): Awaitable
+    public function handleConnection(SocketStream $stream, callable $action): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
+            if ($this->logger) {
+                $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
+            }
+            
             $conn = yield Connection::connectServer($stream, new HPack($this->hpackContext), $this->logger);
             
             try {
