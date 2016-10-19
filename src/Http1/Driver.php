@@ -167,7 +167,7 @@ class Driver implements HttpDriver
         $stream->reference();
         
         if ($this->logger) {
-            $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
         try {
@@ -254,13 +254,13 @@ class Driver implements HttpDriver
         $response = $this->normalizeResponse($request, $response);
         
         if ($this->logger) {
-            $reason = rtrim(' ' . $response->getReasonPhrase());
+            $reason = \rtrim(' ' . $response->getReasonPhrase());
         
             if ($reason === '') {
-                $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
             }
         
-            $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+            $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
         }
         
         $http11 = ($response->getProtocolVersion() == '1.1');

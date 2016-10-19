@@ -74,7 +74,7 @@ class Driver implements HttpDriver
     protected function processRequest(Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
         if ($this->logger) {
-            $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
         $response = $action($request);
@@ -97,13 +97,13 @@ class Driver implements HttpDriver
         $response = $response->withHeader('Server', 'KoolKode HTTP Server');
         
         if ($this->logger) {
-            $reason = rtrim(' ' . $response->getReasonPhrase());
+            $reason = \rtrim(' ' . $response->getReasonPhrase());
             
             if ($reason === '') {
-                $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
             }
             
-            $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+            $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
         }
         
         yield $stream->sendResponse($request, $response);

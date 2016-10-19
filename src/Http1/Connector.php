@@ -147,13 +147,13 @@ class Connector implements HttpConnector
                 $body = $response->getBody();
                 
                 if ($this->logger) {
-                    $reason = rtrim(' ' . $response->getReasonPhrase());
+                    $reason = \rtrim(' ' . $response->getReasonPhrase());
                     
                     if ($reason === '') {
-                        $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                        $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
                     }
                     
-                    $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+                    $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
                 }
                 
                 if ($this->shouldConnectionBeClosed($response)) {
@@ -250,7 +250,7 @@ class Connector implements HttpConnector
         $request = $this->normalizeRequest($request);
         
         if ($this->logger) {
-            $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
         $body = $request->getBody();
@@ -258,12 +258,7 @@ class Connector implements HttpConnector
         $bodyStream = yield $body->getReadableStream();
         
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        
-        if ($this->keepAlive) {
-            $buffer .= "Connection: keep-alive\r\n";
-        } else {
-            $buffer .= "Connection: close\r\n";
-        }
+        $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
         
         if ($request->getProtocolVersion() == '1.0' && $size === null) {
             $bodyStream = yield from $this->bufferBody($bodyStream, $size);

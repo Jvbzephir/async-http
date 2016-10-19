@@ -110,19 +110,19 @@ class Connector implements HttpConnector
             }
             
             if ($this->logger) {
-                $this->logger->info(sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+                $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
             }
             
             $response = yield $conn->openStream()->sendRequest($request);
             
             if ($this->logger) {
-                $reason = rtrim(' ' . $response->getReasonPhrase());
+                $reason = \rtrim(' ' . $response->getReasonPhrase());
             
                 if ($reason === '') {
-                    $reason = rtrim(' ' . Http::getReason($response->getStatusCode()));
+                    $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
                 }
             
-                $this->logger->info(sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+                $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
             }
             
             return $response;
