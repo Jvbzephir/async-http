@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
+use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -62,6 +63,16 @@ class HttpEndpoint
         if ($driver instanceof UpgradeHandler) {
             $this->http1->addUpgradeHandler($driver);
         }
+    }
+
+    public function addUpgradeHandler(UpgradeHandler $handler)
+    {
+        $this->http1->addUpgradeHandler($handler);
+    }
+    
+    public function addUpgradeResultHandler(UpgradeResultHandler $handler)
+    {
+        $this->http1->addUpgradeResultHandler($handler);
     }
 
     public function listen(callable $action): Awaitable

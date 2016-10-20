@@ -21,23 +21,24 @@ use KoolKode\Async\Socket\SocketStream;
  * 
  * @author Martin Schröder
  */
-interface UpgradeHandler
+interface UpgradeResultHandler
 {
     /**
-     * Check if the given HTTP request is suitable for an upgrade.
+     * Check if the given result can be used to upgrade the HTTP connection to the given protocol.
      * 
-     * @param string $protocol The (lowercased) protocol specified by the HTTP Upgrade header.
-     * @param HttpRequest $request The request that could be upgraded.
-     * @return bool True when upgrade is available.
+     * @param string $protocol
+     * @param HttpRequest $request
+     * @param mixed $result
+     * @return bool
      */
-    public function isUpgradeSupported(string $protocol, HttpRequest $request): bool;
+    public function isUpgradeSupported(string $protocol, HttpRequest $request, $result): bool;
     
     /**
      * Take control of the given connection.
-     *
+     * 
      * @param SocketStream $socket The underlying socket connection to be used.
      * @param HttpRequest $request HTTP request that triggered the connection upgrade.
-     * @param callable $action Server action handler.
+     * @param mixed $result
      */
-    public function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator;
+    public function upgradeConnection(SocketStream $socket, HttpRequest $request, $result): \Generator;
 }

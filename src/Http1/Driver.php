@@ -63,6 +63,13 @@ class Driver implements HttpDriver
     protected $upgradeHandlers = [];
     
     /**
+     * Registered result-based HTTP upgrade handlers.
+     * 
+     * @var array
+     */
+    protected $upgradeResultHandlers = [];
+    
+    /**
      * Logger instance.
      * 
      * @var LoggerInterface
@@ -107,6 +114,11 @@ class Driver implements HttpDriver
         $this->upgradeHandlers[] = $handler;
     }
     
+    public function addUpgradeResultHandler(UpgradeResultHandler $handler)
+    {
+        $this->upgradeResultHandlers[] = $handler;
+    }
+    
     /**
      * {@inheritdoc}
      */
@@ -123,16 +135,22 @@ class Driver implements HttpDriver
     public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
     {
         return new Coroutine(function () use ($stream, $action, $peerName) {
+            $remotePeer = \stream_socket_get_name($stream->getSocket(), true);
+            
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
+                $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
             }
             
             try {
                 $request = yield from $this->parseNextRequest($stream, $peerName);
                 
                 if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
-                    if (yield from $this->upgradeConnection($stream, $request, $action)) {
-                        return;
+                    try {
+                        if (yield from $this->upgradeConnection($stream, $request, $action)) {
+                            return;
+                        }
+                    } catch (\Throwable $e) {
+                        return yield from $this->sendErrorResponse($stream, $request, $e);
                     }
                 }
                 
@@ -167,11 +185,13 @@ class Driver implements HttpDriver
                     $pipeline->close($e);
                 }
             } finally {
-                if ($this->logger) {
-                    $this->logger->debug('Client disconnected');
+                try {
+                    yield $stream->close();
+                } finally {
+                    if ($this->logger) {
+                        $this->logger->debug(\sprintf('Closed connection to %s', $remotePeer));
+                    }
                 }
-                
-                $stream->close();
             }
         });
     }
@@ -321,6 +341,9 @@ class Driver implements HttpDriver
                 throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
             }
             
+            // Store state of the HTTP request, needed by upgrade handlers.
+            $backup = $request;
+            
             foreach ($remove as $name) {
                 $request = $request->withoutHeader($name);
             }
@@ -329,6 +352,10 @@ class Driver implements HttpDriver
             
             if ($response instanceof \Generator) {
                 $response = yield from $response;
+            }
+            
+            if (yield from $this->upgradeResult($stream, $backup, $response)) {
+                return;
             }
             
             if (!$response instanceof HttpResponse) {
@@ -345,6 +372,29 @@ class Driver implements HttpDriver
             return yield from $this->sendErrorResponse($stream, $request, $e);
         }
     }
+    
+    protected function upgradeResult(SocketStream $socket, HttpRequest $request, $result): \Generator
+    {
+        $protocols = [
+            ''
+        ];
+        
+        if (\in_array('upgrade', $request->getHeaderTokens('Connection'), true)) {
+            $protocols = \array_merge($request->getHeaderTokens('Upgrade'), $protocols);
+        }
+        
+        foreach ($protocols as $protocol) {
+            foreach ($this->upgradeResultHandlers as $handler) {
+                if ($handler->isUpgradeSupported($protocol, $request, $result)) {
+                    yield from $handler->upgradeConnection($socket, $request, $result);
+                    
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
 
     /**
      * Send an HTTP error response (will contain some useful data in debug mode).
@@ -355,6 +405,12 @@ class Driver implements HttpDriver
         
         if ($e instanceof StatusException) {
             $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
+            
+            foreach ($response->getHeaders() as $k => $vals) {
+                foreach ($vals as $v) {
+                    $response = $response->withAddedHeader($k, $v);
+                }
+            }
         }
         
         if ($this->debug) {

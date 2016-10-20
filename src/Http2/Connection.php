@@ -399,13 +399,7 @@ class Connection
                     $this->streams = [];
                 }
                 
-                try {
-                    yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
-                } finally {
-                    if ($this->logger) {
-                        $this->logger->debug('Client disconnected');
-                    }
-                }
+                yield $this->writeFrame(new Frame(Frame::GOAWAY, ''));
             } finally {
                 $this->socket->close();
             }

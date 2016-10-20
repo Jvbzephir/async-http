@@ -57,8 +57,10 @@ class Driver implements HttpDriver, UpgradeHandler
     public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
+            $remotePeer = \stream_socket_get_name($stream->getSocket(), true);
+            
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
+                $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
             }
             
             $conn = new Connection($stream, new HPack($this->hpackContext), $this->logger);
@@ -70,7 +72,13 @@ class Driver implements HttpDriver, UpgradeHandler
                     new Coroutine($this->processRequest($conn, $action, ...$received), true);
                 }
             } finally {
-                yield $conn->shutdown();
+                try {
+                    yield $conn->shutdown();
+                } finally {
+                    if ($this->logger) {
+                        $this->logger->debug(\sprintf('Closed connection to %s', $remotePeer));
+                    }
+                }
             }
         });
     }
@@ -78,7 +86,7 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * {@inheritdoc}
      */
-    public function isUpgradeSupported(string $protocol, HttpRequest $request)
+    public function isUpgradeSupported(string $protocol, HttpRequest $request): bool
     {
         if ($protocol === '') {
             return $this->isPrefaceRequest($request);
@@ -114,7 +122,7 @@ class Driver implements HttpDriver, UpgradeHandler
         $bodyStream = yield $request->getBody()->getReadableStream();
         
         try {
-            while (yield $bodyStream->read());
+            while (null !== (yield $bodyStream->read()));
         } finally {
             $bodyStream->close();
         }

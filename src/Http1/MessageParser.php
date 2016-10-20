@@ -53,7 +53,7 @@ abstract class MessageParser
                 $message = $message->withAddedHeader(\trim($parts[0]), \trim($parts[1]));
             }
         } catch (StreamException $e) {
-            throw new StatusException(Http::REQUEST_HEADER_FIELDS_TOO_LARGE, 'Maximum HTTP header size exceeded', $e);
+            throw new StatusException(Http::REQUEST_HEADER_FIELDS_TOO_LARGE, 'Maximum HTTP header size exceeded', [], $e);
         }
         
         if ($line === null) {
