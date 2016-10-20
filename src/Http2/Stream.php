@@ -206,9 +206,14 @@ class Stream
         $method = $this->getFirstHeader(':method', $headers, Http::GET);
         $path = $this->getFirstHeader(':path', $headers, '/');
         
-        $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
+        if (\ltrim($path, '/') === '*') {
+            $uri = Uri::parse(\sprintf('%s://%s/', $scheme, $authority));
+        } else {
+            $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
+        }
         
         $request = new HttpRequest($uri, $method);
+        $request = $request->withRequestTarget($path);
         $request = $request->withProtocolVersion('2.0');
         
         foreach ($headers as $header) {
@@ -249,7 +254,13 @@ class Stream
     {
         return new Coroutine(function () use ($request) {
             $uri = $request->getUri();
-            $path = '/' . \ltrim($request->getRequestTarget(), '/');
+            $target = $request->getRequestTarget();
+            
+            if ($target === '*') {
+                $path = '*';
+            } else {
+                $path = '/' . \ltrim($request->getRequestTarget(), '/');
+            }
             
             $headers = [
                 ':method' => [

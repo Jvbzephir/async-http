@@ -54,7 +54,7 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(SocketStream $stream, callable $action): Awaitable
+    public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
             if ($this->logger) {

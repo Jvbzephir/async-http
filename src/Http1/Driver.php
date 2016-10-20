@@ -20,6 +20,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Timeout;
@@ -119,15 +120,15 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(SocketStream $stream, callable $action): Awaitable
+    public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
     {
-        return new Coroutine(function () use ($stream, $action) {
+        return new Coroutine(function () use ($stream, $action, $peerName) {
             if ($this->logger) {
                 $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
             }
             
             try {
-                $request = yield from $this->parseNextRequest($stream);
+                $request = yield from $this->parseNextRequest($stream, $peerName);
                 
                 if (yield from $this->upgradeConnection($stream, $request, $action)) {
                     return;
@@ -148,8 +149,8 @@ class Driver implements HttpDriver
                     ])));
                 }
                 
-                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request) {
-                    yield from $this->parseIncomingRequests($stream, $channel, $request);
+                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request, $peerName) {
+                    yield from $this->parseIncomingRequests($stream, $channel, $request, $peerName);
                 });
                 
                 try {
@@ -211,11 +212,11 @@ class Driver implements HttpDriver
      * @param Channel $pipeline HTTP request pipeline.
      * @param HttpRequest $request First HTTP request within the pipeline.
      */
-    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline, HttpRequest $request): \Generator
+    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline, HttpRequest $request, string $peerName): \Generator
     {
         try {
             do {
-                $request = $request ?? yield from $this->parseNextRequest($stream);
+                $request = $request ?? yield from $this->parseNextRequest($stream, $peerName);
                 $close = $this->shouldConnectionBeClosed($request);
                 
                 yield $pipeline->send([
@@ -240,7 +241,7 @@ class Driver implements HttpDriver
      * @param SocketStream $stream
      * @return HttpRequest
      */
-    protected function parseNextRequest(SocketStream $stream): \Generator
+    protected function parseNextRequest(SocketStream $stream, string $peerName): \Generator
     {
         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
         $request->getBody()->setCascadeClose(false);
@@ -248,6 +249,25 @@ class Driver implements HttpDriver
         if ($request->getProtocolVersion() == '1.1') {
             if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
                 $request->getBody()->setExpectContinue($stream);
+            }
+        }
+        
+        $process = true;
+        
+        if ($request->hasHeader('Host')) {
+            $peerName = $request->getHeaderLine('Host');
+        } elseif ($request->getProtocolVersion() === '1.1') {
+            $process = false;
+        }
+        
+        if ($process) {
+            $protocol = isset($stream->getMetadata()['crypto']['protocol']) ? 'https' : 'http';
+            $target = $request->getRequestTarget();
+            
+            if (\substr($target, 0, 1) === '/') {
+                $request = $request->withUri(Uri::parse(\sprintf('%s://%s/%s', $protocol, $peerName, \ltrim($target, '/'))));
+            } else {
+                $request = $request->withUri(Uri::parse(\sprintf('%s://%s/', $protocol, $peerName)));
             }
         }
         

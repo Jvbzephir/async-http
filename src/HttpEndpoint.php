@@ -82,16 +82,16 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            return new HttpServer($this, $this->server, new Coroutine($this->runServer($action)));
+            return new HttpServer($this, $this->server, new Coroutine($this->runServer($action, $factory->getPeerName())));
         });
     }
 
-    protected function runServer(callable $action): \Generator
+    protected function runServer(callable $action, string $peerName): \Generator
     {
         $pending = new \SplObjectStorage();
         
         try {
-            yield $this->server->listen(function (SocketStream $socket) use ($pending, $action) {
+            yield $this->server->listen(function (SocketStream $socket) use ($pending, $peerName, $action) {
                 if ($this->isEncrypted()) {
                     $alpn = \trim($socket->getMetadata()['crypto']['alpn_protocol'] ?? '');
                 } else {
@@ -102,14 +102,14 @@ class HttpEndpoint
                 
                 foreach ($this->drivers as $driver) {
                     if (\in_array($alpn, $driver->getProtocols(), true)) {
-                        $request = $driver->handleConnection($socket, $action);
+                        $request = $driver->handleConnection($socket, $action, $peerName);
                         
                         break;
                     }
                 }
                 
                 if ($request === null) {
-                    $request = $this->http1->handleConnection($socket, $action);
+                    $request = $this->http1->handleConnection($socket, $action, $peerName);
                 }
                 
                 $pending->attach($request);

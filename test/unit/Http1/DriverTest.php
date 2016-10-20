@@ -72,7 +72,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StringBody('Hello Client :)'));
                 
                 return $response;
-            });
+            }, 'localhost');
         });
     }
     
@@ -105,7 +105,7 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('', yield $request->getBody()->getContents());
                 
                 return new HttpResponse(Http::NO_CONTENT);
-            });
+            }, 'localhost');
         });
     }
     
@@ -132,7 +132,7 @@ class DriverTest extends AsyncTestCase
             
             yield $driver->handleConnection($stream, function (HttpRequest $request) {
                 return new HttpResponse(Http::NO_CONTENT);
-            });
+            }, 'localhost');
         });
     }
     
@@ -173,7 +173,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
                 return $response;
-            });
+            }, 'localhost');
         });
         
         $this->assertCount(4, $logger);
@@ -225,7 +225,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
                 return $response;
-            });
+            }, 'localhost');
         });
     }
     
@@ -271,7 +271,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StringBody($payload));
                 
                 return $response;
-            });
+            }, 'localhost');
         });
     }
     
@@ -308,7 +308,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withHeader('Location', 'http://localhost/api/1.0');
                 
                 return $response;
-            });
+            }, 'localhost');
         });
     }
     
@@ -335,7 +335,7 @@ class DriverTest extends AsyncTestCase
             
             yield $driver->handleConnection($stream, function (HttpRequest $request) {
                 return new \stdClass();
-            });
+            }, 'localhost');
         });
     }
     
@@ -362,7 +362,7 @@ class DriverTest extends AsyncTestCase
             
             yield $driver->handleConnection($stream, function (HttpRequest $request) {
                 throw new StatusException(Http::PRECONDITION_FAILED, 'Failed to check condition');
-            });
+            }, 'localhost');
         });
     }
     
@@ -387,7 +387,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function () {});
+            yield $driver->handleConnection($stream, function () {}, 'localhost');
         });
     }
 }

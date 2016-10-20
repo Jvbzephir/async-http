@@ -36,5 +36,5 @@ interface HttpDriver
      * @param SocketStream $stream
      * @param callable $action
      */
-    public function handleConnection(SocketStream $stream, callable $action): Awaitable;
+    public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable;
 }

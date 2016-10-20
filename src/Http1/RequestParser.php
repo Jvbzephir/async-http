@@ -41,10 +41,7 @@ class RequestParser extends MessageParser
         }
         
         $request = new HttpRequest($m[2], $m[1], [], $m[3]);
-        
-        if (\trim($m[2]) === '*') {
-            $request = $request->withRequestTarget('*');
-        }
+        $request = $request->withRequestTarget(\trim($m[2]));
         
         $request = yield from $this->parseHeaders($stream, $request);
         
