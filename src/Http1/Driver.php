@@ -133,6 +133,21 @@ class Driver implements HttpDriver
                     return;
                 }
                 
+                $tokens = $request->getHeaderTokens('Connection');
+                
+                if (\in_array('upgrade', $tokens, true)) {
+                    foreach ($tokens as $i => $token) {
+                        if ($token === 'keep-alive') {
+                            unset($tokens[$i]);
+                        }
+                    }
+                    
+                    // Ensure connections with an upgrade token in the connection header are not pipelined / persistent.
+                    $request = $request->withHeader('Connection', \implode(', ', \array_merge($tokens, [
+                        'close'
+                    ])));
+                }
+                
                 $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request) {
                     yield from $this->parseIncomingRequests($stream, $channel, $request);
                 });
