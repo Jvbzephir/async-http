@@ -55,6 +55,13 @@ class Driver implements HttpDriver
     protected $debug = false;
     
     /**
+     * Registered HTTP connection upgrade handlers.
+     * 
+     * @var array
+     */
+    protected $upgradeHandlers = [];
+    
+    /**
      * Logger instance.
      * 
      * @var LoggerInterface
@@ -90,6 +97,16 @@ class Driver implements HttpDriver
     }
     
     /**
+     * Add an HTTP/1 connection upgrade handler to the driver.
+     * 
+     * @param UpgradeHandler $handler
+     */
+    public function addUpgradeHandler(UpgradeHandler $handler)
+    {
+        $this->upgradeHandlers[] = $handler;
+    }
+    
+    /**
      * {@inheritdoc}
      */
     public function getProtocols(): array
@@ -110,8 +127,14 @@ class Driver implements HttpDriver
             }
             
             try {
-                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream) {
-                    yield from $this->parseIncomingRequests($stream, $channel);
+                $request = yield from $this->parseNextRequest($stream);
+                
+                if (yield from $this->upgradeConnection($stream, $request, $action)) {
+                    return;
+                }
+                
+                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request) {
+                    yield from $this->parseIncomingRequests($stream, $channel, $request);
                 });
                 
                 try {
@@ -136,39 +159,84 @@ class Driver implements HttpDriver
     }
     
     /**
+     * Consult all registered upgrade handlers in order to upgrade the connection as needed.
+     * 
+     * @param SocketStream $socket
+     * @param HttpRequest $request
+     * @param callable $action
+     * @return bool Returns true when a connection upgrade has been performed.
+     */
+    protected function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    {
+        $protocols = [
+            ''
+        ];
+        
+        if (\in_array('upgrade', $request->getHeaderTokens('Connection'), true)) {
+            $protocols = \array_merge($request->getHeaderTokens('Upgrade'), $protocols);
+        }
+        
+        foreach ($protocols as $protocol) {
+            foreach ($this->upgradeHandlers as $handler) {
+                if ($handler->isUpgradeSupported($protocol, $request)) {
+                    yield from $handler->upgradeConnection($socket, $request, $action);
+                    
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
      * Coroutine that parses incoming requests and queues them into the request pipeline.
      * 
      * @param DuplexStream $stream Stream being used to transmit HTTP messages.
      * @param Channel $pipeline HTTP request pipeline.
+     * @param HttpRequest $request First HTTP request within the pipeline.
      */
-    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline): \Generator
+    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline, HttpRequest $request): \Generator
     {
         try {
             do {
-                $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
-                $request->getBody()->setCascadeClose(false);
-                
-                if ($request->getProtocolVersion() == '1.1') {
-                    if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
-                        $request->getBody()->setExpectContinue($stream);
-                    }
-                }
-                
+                $request = $request ?? yield from $this->parseNextRequest($stream);
                 $close = $this->shouldConnectionBeClosed($request);
-                $body = yield $request->getBody()->getReadableStream();
                 
                 yield $pipeline->send([
                     $request,
                     $close
                 ]);
                 
-                yield $body->getAwaitable();
+                yield (yield $request->getBody()->getReadableStream())->getAwaitable();
+                
+                $request = null;
             } while (!$close);
             
             $pipeline->close();
         } catch (\Throwable $e) {
             $pipeline->close($e);
         }
+    }
+
+    /**
+     * Parse the next HTTP request that arrives via the given stream.
+     * 
+     * @param SocketStream $stream
+     * @return HttpRequest
+     */
+    protected function parseNextRequest(SocketStream $stream): \Generator
+    {
+        $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
+        $request->getBody()->setCascadeClose(false);
+        
+        if ($request->getProtocolVersion() == '1.1') {
+            if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+                $request->getBody()->setExpectContinue($stream);
+            }
+        }
+        
+        return $request;
     }
     
     /**

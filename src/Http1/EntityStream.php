@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 use KoolKode\Async\Stream\WritableStream;
@@ -67,7 +68,7 @@ class EntityStream extends ReadableStreamDecorator
             $expect = $this->expectContinue;
             $this->expectContinue = null;
             
-            yield $expect->write("HTTP/1.1 100 Continue\r\n");
+            yield $expect->write(Http::getStatusLine(Http::CONTINUE) . "\r\n");
         }
         
         return yield $this->stream->read($this->bufferSize);

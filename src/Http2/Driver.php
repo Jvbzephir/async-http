@@ -19,6 +19,8 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Http1\UpgradeHandler;
+use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
@@ -27,20 +29,16 @@ use Psr\Log\LoggerInterface;
  *
  * @author Martin Schröder
  */
-class Driver implements HttpDriver
+class Driver implements HttpDriver, UpgradeHandler
 {
     protected $hpackContext;
     
     protected $logger;
     
-    protected $connections;
-    
     public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
         $this->logger = $logger;
-        
-        $this->connections = new \SplObjectStorage();
     }
     
     /**
@@ -63,7 +61,9 @@ class Driver implements HttpDriver
                 $this->logger->debug(\sprintf('Accepted new connection from %s', \stream_socket_get_name($stream->getSocket(), true)));
             }
             
-            $conn = yield Connection::connectServer($stream, new HPack($this->hpackContext), $this->logger);
+            $conn = new Connection($stream, new HPack($this->hpackContext), $this->logger);
+            
+            yield $conn->performServerHandshake();
             
             try {
                 while (null !== ($received = yield $conn->nextRequest())) {
@@ -73,6 +73,125 @@ class Driver implements HttpDriver
                 yield $conn->shutdown();
             }
         });
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function isUpgradeSupported(string $protocol, HttpRequest $request)
+    {
+        if ($protocol === '') {
+            return $this->isPrefaceRequest($request);
+        }
+        
+        if ($request->getUri()->getScheme() === 'https') {
+            return false;
+        }
+        
+        if ($protocol !== 'h2c' || 1 !== $request->getHeader('HTTP2-Settings')) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    {
+        if ($this->isPrefaceRequest($request)) {
+            return yield from $this->upgradeConnectionDirect($socket, $request, $action);
+        }
+        
+        $settings = @base64_decode($request->getHeaderLine('HTTP2-Settings'));
+        
+        if ($settings === false) {
+            throw new StatusException(Http::CODE_BAD_REQUEST, 'HTTP/2 settings are not properly encoded');
+        }
+        
+        // Discard request body before switching to HTTP/2.
+        $bodyStream = yield $request->getBody()->getReadableStream();
+        
+        try {
+            while (yield $bodyStream->read());
+        } finally {
+            $bodyStream->close();
+        }
+        
+        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
+        $buffer .= "Connection: upgrade\r\n";
+        $buffer .= "Upgrade: h2c\r\n";
+        
+        yield $socket->write($buffer . "\r\n");
+        
+        $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
+        
+        yield $conn->performServerHandshake(new Frame(Frame::SETTINGS, $settings));
+        
+        if ($this->logger) {
+            $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
+        }
+        
+        try {
+            while (null !== ($received = yield $conn->nextRequest())) {
+                new Coroutine($this->processRequest($conn, $action, ...$received), true);
+            }
+        } finally {
+            yield $conn->shutdown();
+        }
+    }
+
+    /**
+     * Perform a direct upgrade of the connection to HTTP/2.
+     * 
+     * @param SocketStream $socket The underlying socket transport.
+     * @param HttpRequest $request The HTTP request that caused the connection upgrade.
+     * @param callable $action Server action to be performed for each incoming HTTP request.
+     */
+    protected function upgradeConnectionDirect(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    {
+        $preface = yield $socket->readBuffer(\strlen(Connection::PREFACE_BODY), true);
+        
+        if ($preface !== Connection::PREFACE_BODY) {
+            throw new StatusException(Http::BAD_REQUEST, 'Invalid HTTP/2 connection preface body');
+        }
+        
+        $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
+        
+        yield $conn->performServerHandshake(null, true);
+        
+        if ($this->logger) {
+            $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
+        }
+        
+        try {
+            while (null !== ($received = yield $conn->nextRequest())) {
+                new Coroutine($this->processRequest($conn, $action, ...$received), true);
+            }
+        } finally {
+            yield $conn->shutdown();
+        }
+    }
+    
+    /**
+     * Check for a pre-parsed HTTP/2 connection preface.
+     */
+    protected function isPrefaceRequest(HttpRequest $request): bool
+    {
+        if ($request->getMethod() !== 'PRI') {
+            return false;
+        }
+        
+        if ($request->getRequestTarget() !== '*') {
+            return false;
+        }
+        
+        if ($request->getProtocolVersion() !== '2.0') {
+            return false;
+        }
+        
+        return true;
     }
 
     protected function processRequest(Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator

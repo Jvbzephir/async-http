@@ -37,6 +37,13 @@ class Connection
     const PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     
     /**
+     * Connection preface HTTP body that is sent by the client.
+     * 
+     * @var string
+     */
+    const PREFACE_BODY = "SM\r\n\r\n";
+    
+    /**
      * Initial window is 64 KB.
      *
      * @var int
@@ -98,14 +105,12 @@ class Connection
      */
     protected $logger;
 
-    public function __construct(SocketStream $socket, HPack $hpack, bool $client, LoggerInterface $logger = null)
+    public function __construct(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null)
     {
         $this->socket = $socket;
         $this->hpack = $hpack;
-        $this->client = $client;
         $this->logger = $logger;
         
-        $this->nextStreamId = $client ? 1 : 2;
         $this->writer = new Executor();
         $this->incoming = new Channel();
     }
@@ -147,24 +152,28 @@ class Connection
         throw new \OutOfBoundsException(\sprintf('Remote setting not found: "%s"', $setting));
     }
     
-    public static function connectClient(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
+    public function performClientHandshake(): Awaitable
     {
-        return new Coroutine(function () use ($socket, $hpack, $logger) {
-            yield $socket->write(self::PREFACE);
+        return new Coroutine(function () {
+            if ($this->client !== null) {
+                throw new \RuntimeException('HTTP/2 handshake has already been performed');
+            }
             
-            $conn = new Connection($socket, $hpack, true, $logger);
+            $this->client = true;
+            
+            yield $this->socket->write(self::PREFACE);
             
             $settings = '';
             
-            foreach ($conn->localSettings as $k => $v) {
+            foreach ($this->localSettings as $k => $v) {
                 $settings .= \pack('nN', $k, $v);
             }
             
-            yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
-            yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
+            yield $this->writeFrame(new Frame(Frame::SETTINGS, $settings));
+            yield $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
             
             $stream = 0;
-            $frame = yield from $conn->readNextFrame($stream);
+            $frame = yield from $this->readNextFrame($stream);
             
             if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');
@@ -176,52 +185,59 @@ class Connection
                 $frame
             ]);
             
-            $conn->processor = new Coroutine($conn->processIncomingFrames($frames), true);
+            $this->nextStreamId = 1;
+            $this->processor = new Coroutine($this->processIncomingFrames($frames), true);
             
-            if ($logger) {
-                $logger->debug("Performed HTTP/2 client handshake");
+            if ($this->logger) {
+                $this->logger->debug("Performed HTTP/2 client handshake");
             }
-            
-            return $conn;
         });
     }
-    
-    public static function connectServer(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null): Awaitable
+
+    public function performServerHandshake(Frame $frame = null, bool $skipPreface = false): Awaitable
     {
-        return new Coroutine(function () use ($socket, $hpack, $logger) {
-            $preface = yield $socket->readBuffer(\strlen(self::PREFACE), true);
-            
-            if ($preface !== self::PREFACE) {
-                throw new ConnectionException('Did not receive valid HTTP/2 connection preface from client');
+        return new Coroutine(function () use ($frame, $skipPreface) {
+            if ($this->client !== null) {
+                throw new \RuntimeException('HTTP/2 handshake has already been performed');
             }
             
-            $conn = new Connection($socket, $hpack, false, $logger);
+            $this->client = false;
+            
+            if (!$skipPreface) {
+                $preface = yield $this->socket->readBuffer(\strlen(self::PREFACE), true);
+                
+                if ($preface !== self::PREFACE) {
+                    throw new ConnectionException('Did not receive valid HTTP/2 connection preface from client');
+                }
+            }
             
             $stream = 0;
-            $frame = yield from $conn->readNextFrame($stream);
+            
+            if ($frame === null) {
+                $frame = yield from $this->readNextFrame($stream);
+            }
             
             if ($stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');
             }
             
-            $conn->processSettingsFrame($frame);
+            $this->processSettingsFrame($frame);
             
             $settings = '';
             
-            foreach ($conn->localSettings as $k => $v) {
+            foreach ($this->localSettings as $k => $v) {
                 $settings .= \pack('nN', $k, $v);
             }
             
-            yield $conn->writeFrame(new Frame(Frame::SETTINGS, $settings));
-            yield $conn->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
+            yield $this->writeFrame(new Frame(Frame::SETTINGS, $settings));
+            yield $this->writeFrame(new Frame(Frame::WINDOW_UPDATE, \pack('N', 0x0FFFFFFF)));
             
-            $conn->processor = new Coroutine($conn->processIncomingFrames(), true);
+            $this->nextStreamId = 2;
+            $this->processor = new Coroutine($this->processIncomingFrames(), true);
             
-            if ($logger) {
-                $logger->debug("Performed HTTP/2 server handshake");
+            if ($this->logger) {
+                $this->logger->debug("Performed HTTP/2 server handshake");
             }
-            
-            return $conn;
         });
     }
     

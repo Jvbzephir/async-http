@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http1\Driver;
+use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -57,6 +58,10 @@ class HttpEndpoint
     public function addDriver(HttpDriver $driver)
     {
         $this->drivers[] = $driver;
+        
+        if ($driver instanceof UpgradeHandler) {
+            $this->http1->addUpgradeHandler($driver);
+        }
     }
 
     public function listen(callable $action): Awaitable

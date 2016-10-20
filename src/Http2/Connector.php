@@ -107,9 +107,11 @@ class Connector implements HttpConnector
             if ($context instanceof ConnectorContext && $context->conn) {
                 $conn = $context->conn;
             } else {
-                $conn = yield Connection::connectClient($context->socket, new HPack($this->hpackContext), $this->logger);
-                $uri = $request->getUri();
+                $conn = new Connection($context->socket, new HPack($this->hpackContext), $this->logger);
                 
+                yield $conn->performClientHandshake();
+                
+                $uri = $request->getUri();
                 $this->connections[\sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true))] = $conn;
             }
             
