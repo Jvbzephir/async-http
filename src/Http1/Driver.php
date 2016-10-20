@@ -130,8 +130,10 @@ class Driver implements HttpDriver
             try {
                 $request = yield from $this->parseNextRequest($stream, $peerName);
                 
-                if (yield from $this->upgradeConnection($stream, $request, $action)) {
-                    return;
+                if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
+                    if (yield from $this->upgradeConnection($stream, $request, $action)) {
+                        return;
+                    }
                 }
                 
                 $tokens = $request->getHeaderTokens('Connection');
