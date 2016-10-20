@@ -809,6 +809,10 @@ abstract class Http
      */
     public static function getStatusLine(int $code, string $protocol = 'HTTP/1.1'): string
     {
+        if (\preg_match("'^[1-9]+\\.[0-9]+$'", $protocol)) {
+            $protocol = 'HTTP/' . $protocol;
+        }
+        
         return $protocol . ' ' . $code . \rtrim(' ' . static::getReason($code, ''));
     }
 

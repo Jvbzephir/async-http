@@ -51,6 +51,7 @@ class HttpTest extends \PHPUnit_Framework_TestCase
     {
         yield [Http::SEE_OTHER, 'HTTP/1.1 303 See Other'];
         yield [Http::NO_CONTENT, 'XXX 204 No Content', 'XXX'];
+        yield [Http::SEE_OTHER, 'HTTP/1.0 303 See Other', '1.0'];
         yield [570, 'HTTP/1.1 570'];
     }
 
