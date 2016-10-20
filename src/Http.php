@@ -471,7 +471,7 @@ abstract class Http
      * 
      * @var int
      */
-    const REQUEST_ENTITY_TOO_LARGE = 413;
+    const PAYLOAD_TOO_LARGE = 413;
 
     /**
      * The server is refusing to service the request because the Request-URI is longer than the
@@ -513,6 +513,20 @@ abstract class Http
      * @var int
      */
     const EXPECTATION_FAILED = 417;
+    
+    /**
+     * The request was directed at a server that is not able to produce a response (for example because a connection reuse).
+     * 
+     * @var int
+     */
+    const MISDIRECTED_REQUEST = 421;
+    
+    /**
+     * The client should switch to a different protocol such as TLS/1.0, given in the Upgrade header field.
+     * 
+     * @var int
+     */
+    const UPGRADE_REQUIRED = 426;
 
     /**
      * The 428 status code indicates that the origin server requires the request to be conditional. Its
@@ -710,11 +724,13 @@ abstract class Http
         self::GONE => 'Gone',
         self::LENGTH_REQUIRED => 'Length Required',
         self::PRECONDITION_FAILED => 'Precondition Failed',
-        self::REQUEST_ENTITY_TOO_LARGE => 'Request Entity Too Large',
+        self::PAYLOAD_TOO_LARGE => 'Payload Too Large',
         self::REQUEST_URI_TOO_LONG => 'Request-URI Too Long',
         self::UNSUPPORTED_MEDIA_TYPE => 'Unsupported Media Type',
         self::REQUEST_RANGE_NOT_SATISFIABLE => 'Requested Range Not Satisfiable',
         self::EXPECTATION_FAILED => 'Expectation Failed',
+        self::MISDIRECTED_REQUEST => 'Misdirected Request',
+        self::UPGRADE_REQUIRED => 'Upgrade Required',
         self::PRECONDITION_REQUIRED => 'Precondition Required',
         self::TOO_MANY_REQUESTS => 'Too Many Requests',
         self::REQUEST_HEADER_FIELDS_TOO_LARGE => 'Request Header Fields Too Large',
