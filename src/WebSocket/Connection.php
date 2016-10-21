@@ -77,7 +77,7 @@ class Connection
             unset($this->pings[$payload]);
         });
         
-        $this->sendFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
+        $this->sendFrame(new Frame(Frame::PING, $payload), 1000)->when(function (\Throwable $e = null) use ($defer, $payload) {
             if ($e) {
                 $defer->fail($e);
             } else {

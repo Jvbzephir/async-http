@@ -303,7 +303,7 @@ class Connection
             unset($this->pings[$payload]);
         });
         
-        $this->writeFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
+        $this->writeFrame(new Frame(Frame::PING, $payload), 1000)->when(function (\Throwable $e = null) use ($defer, $payload) {
             if ($e) {
                 $defer->fail($e);
             } else {
@@ -441,7 +441,7 @@ class Connection
                 }
             }
         } else {
-            yield $this->writeFrame(new Frame(Frame::PING, $frame->data, Frame::ACK), 500);
+            yield $this->writeFrame(new Frame(Frame::PING, $frame->data, Frame::ACK), 1000);
         }
     }
 
