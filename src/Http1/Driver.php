@@ -411,6 +411,8 @@ class Driver implements HttpDriver
                     $response = $response->withAddedHeader($k, $v);
                 }
             }
+        } elseif ($this->logger) {
+            $this->logger->critical(sprintf('[%s] "%s" in %s at line %s', \get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()));
         }
         
         if ($this->debug) {
