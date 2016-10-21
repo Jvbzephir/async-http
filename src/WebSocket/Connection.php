@@ -201,11 +201,13 @@ class Connection
         if ($frame->finished) {
             yield $this->messages->send(new BinaryMessage(new ReadableMemoryStream($frame->data)));
         } else {
-            $this->buffer = Channel::fromArray([
-                $frame->data
-            ], false);
+            $this->buffer = new Channel(16);
             
             yield $this->messages->send(new BinaryMessage(new ReadableChannelStream($this->buffer)));
+            
+            foreach (\str_split($frame->data, 4096) as $chunk) {
+                yield $this->buffer->send($chunk);
+            }
         }
     }
 
@@ -217,7 +219,9 @@ class Connection
         
         try {
             if ($this->buffer instanceof Channel) {
-                yield $this->buffer->send($frame->data);
+                foreach (\str_split($frame->data, 4096) as $chunk) {
+                    yield $this->buffer->send($chunk);
+                }
                 
                 if ($frame->finished) {
                     $this->buffer->close();
