@@ -48,7 +48,7 @@ class Connection
      *
      * @var int
      */
-    const INITIAL_WINDOW_SIZE = 65535;
+    const INITIAL_WINDOW_SIZE = 0xFFFF;
     
     const SETTING_HEADER_TABLE_SIZE = 0x01;
     
@@ -83,7 +83,7 @@ class Connection
     protected $localSettings = [
         self::SETTING_ENABLE_PUSH => 0,
         self::SETTING_MAX_CONCURRENT_STREAMS => 256,
-        self::SETTING_INITIAL_WINDOW_SIZE => 65535,
+        self::SETTING_INITIAL_WINDOW_SIZE => 0xFFFF,
         self::SETTING_MAX_FRAME_SIZE => 16384
     ];
     
@@ -91,7 +91,7 @@ class Connection
         self::SETTING_HEADER_TABLE_SIZE => 4096,
         self::SETTING_ENABLE_PUSH => 1,
         self::SETTING_MAX_CONCURRENT_STREAMS => 100,
-        self::SETTING_INITIAL_WINDOW_SIZE => 65535,
+        self::SETTING_INITIAL_WINDOW_SIZE => 0xFFFF,
         self::SETTING_MAX_FRAME_SIZE => 16384,
         self::SETTING_MAX_HEADER_LIST_SIZE => 16777216
     ];

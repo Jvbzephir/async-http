@@ -56,7 +56,7 @@ class ExampleEndpoint extends Endpoint
         $this->clients->detach($conn);
         
         if ($this->info) {
-            $this->info->cancel();
+            $this->info->cancel(new \RuntimeException('Connection closed'));
         }
     }
 

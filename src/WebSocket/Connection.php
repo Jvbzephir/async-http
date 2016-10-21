@@ -19,10 +19,10 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
-use KoolKode\Async\Stream\ReadableStream;
 
 class Connection
 {
@@ -37,6 +37,10 @@ class Connection
     protected $writer;
     
     protected $buffer;
+    
+    protected $maxFrameSize = 0xFFFF;
+    
+    protected $maxTextMessageSize = 0x80000;
     
     public function __construct(SocketStream $socket, bool $client = true)
     {
@@ -115,6 +119,8 @@ class Connection
 
     protected function processIncomingFrames(): \Generator
     {
+        $e = null;
+        
         try {
             while (true) {
                 $frame = yield from $this->readNextFrame();
@@ -143,7 +149,13 @@ class Connection
             $this->messages->close();
             
             try {
-                yield $this->sendFrame(new Frame(Frame::CONNECTION_CLOSE, ''));
+                $socket = $this->socket->getSocket();
+                
+                if (\is_resource($socket) && !\feof($socket)) {
+                    $reason = ($e === null || $e->getCode() === 0) ? Frame::NORMAL_CLOSURE : $e->getCode();
+                    
+                    yield $this->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));
+                }
             } finally {
                 $this->socket->close();
             }
@@ -166,7 +178,11 @@ class Connection
     protected function handleTextFrame(Frame $frame): \Generator
     {
         if ($this->buffer !== null) {
-            throw new ConnectionException('Cannot receive new message while reading continuation frames');
+            throw new ConnectionException('Cannot receive new message while reading continuation frames', Frame::PROTOCOL_ERROR);
+        }
+        
+        if (\strlen($frame->data) > $this->maxTextMessageSize) {
+            throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxTextMessageSize), Frame::MESSAGE_TOO_BIG);
         }
         
         if ($frame->finished) {
@@ -179,7 +195,7 @@ class Connection
     protected function handleBinaryFrame(Frame $frame): \Generator
     {
         if ($this->buffer !== null) {
-            throw new ConnectionException('Cannot receive new message while reading continuation frames');
+            throw new ConnectionException('Cannot receive new message while reading continuation frames', Frame::PROTOCOL_ERROR);
         }
         
         if ($frame->finished) {
@@ -196,7 +212,7 @@ class Connection
     protected function handleContinuationFrame(Frame $frame): \Generator
     {
         if ($this->buffer === null) {
-            throw new ConnectionException('Continuation frame received outside of a message');
+            throw new ConnectionException('Continuation frame received outside of a message', Frame::PROTOCOL_ERROR);
         }
         
         try {
@@ -207,6 +223,10 @@ class Connection
                     $this->buffer->close();
                 }
             } else {
+                if ((\strlen($this->buffer) + \strlen($frame->data)) > $this->maxTextMessageSize) {
+                    throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxTextMessageSize), Frame::MESSAGE_TOO_BIG);
+                }
+                
                 $this->buffer .= $frame->data;
                 
                 if ($frame->finished) {
@@ -228,21 +248,20 @@ class Connection
 
     protected function readNextFrame(): \Generator
     {
-        $a = \ord(yield $this->socket->readBuffer(1, true));
-        $b = \ord(yield $this->socket->readBuffer(1, true));
+        list ($byte1, $byte2) = \array_map('ord', \str_split(yield $this->socket->readBuffer(2, true), 1));
         
-        $masked = ($b & Frame::MASKED) ? true : false;
+        $masked = ($byte2 & Frame::MASKED) ? true : false;
         
         if ($this->client && $masked) {
-            throw new ConnectionException('Received masked frame from server');
+            throw new ConnectionException('Received masked frame from server', Frame::PROTOCOL_ERROR);
         }
         
         if (!$this->client && !$masked) {
-            throw new ConnectionException('Received unmasked frame from client');
+            throw new ConnectionException('Received unmasked frame from client', Frame::PROTOCOL_ERROR);
         }
         
         // Parse extended length fields:
-        $len = $b & Frame::LENGTH;
+        $len = $byte2 & Frame::LENGTH;
         
         if ($len === 0x7E) {
             $len = \unpack('n', yield $this->socket->readBuffer(2, true))[1];
@@ -250,9 +269,9 @@ class Connection
             $lp = \unpack('N2', yield $this->socket->readBuffer(8, true));
             
             // 32 bit int check:
-            if (\PHP_INT_MAX === 0x7fffffff) {
+            if (\PHP_INT_MAX === 0x7FFFFFFF) {
                 if ($lp[1] !== 0 || $lp[2] < 0) {
-                    throw new ConnectionException('Max payload size exceeded');
+                    throw new ConnectionException('Max payload size exceeded', Frame::MESSAGE_TOO_BIG);
                 }
                 
                 $len = $lp[2];
@@ -260,13 +279,17 @@ class Connection
                 $len = $lp[1] << 32 | $lp[2];
                 
                 if ($len < 0) {
-                    throw new ConnectionException('Cannot use most significant bit in 64 bit length field');
+                    throw new ConnectionException('Cannot use most significant bit in 64 bit length field', Frame::MESSAGE_TOO_BIG);
                 }
             }
         }
         
         if ($len < 0) {
-            throw new ConnectionException('Payload length must not be negative');
+            throw new ConnectionException('Payload length must not be negative', Frame::MESSAGE_TOO_BIG);
+        }
+        
+        if ($len > $this->maxFrameSize) {
+            throw new ConnectionException(\sprintf('Maximum frame size of %u bytes exceeded', $this->maxFrameSize), Frame::MESSAGE_TOO_BIG);
         }
         
         // Read and unmask frame data.
@@ -277,6 +300,6 @@ class Connection
             $data = (yield $this->socket->readBuffer($len, true)) ^ \str_pad($key, $len, $key, \STR_PAD_RIGHT);
         }
         
-        return new Frame($a & Frame::OPCODE, $data, ($a & Frame::FINISHED) ? true : false);
+        return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false);
     }
 }

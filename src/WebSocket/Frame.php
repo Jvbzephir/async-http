@@ -35,14 +35,48 @@ class Frame
 
     const LENGTH = 0b01111111;
 
+    /**
+     * Indicates a normal closure, meaning that the purpose for which the connection was established has been fulfilled.
+     * 
+     * @var int
+     */
     const NORMAL_CLOSURE = 1000;
+    
+    /**
+     * Indicates that an endpoint is terminating the connection due to a protocol error.
+     * 
+     * @var int
+     */
+    const PROTOCOL_ERROR = 1002;
 
+    /**
+     * Indicates that an endpoint is terminating the connection because it has received data within a message that was not
+     * consistent with the type of the message (e.g., non-UTF-8 data within a text message).
+     * 
+     * @var int
+     */
     const INCONSISTENT_MESSAGE = 1007;
 
+    /**
+     * Indicates that an endpoint is terminating the connection because it has received a message that violates its policy.
+     *
+     * @var int
+     */
     const POLICY_VIOLATION = 1008;
 
+    /**
+     * Indicates that an endpoint is terminating the connection because it has received a message that is too big for it to process.
+     *
+     * @var int
+     */
     const MESSAGE_TOO_BIG = 1009;
 
+    /**
+     * Indicates that a server is terminating the connection because it encountered an unexpected condition that
+     * prevented it from fulfilling the request.
+     *
+     * @var int
+     */
     const UNEXPECTED_CONDITION = 1011;
 
     public $finished;
@@ -78,7 +112,7 @@ class Frame
         $mbit = ($mask === null) ? 0 : self::MASKED;
         $len = \strlen($this->data);
         
-        if ($len > 65535) {
+        if ($len > 0xFFFF) {
             $header .= \chr($mbit | 127) . \pack('NN', $len, $len << 32);
         } elseif ($len > 125) {
             $header .= \chr($mbit | 126) . \pack('n', $len);
