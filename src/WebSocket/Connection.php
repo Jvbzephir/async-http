@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\WebSocket;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
@@ -42,6 +43,8 @@ class Connection
     
     protected $maxTextMessageSize = 0x80000;
     
+    protected $pings = [];
+    
     public function __construct(SocketStream $socket, bool $client = true)
     {
         $this->socket = $socket;
@@ -64,6 +67,25 @@ class Connection
         }
         
         return new Success(null);
+    }
+    
+    public function ping(): Awaitable
+    {
+        $payload = \random_bytes(8);
+        
+        $defer = new Deferred(function () use ($payload) {
+            unset($this->pings[$payload]);
+        });
+        
+        $this->sendFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
+            if ($e) {
+                $defer->fail($e);
+            } else {
+                $this->pings[$payload] = $defer;
+            }
+        });
+        
+        return $defer;
     }
     
     public function readNextMessage(): Awaitable
@@ -149,6 +171,14 @@ class Connection
             $this->messages->close();
             
             try {
+                foreach ($this->pings as $defer) {
+                    $defer->fail($e ?? new \RuntimeException('WebSocket connection closed'));
+                }
+            } finally {
+                $this->pings = [];
+            }
+            
+            try {
                 $socket = $this->socket->getSocket();
                 
                 if (\is_resource($socket) && !\feof($socket)) {
@@ -169,6 +199,15 @@ class Connection
                 return false;
             case Frame::PING:
                 yield $this->sendFrame(new Frame(Frame::PONG, $frame->data), 1000);
+                break;
+            case Frame::PONG:
+                if (isset($this->pings[$frame->data])) {
+                    try {
+                        $this->pings[$frame->data]->resolve(true);
+                    } finally {
+                        unset($this->pings[$frame->data]);
+                    }
+                }
                 break;
         }
         
