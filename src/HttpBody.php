@@ -65,4 +65,11 @@ interface HttpBody
      * @return string
      */
     public function getContents(): Awaitable;
+    
+    /**
+     * Discard remaining body contents.
+     * 
+     * @return int The number of body bytes that have been discarded.
+     */
+    public function discard(): Awaitable;
 }

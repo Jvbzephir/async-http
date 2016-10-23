@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
+use KoolKode\Async\Success;
 use KoolKode\Util\Filesystem;
 
 /**
@@ -97,5 +98,13 @@ class FileBody implements HttpBody
         return new Coroutine(function () {
             return yield new ReadContents(yield $this->getReadableStream());
         });
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function discard(): Awaitable
+    {
+        return new Success(0);
     }
 }

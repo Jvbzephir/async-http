@@ -45,4 +45,14 @@ class FileBodyTest extends AsyncTestCase
         $message = $body->prepareMessage(new HttpResponse());
         $this->assertEquals('application/x-httpd-php', $message->getHeaderLine('Content-Type'));
     }
+    
+    public function testCanDiscardBody()
+    {
+        $body = new FileBody(__FILE__);
+        
+        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals(0, yield $body->discard());
+        
+        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents());
+    }
 }

@@ -37,4 +37,14 @@ class StringBodyTest extends AsyncTestCase
         $this->assertEquals(strlen($contents), yield $body->getSize());
         $this->assertSame($message, $body->prepareMessage($message));
     }
+    
+    public function testCanDiscardBody()
+    {
+        $body = new StringBody($contents = 'Test 1');
+        
+        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals(0, yield $body->discard());
+        
+        $this->assertEquals($contents, yield $body->getContents());
+    }
 }

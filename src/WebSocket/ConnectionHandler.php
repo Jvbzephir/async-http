@@ -60,14 +60,8 @@ class ConnectionHandler implements UpgradeResultHandler
         
         $this->assertUpgradePossible($socket, $request);
         
-        // Discard HTTP request body prior to connection upgrade.
-        $bodyStream = yield $request->getBody()->getReadableStream();
-        
-        try {
-            while (null !== (yield $bodyStream->read()));
-        } finally {
-            $bodyStream->close();
-        }
+        // Discard HTTP request body before connection upgrade.
+        yield $request->getBody()->discard();
         
         yield from $this->sendHandshake($socket, $request);
         

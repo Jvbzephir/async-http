@@ -119,13 +119,7 @@ class Driver implements HttpDriver, UpgradeHandler
         }
         
         // Discard request body before switching to HTTP/2.
-        $bodyStream = yield $request->getBody()->getReadableStream();
-        
-        try {
-            while (null !== (yield $bodyStream->read()));
-        } finally {
-            $bodyStream->close();
-        }
+        yield $request->getBody()->discard();
         
         $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
         $buffer .= "Connection: upgrade\r\n";

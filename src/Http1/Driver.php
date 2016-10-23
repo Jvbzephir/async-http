@@ -424,27 +424,12 @@ class Driver implements HttpDriver
     }
     
     /**
-     * Coroutine that discards the remainder of the given HTTP request body.
-     */
-    protected function discardRequestBody(Body $body): \Generator
-    {
-        $body->setExpectContinue(null);
-        
-        $input = yield $body->getReadableStream();
-        
-        try {
-            while (null !== yield $input->read());
-        } finally {
-            $input->close();
-        }
-    }
-
-    /**
      * Coroutine that sends the given HTTP response to the connected client.
      */
     protected function sendResponse(SocketStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
-        new Coroutine($this->discardRequestBody($request->getBody()));
+        // Discard request body in another coroutine.
+        $request->getBody()->discard();
         
         $response = $this->normalizeResponse($request, $response);
         

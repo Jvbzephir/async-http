@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Coroutine;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
@@ -28,10 +29,10 @@ class StreamBody implements HttpBody
     /**
      * Body data stream.
      * 
-     * @var InputStreamInterface
+     * @var ReadableStream
      */
     protected $stream;
-
+    
     /**
      * Create message body backed by the given stream.
      * 
@@ -80,5 +81,25 @@ class StreamBody implements HttpBody
     public function getContents(): Awaitable
     {
         return new ReadContents($this->stream);
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function discard(): Awaitable
+    {
+        return new Coroutine(function () {
+            $len = 0;
+            
+            try {
+                while (null !== ($chunk = yield $this->stream->read())) {
+                    $len += \strlen($chunk);
+                }
+                
+                return $len;
+            } finally {
+                $this->stream->close();
+            }
+        });
     }
 }

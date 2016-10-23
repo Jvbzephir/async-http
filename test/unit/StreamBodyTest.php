@@ -46,4 +46,15 @@ class StreamBodyTest extends AsyncTestCase
         $this->assertnull(yield $body->getSize());
         $this->assertSame($message, $body->prepareMessage($message));
     }
+    
+    public function testCanDiscardBody()
+    {
+        $body = new StreamBody(new ReadableMemoryStream('Hello World'));
+        
+        $this->assertEquals(11, yield $body->discard());
+        $this->assertEquals('', yield $body->getContents());
+        
+        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals('', yield $body->getContents());
+    }
 }

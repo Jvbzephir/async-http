@@ -307,6 +307,32 @@ class Body implements HttpBody
             return yield new ReadContents($this->decodedStream);
         });
     }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function discard(): Awaitable
+    {
+        return new Coroutine(function () {
+            $this->expectContinue = null;
+            
+            if ($this->decodedStream === null) {
+                $this->decodedStream = $this->createInputStream();
+            }
+            
+            $len = 0;
+            
+            try {
+                while (null !== ($chunk = yield $this->decodedStream->read())) {
+                    $len += \strlen($chunk);
+                }
+                
+                return $len;
+            } finally {
+                $this->decodedStream->close();
+            }
+        });
+    }
 
     /**
      * Create the input stream being used to read decoded body data from the remote peer.

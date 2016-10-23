@@ -90,4 +90,12 @@ class StringBody implements HttpBody
     {
         return new Success($this->contents);
     }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function discard(): Awaitable
+    {
+        return new Success(0);
+    }
 }
