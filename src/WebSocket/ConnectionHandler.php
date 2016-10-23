@@ -13,7 +13,6 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
-use Interop\Async\Awaitable as Promise;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
@@ -101,11 +100,7 @@ class ConnectionHandler implements UpgradeResultHandler
             return yield from $result;
         }
         
-        if ($result instanceof Promise) {
-            return yield $result;
-        }
-        
-        return $result;
+        return yield $result;
     }
 
     protected function assertUpgradePossible(SocketStream $socket, HttpRequest $request)
