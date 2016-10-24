@@ -119,15 +119,17 @@ class Connector implements HttpConnector
                 $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
             }
             
+            $request = $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
+            
             $response = yield $conn->openStream()->sendRequest($request);
             
             if ($this->logger) {
                 $reason = \rtrim(' ' . $response->getReasonPhrase());
-            
+                
                 if ($reason === '') {
                     $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
                 }
-            
+                
                 $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
             }
             

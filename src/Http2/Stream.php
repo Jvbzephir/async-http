@@ -314,7 +314,6 @@ class Stream
             'content-length',
             'host',
             'keep-alive',
-            'host',
             'transfer-encoding',
             'upgrade',
             'te'

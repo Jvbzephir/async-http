@@ -112,7 +112,7 @@ class Driver implements HttpDriver, UpgradeHandler
             return yield from $this->upgradeConnectionDirect($socket, $request, $action);
         }
         
-        $settings = @base64_decode($request->getHeaderLine('HTTP2-Settings'));
+        $settings = @\base64_decode($request->getHeaderLine('HTTP2-Settings'));
         
         if ($settings === false) {
             throw new StatusException(Http::CODE_BAD_REQUEST, 'HTTP/2 settings are not properly encoded');
@@ -211,7 +211,7 @@ class Driver implements HttpDriver, UpgradeHandler
         if (!$response instanceof HttpResponse) {
             if ($this->logger) {
                 $type = \is_object($response) ? \get_class($response) : \gettype($response);
-            
+                
                 $this->logger->error(\sprintf('Expecting HTTP response, server action returned %s', $type));
             }
             
@@ -219,6 +219,7 @@ class Driver implements HttpDriver, UpgradeHandler
         }
         
         $response = $response->withProtocolVersion($request->getProtocolVersion());
+        $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         $response = $response->withHeader('Server', 'KoolKode HTTP Server');
         
         if ($this->logger) {
