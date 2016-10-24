@@ -117,9 +117,7 @@ class Connection
     
     public function isAlive(): bool
     {
-        $socket = $this->socket->getSocket();
-        
-        return \is_resource($socket) && !\feof($this->socket);
+        return $this->socket->isAlive();
     }
 
     public function isClient(): bool

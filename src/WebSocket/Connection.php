@@ -179,9 +179,7 @@ class Connection
             }
             
             try {
-                $socket = $this->socket->getSocket();
-                
-                if (\is_resource($socket) && !\feof($socket)) {
+                if ($this->socket->isAlive()) {
                     $reason = ($e === null || $e->getCode() === 0) ? Frame::NORMAL_CLOSURE : $e->getCode();
                     
                     yield $this->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));

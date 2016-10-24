@@ -211,9 +211,8 @@ class Connector implements HttpConnector
                 }
                 
                 list ($conn, $expires, $remaining) = $this->conns[$key]->dequeue();
-                $socket = $conn->getSocket();
                 
-                if ($expires > $time && \is_resource($socket) && !\feof($socket)) {
+                if ($expires > $time && $conn->isAlive()) {
                     return [
                         $conn,
                         $remaining
@@ -227,9 +226,7 @@ class Connector implements HttpConnector
 
     protected function releaseConnection(Uri $uri, SocketStream $conn, int $ttl, int $remaining)
     {
-        $socket = $conn->getSocket();
-        
-        if ($remaining > 0 && $ttl > 0 && \is_resource($socket) && !\feof($socket)) {
+        if ($remaining > 0 && $ttl > 0 && $conn->isAlive()) {
             $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
             
             if (empty($this->conns[$key])) {

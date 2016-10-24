@@ -57,7 +57,7 @@ class Driver implements HttpDriver, UpgradeHandler
     public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
     {
         return new Coroutine(function () use ($stream, $action) {
-            $remotePeer = \stream_socket_get_name($stream->getSocket(), true);
+            $remotePeer = $stream->getRemoteAddress();
             
             if ($this->logger) {
                 $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
