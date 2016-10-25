@@ -372,27 +372,25 @@ class Stream
             while (null !== ($chunk = yield $channel->receive())) {
                 $len = \strlen($chunk);
                 
-                // FIXME: Re-enable flow control when settings and window updates are applied correctly!
-                
-//                 while (true) {
-//                     if ($this->outputWindow < $len) {
-//                         try {
-//                             yield $this->outputDefer = new Deferred();
-//                         } finally {
-//                             $this->outputDefer = null;
-//                         }
+                while (true) {
+                    if ($this->outputWindow < $len) {
+                        try {
+                            yield $this->outputDefer = new Deferred();
+                        } finally {
+                            $this->outputDefer = null;
+                        }
                         
-//                         continue;
-//                     }
+                        continue;
+                    }
                     
-//                     if ($this->conn->getOutputWindow() < $len) {
-//                         yield $this->conn->awaitWindowUpdate();
+                    if ($this->conn->getOutputWindow() < $len) {
+                        yield $this->conn->awaitWindowUpdate();
                         
-//                         continue;
-//                     }
+                        continue;
+                    }
                     
-//                     break;
-//                 }
+                    break;
+                }
                 
                 if ($len < $chunkSize) {
                     $done = true;

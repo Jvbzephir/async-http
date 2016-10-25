@@ -563,6 +563,9 @@ class Connection
             case Frame::DATA:
                 yield from $this->streams[$stream]->processDataFrame($frame);
                 break;
+            case Frame::WINDOW_UPDATE:
+                $this->streams[$stream]->processWindowUpdateFrame($frame);
+                break;
             default:
                 $this->streams[$stream]->processFrame($frame);
         }
