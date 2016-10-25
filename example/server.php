@@ -54,6 +54,10 @@ Loop::execute(function () use ($logger) {
                 $type = 'text/javascript';
                 $file = 'websocket.js';
                 break;
+            case 'bigbang.jpg':
+                $type = 'image/jpeg';
+                $file = 'big-bang-theory.jpg';
+                break;
             default:
                 $type = 'text/html; charset="utf-8"';
                 $file = 'index.html';
@@ -61,7 +65,7 @@ Loop::execute(function () use ($logger) {
         
         $response = new HttpResponse();
         $response = $response->withHeader('Content-Type', $type);
-        $response = $response->withBody(new FileBody(__DIR__ . '/' . $file));
+        $response = $response->withBody(new FileBody(__DIR__ . '/public/' . $file));
         
         return $response;
     });

@@ -366,37 +366,45 @@ class Stream
     {
         $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
         $channel = $body->channel($chunkSize);
+        $done = false;
         
         try {
             while (null !== ($chunk = yield $channel->receive())) {
                 $len = \strlen($chunk);
                 
-                while (true) {
-                    if ($this->outputWindow < $len) {
-                        try {
-                            yield $this->outputDefer = new Deferred();
-                        } finally {
-                            $this->outputDefer = null;
-                        }
-                        
-                        continue;
-                    }
-                    
-                    if ($this->conn->getOutputWindow() < $len) {
-                        yield $this->conn->awaitWindowUpdate();
-                        
-                        continue;
-                    }
-                    
-                    break;
-                }
+                // FIXME: Re-enable flow control when settings and window updates are applied correctly!
                 
-                $frame = new Frame(Frame::DATA, $chunk, ($len < $chunkSize) ? Frame::END_STREAM : Frame::NOFLAG);
+//                 while (true) {
+//                     if ($this->outputWindow < $len) {
+//                         try {
+//                             yield $this->outputDefer = new Deferred();
+//                         } finally {
+//                             $this->outputDefer = null;
+//                         }
+                        
+//                         continue;
+//                     }
+                    
+//                     if ($this->conn->getOutputWindow() < $len) {
+//                         yield $this->conn->awaitWindowUpdate();
+                        
+//                         continue;
+//                     }
+                    
+//                     break;
+//                 }
+                
+                if ($len < $chunkSize) {
+                    $done = true;
+                    $frame = new Frame(Frame::DATA, $chunk, Frame::END_STREAM);
+                } else {
+                    $frame = new Frame(Frame::DATA, $chunk, Frame::NOFLAG);
+                }
                 
                 $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, $frame);
             }
             
-            if (!isset($len)) {
+            if (!$done) {
                 yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
             }
         } finally {
