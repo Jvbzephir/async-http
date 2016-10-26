@@ -42,12 +42,12 @@ class NextMiddleware
     {
         if ($this->middlewares->isEmpty()) {
             $response = ($this->target)($request);
-            
-            if ($response instanceof \Generator) {
-                $response = yield from $response;
-            }
         } else {
-            $response = yield from $this->middlewares->extract()($request, $this);
+            $response = $this->middlewares->extract()($request, $this);
+        }
+        
+        if ($response instanceof \Generator) {
+            $response = yield from $response;
         }
         
         if (!$response instanceof HttpResponse) {
