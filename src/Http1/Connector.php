@@ -14,6 +14,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\FileBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpConnectorContext;
@@ -268,12 +269,6 @@ class Connector implements HttpConnector
     
     protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
     {
-        static $compression;
-        
-        if ($compression === null) {
-            $compression = \function_exists('inflate_init');
-        }
-        
         $request = $this->normalizeRequest($request);
         
         if ($this->logger) {
@@ -282,47 +277,28 @@ class Connector implements HttpConnector
         
         $body = $request->getBody();
         $size = yield $body->getSize();
-        $bodyStream = yield $body->getReadableStream();
         
-        $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
-        
-        if ($this->keepAlive) {
-            $buffer .= \sprintf("Keep-Alive: timeout=%u\r\n", $this->maxLifetime);
-        }
-        
-        if ($request->getProtocolVersion() == '1.0' && $size === null) {
-            $bodyStream = yield from $this->bufferBody($bodyStream, $size);
-        }
-        
-        $clen = ($size === null) ? 4089 : 4096;
-        $chunk = yield $bodyStream->readBuffer($clen);
-        $len = \strlen($chunk);
-        
-        if ($chunk === null) {
-            $size = 0;
-        } elseif ($len < $clen) {
-            $size = $len;
-        }
-        
-        if ($size === null) {
-            $buffer .= "Transfer-Encoding: chunked\r\n";
+        if ($body instanceof FileBody) {
+            $chunk = $size ? '' : null;
         } else {
-            $buffer .= "Content-Length: $size\r\n";
-        }
-        
-        if ($compression) {
-            $buffer .= "Accept-Encoding: gzip, deflate\r\n";
-        }
-        
-        foreach ($request->getHeaders() as $name => $header) {
-            $name = Http::normalizeHeaderName($name);
+            $bodyStream = yield $body->getReadableStream();
             
-            foreach ($header as $value) {
-                $buffer .= $name . ': ' . $value . "\r\n";
+            if ($request->getProtocolVersion() == '1.0' && $size === null) {
+                $bodyStream = yield from $this->bufferBody($bodyStream, $size);
+            }
+            
+            $clen = ($size === null) ? 4089 : 4096;
+            $chunk = yield $bodyStream->readBuffer($clen);
+            $len = \strlen($chunk);
+            
+            if ($chunk === null) {
+                $size = 0;
+            } elseif ($len < $clen) {
+                $size = $len;
             }
         }
         
+        $buffer = $this->serializeHeaders($request, $size);
         $expect = false;
         
         if ($this->expectContinue && $chunk !== null && $request->getProtocolVersion() == '1.1') {
@@ -338,12 +314,18 @@ class Connector implements HttpConnector
                 try {
                     return $line;
                 } finally {
-                    $bodyStream->close();
+                    if (isset($bodyStream)) {
+                        $bodyStream->close();
+                    }
                 }
             }
         }
         
-        if ($size === null) {
+        if ($body instanceof FileBody) {
+            if ($size) {
+                yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $stream->getSocket(), $size);
+            }
+        } elseif ($size === null) {
             yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
             
             if ($len === $clen) {
@@ -395,7 +377,43 @@ class Connector implements HttpConnector
         
         return $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
     }
-    
+
+    protected function serializeHeaders(HttpRequest $request, int $size = null)
+    {
+        static $compression;
+        
+        if ($compression === null) {
+            $compression = \function_exists('inflate_init');
+        }
+        
+        $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
+        $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
+        
+        if ($this->keepAlive) {
+            $buffer .= \sprintf("Keep-Alive: timeout=%u\r\n", $this->maxLifetime);
+        }
+        
+        if ($size === null) {
+            $buffer .= "Transfer-Encoding: chunked\r\n";
+        } else {
+            $buffer .= "Content-Length: $size\r\n";
+        }
+        
+        if ($compression) {
+            $buffer .= "Accept-Encoding: gzip, deflate\r\n";
+        }
+        
+        foreach ($request->getHeaders() as $name => $header) {
+            $name = Http::normalizeHeaderName($name);
+            
+            foreach ($header as $value) {
+                $buffer .= $name . ': ' . $value . "\r\n";
+            }
+        }
+        
+        return $buffer;
+    }
+
     protected function bufferBody(ReadableStream $stream, int & $size = null): \Generator
     {
         $tmp = yield LoopConfig::currentFilesystem()->tempStream();

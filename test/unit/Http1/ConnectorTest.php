@@ -21,6 +21,7 @@ use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Test\SocketStreamTester;
+use KoolKode\Async\Http\FileBody;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Connector
@@ -147,7 +148,7 @@ class ConnectorTest extends AsyncTestCase
         });
     }
     
-    public function testhttp10RequestWithPayloadOfUnknownSize()
+    public function testHttp10RequestWithPayloadOfUnknownSize()
     {
         $payload = str_repeat('A', 10000);
         
@@ -180,6 +181,46 @@ class ConnectorTest extends AsyncTestCase
             
             yield $socket->write(implode("\r\n", [
                 'HTTP/1.0 200 OK',
+                'Connection: close',
+                '',
+                $payload
+            ]));
+        });
+    }
+    
+    public function testRequestWithFileBody()
+    {
+        yield new SocketStreamTester(function (DuplexStream $socket) {
+            $connector = new Connector();
+            $connector->setExpectContinue(false);
+            
+            try {
+                $request = new HttpRequest('http://localhost/api', Http::POST);
+                $request = $request->withBody(new FileBody(__FILE__));
+                
+                $context = $connector->getConnectorContext($request->getUri());
+                $context->connected = true;
+                $context->socket = $socket;
+                
+                $response = yield $connector->send($context, $request);
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals(file_get_contents(__FILE__), yield $response->getBody()->getContents());
+            } finally {
+                $connector->shutdown();
+            }
+        }, function (DuplexStream $socket) {
+            $request = yield from (new RequestParser())->parseRequest($socket);
+            $request->getBody()->setCascadeClose(false);
+            
+            $this->assertTrue($request instanceof HttpRequest);
+            
+            $payload = yield $request->getBody()->getContents();
+            
+            $this->assertEquals(file_get_contents(__FILE__), $payload);
+            
+            yield $socket->write(implode("\r\n", [
+                'HTTP/1.1 200 OK',
                 'Connection: close',
                 '',
                 $payload
