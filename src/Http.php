@@ -330,6 +330,15 @@ abstract class Http
      * @var int
      */
     const TEMPORARY_REDIRECT = 307;
+    
+    /**
+     * The request and all future requests should be repeated using another URI. 307 and 308 parallel the
+     * behaviors of 302 and 301, but do not allow the HTTP method to change. So, for example, submitting
+     * a form to a permanently redirected resource may continue smoothly.
+     * 
+     * @var int
+     */
+    const PERMANENT_REDIRECT = 308;
 
     /**
      * The request could not be understood by the server due to malformed syntax. The client

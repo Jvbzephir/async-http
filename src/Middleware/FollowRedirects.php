@@ -33,8 +33,19 @@ class FollowRedirects
         do {
             $response = yield from $next($request);
             
-            if (!Http::isRedirect($response->getStatusCode())) {
-                return $response;
+            switch ($response->getStatusCode()) {
+                case Http::MOVED_PERMANENTLY:
+                case Http::FOUND:
+                case Http::SEE_OTHER:
+                    $request = $request->withMethod(Http::GET);
+                    $request = $request->withoutHeader('Content-Type');
+                    break;
+                case Http::TEMPORARY_REDIRECT:
+                case Http::PERMANENT_REDIRECT:
+                    // Replay request to a different URL.
+                    break;
+                default:
+                    return $response;
             }
             
             try {
