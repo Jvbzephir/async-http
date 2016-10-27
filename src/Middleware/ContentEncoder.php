@@ -142,7 +142,7 @@ class ContentEncoder
             return false;
         }
         
-        if ($response->hasHeader('Content-Encoding')) {
+        if ($response->hasHeader('Content-Encoding') || !$response->hasHeader('Content-Type')) {
             return false;
         }
         
