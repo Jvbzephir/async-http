@@ -29,7 +29,7 @@ class NextMiddleware
 
     public function __construct(\SplPriorityQueue $middlewares, callable $target)
     {
-        $this->middlewares = $middlewares;
+        $this->middlewares = clone $middlewares;
         $this->target = $target;
     }
 

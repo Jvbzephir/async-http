@@ -18,6 +18,7 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Http1\Connector;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
 
@@ -50,6 +51,13 @@ class HttpClient
     protected $connectors;
     
     /**
+     * Registered HTTP client middleware.
+     * 
+     * @var \SplPriorityQueue
+     */
+    protected $middleware;
+    
+    /**
      * Create a new HTTP client using the given connectors.
      * 
      * Will auto-create an HTTP/1.x connector if no other connector is given. 
@@ -65,6 +73,8 @@ class HttpClient
         $this->protocols = \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
             return $connector->getProtocols();
         }, $this->connectors)));
+        
+        $this->middleware = new \SplPriorityQueue();
     }
 
     public function shutdown(): Awaitable
@@ -77,6 +87,11 @@ class HttpClient
         
         return new AwaitPending($close);
     }
+
+    public function addMiddleware(callable $middleware, int $priority = 0)
+    {
+        $this->middleware->insert($middleware, $priority);
+    }
     
     /**
      * Send the given HTTP request and fetch the HTTP response from the server.
@@ -86,7 +101,7 @@ class HttpClient
      */
     public function send(HttpRequest $request): Awaitable
     {
-        return new Coroutine(function () use ($request) {
+        $next = new NextMiddleware($this->middleware, function (HttpRequest $request) {
             if (!$request->hasHeader('User-Agent')) {
                 $request = $request->withHeader('User-Agent', $this->userAgent);
             }
@@ -117,6 +132,8 @@ class HttpClient
             
             return yield $connector->send($context, $request);
         });
+        
+        return new Coroutine($next($request));
     }
     
     protected function connectSocket(Uri $uri): Awaitable

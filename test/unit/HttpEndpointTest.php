@@ -13,6 +13,7 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\Connector as Http1Connector;
 use KoolKode\Async\Http\Http2\Connector as Http2Connector;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -28,6 +29,8 @@ class HttpEndpointTest extends AsyncTestCase
         $server = yield $endpoint->listen(function (HttpRequest $request) {
             $response = new HttpResponse();
             
+            $this->assertEquals('Filtered Request', $request->getHeaderLine('Middleware-Info'));
+            
             if ($request->getMethod() === Http::POST) {
                 $response = $response->withHeader('Content-Type', 'application/json');
                 $response = $response->withBody(new StringBody(yield $request->getBody()->getContents()));
@@ -42,6 +45,15 @@ class HttpEndpointTest extends AsyncTestCase
         
         try {
             $client = new HttpClient();
+            
+            $client->addMiddleware(function (HttpRequest $request, NextMiddleware $next) {
+                $request = $request->withHeader('Middleware-Info', 'Filtered Request');
+                
+                $response = yield from $next($request);
+                $response = $response->withHeader('Middleware-Info', 'Filtered Response');
+                
+                return $response;
+            });
             
             try {
                 $data = json_encode([
@@ -119,7 +131,14 @@ class HttpEndpointTest extends AsyncTestCase
             return $this->markTestSkipped('Test requires SSL ALPN support');
         }
         
-        $client = new HttpClient(new Http2Connector() , new Http1Connector());
+        $client = new HttpClient(new Http2Connector(), new Http1Connector());
+        
+        $client->addMiddleware(function (HttpRequest $request, NextMiddleware $next) {
+            $response = yield from $next($request);
+            $response = $response->withHeader('Middleware-Info', 'Filtered Response');
+            
+            return $response;
+        });
         
         try {
             $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT);
@@ -129,6 +148,7 @@ class HttpEndpointTest extends AsyncTestCase
             
             $this->assertTrue($response instanceof HttpResponse);
             $this->assertEquals(Http::OK, $response->getStatusCode());
+            $this->assertEquals('Filtered Response', $response->getHeaderLine('Middleware-Info'));
             
             $this->assertEquals('HELLO WORLD :)', yield $response->getBody()->getContents());
         } finally {
