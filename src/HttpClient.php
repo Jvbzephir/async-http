@@ -34,7 +34,7 @@ class HttpClient
      * 
      * @var string
      */
-    protected $userAgent = 'KoolKode HTTP Client';
+    protected $userAgent;
     
     /**
      * Lists ALPN protocols supported by registered connectors.
@@ -75,6 +75,8 @@ class HttpClient
         }, $this->connectors)));
         
         $this->middleware = new \SplPriorityQueue();
+        
+        $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
     }
 
     public function shutdown(): Awaitable
@@ -91,6 +93,11 @@ class HttpClient
     public function addMiddleware(callable $middleware, int $priority = 0)
     {
         $this->middleware->insert($middleware, $priority);
+    }
+    
+    public function setUserAgent(string $agent)
+    {
+        $this->userAgent = $agent;
     }
     
     /**

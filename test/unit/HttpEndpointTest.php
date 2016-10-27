@@ -29,6 +29,7 @@ class HttpEndpointTest extends AsyncTestCase
         $server = yield $endpoint->listen(function (HttpRequest $request) {
             $response = new HttpResponse();
             
+            $this->assertEquals(sprintf('PHP/%s', PHP_VERSION), $request->getHeaderLine('User-Agent'));
             $this->assertEquals('Filtered Request', $request->getHeaderLine('Middleware-Info'));
             
             if ($request->getMethod() === Http::POST) {
