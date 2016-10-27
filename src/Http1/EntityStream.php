@@ -32,13 +32,15 @@ class EntityStream extends ReadableStreamDecorator
     protected $defer;
     
     protected $expectContinue;
+    
+    protected $continued = false;
 
-    public function __construct(ReadableStream $stream, bool $cascadeClose = true, WritableStream & $expectContinue = null)
+    public function __construct(ReadableStream $stream, bool $cascadeClose = true, WritableStream $expectContinue = null)
     {
         parent::__construct($stream);
         
         $this->cascadeClose = $cascadeClose;
-        $this->expectContinue = & $expectContinue;
+        $this->expectContinue = $expectContinue;
         $this->defer = new Deferred();
     }
     
@@ -61,12 +63,18 @@ class EntityStream extends ReadableStreamDecorator
         
         return parent::close();
     }
-
+    
+    public function isContinued(): bool
+    {
+        return $this->continued;
+    }
+    
     protected function readNextChunk(): \Generator
     {
         if ($this->expectContinue) {
             $expect = $this->expectContinue;
             $this->expectContinue = null;
+            $this->continued = true;
             
             yield $expect->write(Http::getStatusLine(Http::CONTINUE) . "\r\n");
         }

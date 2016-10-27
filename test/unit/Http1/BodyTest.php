@@ -201,18 +201,31 @@ class BodyTest extends AsyncTestCase
         $this->assertFalse($input->isClosed());
     }
     
-    public function testCanDiscardBody()
+    public function testCanDiscardBodyBeforeContinue()
     {
         $body = new Body(new ReadableMemoryStream('Hello World'), true);
         $body->setExpectContinue($expect = new WritableMemoryStream());
         
-        $this->assertEquals(11, yield $body->discard());
-        $this->assertEquals('', yield $body->getContents());
-        
         $this->assertEquals(0, yield $body->discard());
         $this->assertEquals('', yield $body->getContents());
-    
+        
         // Ensure expect continue is skipped...
         $this->assertEquals('', $expect->getContents());
+    }
+    
+    public function testCanDiscardBody()
+    {
+        $body = new Body(new ReadableMemoryStream('Hello World'), true);
+        $body->setExpectContinue($expect = new WritableMemoryStream());
+    
+        $this->assertEquals('H', yield (yield $body->getReadableStream())->read(1));
+        
+        $this->assertEquals(10, yield $body->discard());
+        $this->assertEquals('', yield $body->getContents());
+    
+        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals('', yield $body->getContents());
+        
+        $this->assertEquals("HTTP/1.1 100 Continue\r\n", $expect->getContents());
     }
 }

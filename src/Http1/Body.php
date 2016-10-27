@@ -255,8 +255,6 @@ class Body implements HttpBody
     public function discard(): Awaitable
     {
         return new Coroutine(function () {
-            $this->expectContinue = null;
-            
             if ($this->decodedStream === null) {
                 $this->decodedStream = $this->createInputStream();
             }
@@ -264,8 +262,10 @@ class Body implements HttpBody
             $len = 0;
             
             try {
-                while (null !== ($chunk = yield $this->decodedStream->read())) {
-                    $len += \strlen($chunk);
+                if ($this->expectContinue === null || $this->decodedStream->isContinued()) {
+                    while (null !== ($chunk = yield $this->decodedStream->read())) {
+                        $len += \strlen($chunk);
+                    }
                 }
                 
                 return $len;

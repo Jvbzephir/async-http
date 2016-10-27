@@ -24,9 +24,6 @@ class RedirectTest extends EndToEndTest
 {
     public function testFollowsRedirect()
     {
-        // FIXME: Investigate why this test fails with expect continue.
-        $this->connector->setExpectContinue(false);
-        
         $this->clientMiddleware->insert(new FollowRedirects(), 0);
         
         $request = new HttpRequest('http://localhost/test', Http::POST);
