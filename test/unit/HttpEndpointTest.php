@@ -13,6 +13,8 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Http1\Connector as Http1Connector;
 use KoolKode\Async\Http\Http2\Connector as Http2Connector;
+use KoolKode\Async\Http\Middleware\ContentDecoder;
+use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -25,6 +27,7 @@ class HttpEndpointTest extends AsyncTestCase
     public function testClient()
     {
         $endpoint = new HttpEndpoint();
+        $endpoint->addMiddleware(new ContentEncoder(), -10000);
         
         $server = yield $endpoint->listen(function (HttpRequest $request) {
             $response = new HttpResponse();
@@ -46,6 +49,7 @@ class HttpEndpointTest extends AsyncTestCase
         
         try {
             $client = new HttpClient();
+            $client->addMiddleware(new ContentDecoder(), -10000);
             
             $client->addMiddleware(function (HttpRequest $request, NextMiddleware $next) {
                 $request = $request->withHeader('Middleware-Info', 'Filtered Request');
