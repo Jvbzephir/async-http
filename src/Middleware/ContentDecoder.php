@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Middleware;
 
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\NextMiddleware;
 use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Stream\ReadableInflateStream;
 

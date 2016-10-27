@@ -11,7 +11,10 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Middleware;
+
+use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 
 /**
  * Extendable context object that is used to allow for persistent connections etc.

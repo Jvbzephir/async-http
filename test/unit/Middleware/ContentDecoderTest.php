@@ -13,7 +13,7 @@ namespace KoolKode\Async\Http\Middleware;
 
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\NextMiddleware;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Http\StringBody;
 
