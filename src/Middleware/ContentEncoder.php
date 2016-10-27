@@ -21,20 +21,82 @@ use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Util\InvalidMediaTypeException;
 use KoolKode\Util\MediaType;
 
+/**
+ * Middleware that compresses HTTP response bodies.
+ * 
+ * Compression will be enabled based on the content type of the response.
+ * 
+ * Supported content encodings are "gzip" and "deflate".
+ * 
+ * @author Martin Schröder
+ */
 class ContentEncoder
 {
+    /**
+     * Compressable content types.
+     * 
+     * @var array
+     */
     protected $types = [
-        'text/plain'
+        'application/vnd.ms-fontobject',
+        'font/eot',
+        'font/opentype',
+        'image/bmp',
+        'image/vnd.microsoft.icon',
+        'image/x-icon',
+        'text/cache-manifest',
+        'text/plain',
+        'text/vcard',
+        'text/vtt',
+        'text/x-component',
+        'text/x-cross-domain-policy'
     ];
 
+    /**
+     * Compressable media sub types.
+     * 
+     * @var array
+     */
     protected $subTypes = [
+        'css' => true,
+        'javascript' => true,
         'json' => true,
-        'xml' => true,
         'html' => true,
         'xhtml' => true,
-        'css' => true
+        'xml' => true,
+        'x-font-ttf' => true,
+        'x-javascript'
     ];
 
+    /**
+     * Add a media type that should be served compressed.
+     * 
+     * @param string $type
+     */
+    public function addType(string $type)
+    {
+        $this->types = $type;
+    }
+
+    /**
+     * Add a media sub type that should be served compressed.
+     * 
+     * @param string $type
+     */
+    public function addSubType(string $type)
+    {
+        $this->subTypes[$type] = true;
+    }
+
+    /**
+     * Compresses the response body using a deflate stream if compression is supported by the client (accept encoding header).
+     * 
+     * Will set a content encoding header if the body has been compressed.
+     * 
+     * @param HttpRequest $request
+     * @param NextMiddleware $next
+     * @return HttpResponse
+     */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {
         $response = yield from $next($request);
@@ -75,6 +137,10 @@ class ContentEncoder
         }
         
         if (Http::isResponseWithoutBody($response->getStatusCode())) {
+            return false;
+        }
+        
+        if ($response->hasHeader('Content-Encoding')) {
             return false;
         }
         
