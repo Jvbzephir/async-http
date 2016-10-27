@@ -22,6 +22,7 @@ use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Test\SocketStreamTester;
+use KoolKode\Async\Http\HttpDriverContext;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Driver
@@ -60,7 +61,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::GET, $request->getMethod());
                 $this->assertEquals('/', $request->getRequestTarget());
                 $this->assertEquals('1.0', $request->getProtocolVersion());
@@ -72,7 +73,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StringBody('Hello Client :)'));
                 
                 return $response;
-            }, 'localhost');
+            });
         });
     }
     
@@ -97,7 +98,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setKeepAliveSupported(false);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::OPTIONS, $request->getMethod());
                 $this->assertEquals('*', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -105,7 +106,7 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('', yield $request->getBody()->getContents());
                 
                 return new HttpResponse(Http::NO_CONTENT);
-            }, 'localhost');
+            });
         });
     }
     
@@ -130,9 +131,9 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 return new HttpResponse(Http::NO_CONTENT);
-            }, 'localhost');
+            });
         });
     }
     
@@ -161,7 +162,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) use ($payload, $logger) {
             $driver = new Driver(null, $logger);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.0', $request->getProtocolVersion());
@@ -173,7 +174,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
                 return $response;
-            }, 'localhost');
+            });
         });
         
         $this->assertCount(4, $logger);
@@ -206,7 +207,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) use ($payload) {
             $driver = new Driver();
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -218,7 +219,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
                 return $response;
-            }, 'localhost');
+            });
         });
     }
     
@@ -251,7 +252,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -264,7 +265,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withBody(new StringBody($payload));
                 
                 return $response;
-            }, 'localhost');
+            });
         });
     }
     
@@ -291,7 +292,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -301,7 +302,7 @@ class DriverTest extends AsyncTestCase
                 $response = $response->withHeader('Location', 'http://localhost/api/1.0');
                 
                 return $response;
-            }, 'localhost');
+            });
         });
     }
     
@@ -326,9 +327,9 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 return new \stdClass();
-            }, 'localhost');
+            });
         });
     }
     
@@ -353,9 +354,9 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
                 throw new StatusException(Http::PRECONDITION_FAILED, 'Failed to check condition');
-            }, 'localhost');
+            });
         });
     }
     
@@ -380,7 +381,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection($stream, function () {}, 'localhost');
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function () {});
         });
     }
 }

@@ -16,8 +16,10 @@ use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
+use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Http\Uri;
@@ -131,9 +133,9 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
+    public function handleConnection(HttpDriverContext $context, SocketStream $stream, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($stream, $action, $peerName) {
+        return new Coroutine(function () use ($stream, $action, $context) {
             $remotePeer = $stream->getRemoteAddress();
             
             if ($this->logger) {
@@ -141,7 +143,7 @@ class Driver implements HttpDriver
             }
             
             try {
-                $request = yield from $this->parseNextRequest($stream, $peerName);
+                $request = yield from $this->parseNextRequest($context, $stream);
                 
                 if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
                     try {
@@ -168,13 +170,13 @@ class Driver implements HttpDriver
                     ])));
                 }
                 
-                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request, $peerName) {
-                    yield from $this->parseIncomingRequests($stream, $channel, $request, $peerName);
+                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request, $context) {
+                    yield from $this->parseIncomingRequests($context, $stream, $channel, $request);
                 });
                 
                 try {
                     while (null !== ($next = yield $pipeline->receive())) {
-                        if (!yield from $this->processRequest($stream, $action, ...$next)) {
+                        if (!yield from $this->processRequest($context, $stream, $action, ...$next)) {
                             break;
                         }
                     }
@@ -233,11 +235,11 @@ class Driver implements HttpDriver
      * @param Channel $pipeline HTTP request pipeline.
      * @param HttpRequest $request First HTTP request within the pipeline.
      */
-    protected function parseIncomingRequests(SocketStream $stream, Channel $pipeline, HttpRequest $request, string $peerName): \Generator
+    protected function parseIncomingRequests(HttpDriverContext $context, SocketStream $stream, Channel $pipeline, HttpRequest $request): \Generator
     {
         try {
             do {
-                $request = $request ?? yield from $this->parseNextRequest($stream, $peerName);
+                $request = $request ?? yield from $this->parseNextRequest($context, $stream);
                 $close = $this->shouldConnectionBeClosed($request);
                 
                 yield $pipeline->send([
@@ -262,7 +264,7 @@ class Driver implements HttpDriver
      * @param SocketStream $stream
      * @return HttpRequest
      */
-    protected function parseNextRequest(SocketStream $stream, string $peerName): \Generator
+    protected function parseNextRequest(HttpDriverContext $context, SocketStream $stream): \Generator
     {
         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
         $request->getBody()->setCascadeClose(false);
@@ -273,6 +275,7 @@ class Driver implements HttpDriver
             }
         }
         
+        $peerName = $context->peerName;
         $process = true;
         
         if ($request->hasHeader('Host')) {
@@ -322,10 +325,9 @@ class Driver implements HttpDriver
     /**
      * Dispatch the given HTTP request to the given action.
      */
-    protected function processRequest(SocketStream $stream, callable $action, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(HttpDriverContext $context, SocketStream $socket, callable $action, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
-            'Connection',
             'Keep-Alive',
             'Content-Length',
             'Transfer-Encoding'
@@ -340,39 +342,57 @@ class Driver implements HttpDriver
                 throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
             }
             
-            // Store state of the HTTP request, needed by upgrade handlers.
-            $backup = $request;
-            
             foreach ($remove as $name) {
                 $request = $request->withoutHeader($name);
             }
             
-            $response = $action($request);
-            
-            if ($response instanceof \Generator) {
-                $response = yield from $response;
-            }
-            
-            if (yield from $this->upgradeResult($stream, $backup, $response)) {
-                return;
-            }
-            
-            if (!$response instanceof HttpResponse) {
-                $type = \is_object($response) ? \get_class($response) : \gettype($response);
+            $next = new NextMiddleware($context->middleware, function (HttpRequest $request) use ($action) {
+                $response = $action($request);
                 
-                throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                if ($response instanceof \Generator) {
+                    $response = yield from $response;
+                }
+                
+                if (!$response instanceof HttpResponse) {
+                    $response = $this->upgradeResult($request, $response);
+                    
+                    if (!$response instanceof HttpResponse) {
+                        $type = \is_object($response) ? \get_class($response) : \gettype($response);
+                        
+                        throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                    }
+                }
+                
+                $response = $response->withProtocolVersion($request->getProtocolVersion());
+                $response = $response->withHeader('Server', 'KoolKode HTTP Server');
+                
+                return $response;
+            });
+            
+            $response = yield from $next($request);
+            
+            if ($response->getStatusCode() === Http::SWITCHING_PROTOCOLS) {
+                $handler = $response->getAttribute(UpgradeResultHandler::class);
+                
+                if ($handler instanceof UpgradeResultHandler) {
+                    return yield from $this->upgradeResultConnection($handler, $socket, $request, $response);
+                }
             }
             
-            $response = $response->withProtocolVersion($request->getProtocolVersion());
-            $response = $response->withHeader('Server', 'KoolKode HTTP Server');
-            
-            return yield from $this->sendResponse($stream, $request, $response, $close);
+            return yield from $this->sendResponse($socket, $request, $response, $close);
         } catch (\Throwable $e) {
-            return yield from $this->sendErrorResponse($stream, $request, $e);
+            return yield from $this->sendErrorResponse($socket, $request, $e);
         }
     }
     
-    protected function upgradeResult(SocketStream $socket, HttpRequest $request, $result): \Generator
+    /**
+     * Invoke HTTP/1 upgrade handlers in an attempt to update the connection based on the outcome of an action.
+     * 
+     * @param HttpRequest $request
+     * @param mixed $result
+     * @return HttpResponse Or null if no connection upgrade is available.
+     */
+    protected function upgradeResult(HttpRequest $request, $result)
     {
         $protocols = [
             ''
@@ -385,16 +405,45 @@ class Driver implements HttpDriver
         foreach ($protocols as $protocol) {
             foreach ($this->upgradeResultHandlers as $handler) {
                 if ($handler->isUpgradeSupported($protocol, $request, $result)) {
-                    yield from $handler->upgradeConnection($socket, $request, $result);
+                    $response = $handler->createUpgradeResponse($request, $result);
+                    $response = $response->withAttribute(UpgradeResultHandler::class, $handler);
                     
-                    return true;
+                    return $response;
                 }
             }
         }
         
-        return false;
+        return $result;
     }
 
+    /**
+     * Have the upgrade handler take control of the given socket connection.
+     * 
+     * This method will send an HTTP/1 upgrade response before the handler takes over.
+     */
+    protected function upgradeResultConnection(UpgradeResultHandler $handler, SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator
+    {
+        yield $request->getBody()->discard();
+        
+        $response = $this->normalizeResponse($request, $response);
+        
+        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
+        $buffer .= "Connection: upgrade\r\n";
+        
+        foreach ($response->getHeaders() as $name => $header) {
+            $name = Http::normalizeHeaderName($name);
+            
+            foreach ($header as $value) {
+                $buffer .= $name . ': ' . $value . "\r\n";
+            }
+        }
+        
+        yield $socket->write($buffer . "\r\n");
+        yield $socket->flush();
+        
+        return yield from $handler->upgradeConnection($socket, $request, $response);
+    }
+    
     /**
      * Send an HTTP error response (will contain some useful data in debug mode).
      */

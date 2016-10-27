@@ -15,11 +15,17 @@ namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Upgrades an HTTP/1.1+ connection to the WebSocket protocol.
+ * 
+ * @author Martin Schröder
+ */
 class ConnectionHandler implements UpgradeResultHandler
 {
     /**
@@ -29,6 +35,11 @@ class ConnectionHandler implements UpgradeResultHandler
      */
     const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+    /**
+     * PSR logger instance.
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
 
     public function __construct(LoggerInterface $logger = null)
@@ -51,18 +62,37 @@ class ConnectionHandler implements UpgradeResultHandler
     /**
      * {@inheritdoc}
      */
-    public function upgradeConnection(SocketStream $socket, HttpRequest $request, $endpoint): \Generator
+    public function createUpgradeResponse(HttpRequest $request, $endpoint): HttpResponse
     {
         if (!$endpoint instanceof Endpoint) {
             throw new \InvalidArgumentException('No endpoint object passed to WebSocket handler');
         }
         
-        $this->assertUpgradePossible($socket, $request);
+        $this->assertUpgradePossible($request);
         
-        // Discard HTTP request body before connection upgrade.
-        yield $request->getBody()->discard();
+        $accept = \base64_encode(\sha1($request->getHeaderLine('Sec-WebSocket-Key') . self::GUID, true));
         
-        yield from $this->sendHandshake($socket, $request);
+        $response = new HttpResponse(Http::SWITCHING_PROTOCOLS);
+        
+        $response = $response->withHeader('Upgrade', 'websocket');
+        $response = $response->withHeader('Sec-WebSocket-Accept', $accept);
+        $response = $response->withHeader('Sec-WebSocket-Version', '13');
+        
+        $response = $response->withAttribute(Endpoint::class, $endpoint);
+        
+        return $response;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function upgradeConnection(SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator
+    {
+        $endpoint = $response->getAttribute(Endpoint::class);
+        
+        if (!$endpoint instanceof Endpoint) {
+            throw new \InvalidArgumentException('No endpoint object passed to WebSocket handler');
+        }
         
         if ($this->logger) {
             $this->logger->info(\sprintf('HTTP/%s connection upgraded to WebSocket', $request->getProtocolVersion()));
@@ -71,6 +101,9 @@ class ConnectionHandler implements UpgradeResultHandler
         yield from $this->delegateToEndpoint(new Connection($socket, false), $endpoint);
     }
 
+    /**
+     * Delegate connection contol to the given WebSocket endpoint.
+     */
     protected function delegateToEndpoint(Connection $conn, Endpoint $endpoint): \Generator
     {
         try {
@@ -103,7 +136,10 @@ class ConnectionHandler implements UpgradeResultHandler
         return yield $result;
     }
 
-    protected function assertUpgradePossible(SocketStream $socket, HttpRequest $request)
+    /**
+     * Assert that the given HTTP request can be upgraded to the WebSocket protocol.
+     */
+    protected function assertUpgradePossible(HttpRequest $request)
     {
         if ($request->getMethod() !== Http::GET) {
             throw new StatusException(Http::METHOD_NOT_ALLOWED, 'WebSocket upgrade requires an HTTP GET request', [
@@ -125,18 +161,5 @@ class ConnectionHandler implements UpgradeResultHandler
                 'Sec-Websocket-Version' => '13'
             ]);
         }
-    }
-
-    protected function sendHandshake(SocketStream $socket, HttpRequest $request): \Generator
-    {
-        $accept = \base64_encode(\sha1($request->getHeaderLine('Sec-WebSocket-Key') . self::GUID, true));
-        
-        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
-        $buffer .= "Connection: upgrade\r\n";
-        $buffer .= "Upgrade: websocket\r\n";
-        $buffer .= "Sec-WebSocket-Accept: $accept\r\n";
-        $buffer .= "Sec-WebSocket-Version: 13\r\n";
-        
-        return yield $socket->write($buffer . "\r\n");
     }
 }

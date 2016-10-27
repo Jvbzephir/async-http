@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
 
 /**
@@ -34,11 +35,22 @@ interface UpgradeResultHandler
     public function isUpgradeSupported(string $protocol, HttpRequest $request, $result): bool;
     
     /**
-     * Take control of the given connection.
+     * Create an HTTP/1 upgrade response that will be sent before switching protocol.
+     * 
+     * Passing data to the connection upgrade handling can make use of HTTP response attributes.
+     * 
+     * @param HttpRequest $request
+     * @param mixed $result
+     * @return HttpResponse
+     */
+    public function createUpgradeResponse(HttpRequest $request, $result): HttpResponse;
+    
+    /**
+     * Take control of the given connection upgrading it to a different protocol.
      * 
      * @param SocketStream $socket The underlying socket connection to be used.
      * @param HttpRequest $request HTTP request that triggered the connection upgrade.
-     * @param mixed $result
+     * @param HttpResponse $response HTTP response that has been sent in order to upgrade the connection.
      */
-    public function upgradeConnection(SocketStream $socket, HttpRequest $request, $result): \Generator;
+    public function upgradeConnection(SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator;
 }

@@ -17,9 +17,11 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
+use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
@@ -54,9 +56,9 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(SocketStream $stream, callable $action, string $peerName): Awaitable
+    public function handleConnection(HttpDriverContext $context, SocketStream $stream, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($stream, $action) {
+        return new Coroutine(function () use ($context, $stream, $action) {
             $remotePeer = $stream->getRemoteAddress();
             
             if ($this->logger) {
@@ -69,7 +71,7 @@ class Driver implements HttpDriver, UpgradeHandler
             
             try {
                 while (null !== ($received = yield $conn->nextRequest())) {
-                    new Coroutine($this->processRequest($conn, $action, ...$received), true);
+                    new Coroutine($this->processRequest($context, $conn, $action, ...$received), true);
                 }
             } finally {
                 try {
@@ -196,17 +198,18 @@ class Driver implements HttpDriver, UpgradeHandler
         return true;
     }
 
-    protected function processRequest(Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
+    /**
+     * Process the given HTTP request and generate and send an appropriate response to the client.
+     */
+    protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
         if ($this->logger) {
             $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
         }
         
-        $response = $action($request);
+        $next = new NextMiddleware($context->middleware, $action);
         
-        if ($response instanceof \Generator) {
-            $response = yield from $response;
-        }
+        $response = yield from $next($request);
         
         if (!$response instanceof HttpResponse) {
             if ($this->logger) {

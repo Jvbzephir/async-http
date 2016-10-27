@@ -34,6 +34,8 @@ class HttpEndpoint
     
     protected $http1;
 
+    protected $middleware;
+    
     protected $logger;
     
     public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', LoggerInterface $logger = null)
@@ -44,6 +46,8 @@ class HttpEndpoint
         $this->factory->setPeerName($peerName);
         
         $this->http1 = new Driver(null, $logger);
+        
+        $this->middleware = new \SplPriorityQueue();
     }
 
     public function isEncrypted(): bool
@@ -54,6 +58,11 @@ class HttpEndpoint
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
     {
         $this->factory->setCertificate($file, $allowSelfSigned, $password);
+    }
+    
+    public function addMiddleware(callable $middleware, int $priority = 0)
+    {
+        $this->middleware->insert($middleware, $priority);
     }
     
     public function addDriver(HttpDriver $driver)
@@ -93,16 +102,18 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            return new HttpServer($this, $this->server, new Coroutine($this->runServer($action, $factory->getPeerName())));
+            $context = new HttpDriverContext($factory->getPeerName(), $this->middleware);
+            
+            return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });
     }
 
-    protected function runServer(callable $action, string $peerName): \Generator
+    protected function runServer(HttpDriverContext $context, callable $action): \Generator
     {
         $pending = new \SplObjectStorage();
         
         try {
-            yield $this->server->listen(function (SocketStream $socket) use ($pending, $peerName, $action) {
+            yield $this->server->listen(function (SocketStream $socket) use ($pending, $context, $action) {
                 if ($this->isEncrypted()) {
                     $alpn = \trim($socket->getMetadata()['crypto']['alpn_protocol'] ?? '');
                 } else {
@@ -113,14 +124,14 @@ class HttpEndpoint
                 
                 foreach ($this->drivers as $driver) {
                     if (\in_array($alpn, $driver->getProtocols(), true)) {
-                        $request = $driver->handleConnection($socket, $action, $peerName);
+                        $request = $driver->handleConnection($context, $socket, $action);
                         
                         break;
                     }
                 }
                 
                 if ($request === null) {
-                    $request = $this->http1->handleConnection($socket, $action, $peerName);
+                    $request = $this->http1->handleConnection($context, $socket, $action);
                 }
                 
                 $pending->attach($request);
