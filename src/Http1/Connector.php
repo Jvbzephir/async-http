@@ -350,12 +350,11 @@ class Connector implements HttpConnector
     protected function normalizeRequest(HttpRequest $request): HttpRequest
     {
         static $remove = [
-            'Accept-Encoding',
             'Connection',
-            'Content-Encoding',
             'Content-Length',
             'Expect',
             'Keep-Alive',
+            'TE',
             'Trailer',
             'Transfer-Encoding'
         ];
@@ -380,12 +379,6 @@ class Connector implements HttpConnector
 
     protected function serializeHeaders(HttpRequest $request, int $size = null)
     {
-        static $compression;
-        
-        if ($compression === null) {
-            $compression = \function_exists('inflate_init');
-        }
-        
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
         $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
         
@@ -397,10 +390,6 @@ class Connector implements HttpConnector
             $buffer .= "Transfer-Encoding: chunked\r\n";
         } else {
             $buffer .= "Content-Length: $size\r\n";
-        }
-        
-        if ($compression) {
-            $buffer .= "Accept-Encoding: gzip, deflate\r\n";
         }
         
         foreach ($request->getHeaders() as $name => $header) {

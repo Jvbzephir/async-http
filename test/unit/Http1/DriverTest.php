@@ -184,17 +184,10 @@ class DriverTest extends AsyncTestCase
         $payload = random_bytes(20000);
         
         yield new SocketStreamTester(function (DuplexStream $stream) use ($payload) {
-            $accept = [];
-            
-            if (function_exists('inflate_init')) {
-                $accept[] = 'Accept-Encoding: gzip, deflate';
-            }
-            
             for ($i = 0; $i < 3; $i++) {
                 yield $stream->write(implode("\r\n", array_merge([
                     'POST /api HTTP/1.1',
-                    'Host: localhost'
-                ], $accept, [
+                    'Host: localhost',
                     'Content-Type: application/otet-stream',
                     'Content-Length: ' . strlen($payload),
                     '',

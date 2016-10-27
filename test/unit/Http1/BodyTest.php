@@ -11,14 +11,13 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
-use KoolKode\Async\Http\StreamBody;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Body
@@ -106,45 +105,6 @@ class BodyTest extends AsyncTestCase
         $this->assertSame($message, $body->prepareMessage($message));
     }
     
-    public function testDeflateEncodedBody()
-    {
-        if (!function_exists('inflate_init')) {
-            return $this->markTestSkipped('Test requires incremental zlib compression');
-        }
-    
-        $input = new ReadableMemoryStream(gzcompress('Hello'));
-    
-        $body = new Body($input);
-        $body->setLength($input->getSize());
-        $body->setCompression(Body::COMPRESSION_DEFLATE);
-    
-        $this->assertEquals('Hello', yield $body->getContents());
-    }
-
-    public function testGzipEncodedBody()
-    {
-        if (!function_exists('inflate_init')) {
-            return $this->markTestSkipped('Test requires incremental zlib compression');
-        }
-        
-        $input = new ReadableMemoryStream(gzencode('Hello'));
-        
-        $body = new Body($input);
-        $body->setLength($input->getSize());
-        $body->setCompression(Body::COMPRESSION_GZIP);
-        
-        $this->assertEquals('Hello', yield $body->getContents());
-    }
-    
-    public function testDetectsInvalidCompressionEncoding()
-    {
-        $body = new Body(new ReadableMemoryStream());
-        
-        $this->expectException(\InvalidArgumentException::class);
-        
-        $body->setCompression('foo');
-    }
-    
     public function testExpectContinue()
     {
         $expect = new WritableMemoryStream();
@@ -203,31 +163,6 @@ class BodyTest extends AsyncTestCase
         Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
     }
     
-    public function testDetectsCompressionFromMessage()
-    {
-        if (!function_exists('inflate_init')) {
-            return $this->markTestSkipped('Test requires incremental zlib compression');
-        }
-        
-        $input = new ReadableMemoryStream(gzencode('Test'));
-        
-        $message = new HttpResponse();
-        $message = $message->withHeader('Content-Length', $input->getSize());
-        $message = $message->withHeader('Content-Encoding', 'gzip');
-        
-        $this->assertEquals('Test', yield Body::fromMessage($input, $message)->getContents());
-    }
-    
-    public function testDetectsCompressedRequestBody()
-    {
-        $message = new HttpRequest('http://test.me/');
-        $message = $message->withHeader('Content-Encoding', 'gzip');
-        
-        $this->expectException(StatusException::class);
-        
-        Body::fromMessage(new ReadableMemoryStream(), $message);
-    }
-    
     public function testSupportsEOFUsingMessage()
     {
         $input = new ReadableMemoryStream('Hi');
@@ -262,26 +197,6 @@ class BodyTest extends AsyncTestCase
             $stream->close();
         }
         
-        $this->assertNull(yield $input->read());
-        $this->assertFalse($input->isClosed());
-    }
-    
-    public function testDecoratesCompressedStreamWhenNotCascadingClose()
-    {
-        $input = new ReadableMemoryStream(gzencode('Hi'));
-    
-        $body = new Body($input, true);
-        $body->setCascadeClose(false);
-        $body->setCompression(Body::COMPRESSION_GZIP);
-    
-        $stream = yield $body->getReadableStream();
-    
-        try {
-            $this->assertEquals('Hi', yield new ReadContents($stream));
-        } finally {
-            $stream->close();
-        }
-    
         $this->assertNull(yield $input->read());
         $this->assertFalse($input->isClosed());
     }

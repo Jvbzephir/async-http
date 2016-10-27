@@ -68,7 +68,7 @@ class ResponseParser extends MessageParser
         }
         
         static $remove = [
-            'Content-Encoding',
+            'TE',
             'Trailer',
         ];
         

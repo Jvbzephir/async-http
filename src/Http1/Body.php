@@ -21,7 +21,6 @@ use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\ReadContents;
-use KoolKode\Async\Stream\ReadableInflateStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\WritableStream;
@@ -36,10 +35,6 @@ use KoolKode\Async\Success;
  */
 class Body implements HttpBody
 {
-    const COMPRESSION_GZIP = 'gzip';
-
-    const COMPRESSION_DEFLATE = 'deflate';
-
     /**
      * Wrapped input stream that is being used to receive data from the remote peer.
      * 
@@ -69,15 +64,6 @@ class Body implements HttpBody
      * @var int
      */
     protected $length;
-
-    /**
-     * Compression method being used by the remote peer.
-     * 
-     * A value of null indicates thatincoming data is not compressed.
-     * 
-     * @var string
-     */
-    protected $compression;
 
     /**
      * Indicates that the remote peer expects a 100 Continue response before data will be sent.
@@ -162,34 +148,7 @@ class Body implements HttpBody
             $body->setLength((int) $len);
         }
         
-        if ($message->hasHeader('Content-Encoding')) {
-            if (!$message instanceof HttpResponse) {
-                throw new StatusException(Http::BAD_REQUEST, 'Compressed request bodies are not supported');
-            }
-            
-            $body->setCompression($message->getHeaderLine('Content-Encoding'));
-        }
-        
         return $body;
-    }
-
-    /**
-     * Get available compression encoding names.
-     * 
-     * @return array
-     */
-    public static function getAvailableCompressionEncodings(): array
-    {
-        static $compression;
-        
-        if ($compression === null) {
-            $compression = \function_exists('inflate_init');
-        }
-        
-        return $compression ? [
-            self::COMPRESSION_GZIP,
-            self::COMPRESSION_DEFLATE
-        ] : [];
     }
 
     /**
@@ -226,24 +185,6 @@ class Body implements HttpBody
         }
         
         $this->length = $length;
-    }
-
-    /**
-     * Set encoding being used to decompress body data.
-     * 
-     * @param string $encoding
-     * 
-     * @throws \InvalidArgumentException
-     */
-    public function setCompression(string $encoding)
-    {
-        $encoding = \strtolower($encoding);
-        
-        if (!\in_array($encoding, self::getAvailableCompressionEncodings(), true)) {
-            throw new \InvalidArgumentException(\sprintf('Unsupported compression encoding: "%s"', $encoding), Http::NOT_IMPLEMENTED);
-        }
-        
-        $this->compression = $encoding;
     }
 
     /**
@@ -351,17 +292,6 @@ class Body implements HttpBody
             }
             
             return new EntityStream(new ReadableMemoryStream(), true, $this->expectContinue);
-        }
-        
-        if ($this->compression) {
-            switch ($this->compression) {
-                case self::COMPRESSION_GZIP:
-                    $stream = new ReadableInflateStream($stream, \ZLIB_ENCODING_GZIP);
-                    break;
-                case self::COMPRESSION_DEFLATE:
-                    $stream = new ReadableInflateStream($stream, \ZLIB_ENCODING_DEFLATE);
-                    break;
-            }
         }
         
         return new EntityStream($stream, $this->cascadeClose, $this->expectContinue);

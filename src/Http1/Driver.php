@@ -22,7 +22,6 @@ use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
@@ -456,17 +455,7 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        $compress = null;
-        
-        if (!$nobody && $size !== 0) {
-            $buffer .= $this->enableCompression($request, $compress, $size);
-        }
-        
         $bodyStream = yield $body->getReadableStream();
-        
-        if ($compress !== null) {
-            $bodyStream = new ReadableDeflateStream($bodyStream, $compress);
-        }
         
         if ($nobody || $size === 0) {
             $chunk = null;
@@ -548,7 +537,6 @@ class Driver implements HttpDriver
     {
         static $remove = [
             'Connection',
-            'Content-Encoding',
             'Content-Length',
             'Keep-Alive',
             'Trailer',
@@ -562,34 +550,5 @@ class Driver implements HttpDriver
         }
         
         return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
-    }
-
-    /**
-     * Enable HTTP body compression if available on the server and supported by the client.
-     */
-    protected function enableCompression(HttpRequest $request, int & $compress = null, int & $size = null): string
-    {
-        static $available;
-        
-        static $map = [
-            'gzip' => \ZLIB_ENCODING_GZIP,
-            'x-gzip' => \ZLIB_ENCODING_GZIP,
-            'deflate' => \ZLIB_ENCODING_DEFLATE
-        ];
-        
-        if ($available ?? ($available = \function_exists('deflate_init'))) {
-            $accept = $request->getHeaderTokens('Accept-Encoding');
-            
-            foreach ($accept as $key) {
-                if (isset($map[$key])) {
-                    $compress = $map[$key];
-                    $size = null;
-                    
-                    return \sprintf("Content-Encoding: %s\r\n", $key);
-                }
-            }
-        }
-        
-        return '';
     }
 }
