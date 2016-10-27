@@ -364,7 +364,6 @@ class Driver implements HttpDriver
                 }
                 
                 $response = $response->withProtocolVersion($request->getProtocolVersion());
-                $response = $response->withHeader('Server', 'KoolKode HTTP Server');
                 
                 return $response;
             });

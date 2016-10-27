@@ -71,7 +71,7 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals(Http::OK, $response->getStatusCode());
                 $this->assertEquals('OK', $response->getReasonPhrase());
                 $this->assertEquals('application/json', $response->getHeaderLine('Content-Type'));
-                $this->assertEquals('KoolKode HTTP Server', $response->getHeaderLine('Server'));
+                $this->assertEquals('Filtered Response', $response->getHeaderLine('Middleware-Info'));
                 
                 $this->assertEquals($data, yield $response->getBody()->getContents());
                 
@@ -82,7 +82,7 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals('1.1', $response->getProtocolVersion());
                 $this->assertEquals(Http::OK, $response->getStatusCode());
                 $this->assertEquals('OK', $response->getReasonPhrase());
-                $this->assertEquals('KoolKode HTTP Server', $response->getHeaderLine('Server'));
+                $this->assertEquals('Filtered Response', $response->getHeaderLine('Middleware-Info'));
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
             } finally {
@@ -114,7 +114,6 @@ class HttpEndpointTest extends AsyncTestCase
                 $this->assertEquals('1.0', $response->getProtocolVersion());
                 $this->assertEquals(Http::OK, $response->getStatusCode());
                 $this->assertEquals('OK', $response->getReasonPhrase());
-                $this->assertEquals('KoolKode HTTP Server', $response->getHeaderLine('Server'));
                 
                 $this->assertEquals('', yield $response->getBody()->getContents());
             } finally {

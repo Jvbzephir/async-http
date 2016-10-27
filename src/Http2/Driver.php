@@ -223,7 +223,6 @@ class Driver implements HttpDriver, UpgradeHandler
         
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
-        $response = $response->withHeader('Server', 'KoolKode HTTP Server');
         
         if ($this->logger) {
             $reason = \rtrim(' ' . $response->getReasonPhrase());
