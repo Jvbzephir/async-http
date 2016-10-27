@@ -38,18 +38,18 @@ class ContentEncoder
      * @var array
      */
     protected $types = [
-        'application/vnd.ms-fontobject',
-        'font/eot',
-        'font/opentype',
-        'image/bmp',
-        'image/vnd.microsoft.icon',
-        'image/x-icon',
-        'text/cache-manifest',
-        'text/plain',
-        'text/vcard',
-        'text/vtt',
-        'text/x-component',
-        'text/x-cross-domain-policy'
+        'application/vnd.ms-fontobject' => true,
+        'font/eot' => true,
+        'font/opentype' => true,
+        'image/bmp' => true,
+        'image/vnd.microsoft.icon' => true,
+        'image/x-icon' => true,
+        'text/cache-manifest' => true,
+        'text/plain' => true,
+        'text/vcard' => true,
+        'text/vtt' => true,
+        'text/x-component' => true,
+        'text/x-cross-domain-policy' => true
     ];
 
     /**
@@ -59,13 +59,15 @@ class ContentEncoder
      */
     protected $subTypes = [
         'css' => true,
+        'ecmascript' => true,
         'javascript' => true,
         'json' => true,
         'html' => true,
         'xhtml' => true,
         'xml' => true,
+        'x-ecmascript' => true,
         'x-font-ttf' => true,
-        'x-javascript'
+        'x-javascript' => true
     ];
 
     /**
@@ -75,7 +77,7 @@ class ContentEncoder
      */
     public function addType(string $type)
     {
-        $this->types = $type;
+        $this->types[$type] = true;
     }
 
     /**
@@ -144,20 +146,20 @@ class ContentEncoder
             return false;
         }
         
+        $type = \preg_replace("';.*$'", '', $response->getHeaderLine('Content-Type'));
+        
+        if (isset($this->types[$type])) {
+            return true;
+        }
+        
         try {
-            $media = new MediaType($response->getHeaderLine('Content-Type'));
+            $media = new MediaType($type);
         } catch (InvalidMediaTypeException $e) {
             return false;
         }
         
         foreach ($media->getSubTypes() as $sub) {
             if (isset($this->subTypes[$sub])) {
-                return true;
-            }
-        }
-        
-        foreach ($this->types as $type) {
-            if ($media->is($type)) {
                 return true;
             }
         }
