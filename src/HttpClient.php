@@ -108,11 +108,11 @@ class HttpClient
      */
     public function send(HttpRequest $request): Awaitable
     {
+        if (!$request->hasHeader('User-Agent')) {
+            $request = $request->withHeader('User-Agent', $this->userAgent);
+        }
+        
         $next = new NextMiddleware($this->middleware, function (HttpRequest $request) {
-            if (!$request->hasHeader('User-Agent')) {
-                $request = $request->withHeader('User-Agent', $this->userAgent);
-            }
-            
             $uri = $request->getUri();
             
             foreach ($this->connectors as $connector) {
