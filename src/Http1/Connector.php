@@ -23,8 +23,8 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerInterface;
+use KoolKode\Async\Http\BufferedBody;
 
 /**
  * Implements the HTTP/1.x protocol on the client side.
@@ -281,11 +281,17 @@ class Connector implements HttpConnector
         if ($body instanceof FileBody && !$stream->isEncrypted()) {
             $chunk = $size ? '' : null;
         } else {
-            $bodyStream = yield $body->getReadableStream();
-            
             if ($request->getProtocolVersion() == '1.0' && $size === null) {
-                $bodyStream = yield from $this->bufferBody($bodyStream, $size);
+                if (!$body->isCached()) {
+                    $body = new BufferedBody(yield $body->getReadableStream());
+                }
+                
+                yield $body->discard();
+                
+                $size = yield $body->getSize();
             }
+            
+            $bodyStream = yield $body->getReadableStream();
             
             $clen = ($size === null) ? 4089 : 4096;
             $chunk = yield $bodyStream->readBuffer($clen);
@@ -401,20 +407,5 @@ class Connector implements HttpConnector
         }
         
         return $buffer;
-    }
-
-    protected function bufferBody(ReadableStream $stream, int & $size = null): \Generator
-    {
-        $tmp = yield LoopConfig::currentFilesystem()->tempStream();
-        
-        try {
-            $size = yield new CopyBytes($stream, $tmp);
-        } catch (\Throwable $e) {
-            $tmp->close();
-            
-            throw $e;
-        }
-        
-        return $tmp;
     }
 }
