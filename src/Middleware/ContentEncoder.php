@@ -69,6 +69,27 @@ class ContentEncoder
         'x-font-ttf' => true,
         'x-javascript' => true
     ];
+    
+    /**
+     * Create a new content encoder.
+     * 
+     * @param array $types Compressable media types (passing null will use a default list).
+     * @param array $subTypes Compressable media sub types (passing null will use a default list).
+     */
+    public function __construct(array $types = null, array $subTypes = null)
+    {
+        if ($types !== null) {
+            foreach ($types as $type) {
+                $this->types[(string) $type] = true;
+            }
+        }
+        
+        if ($subTypes !== null) {
+            foreach ($subTypes as $type) {
+                $this->subTypes[(string) $type] = true;
+            }
+        }
+    }
 
     /**
      * Add a media type that should be served compressed.
@@ -134,6 +155,13 @@ class ContentEncoder
         return $response;
     }
 
+    /**
+     * Check if the given response payload should be compressed.
+     * 
+     * @param HttpRequest $request
+     * @param HttpResponse $response
+     * @return bool
+     */
     protected function isCompressable(HttpRequest $request, HttpResponse $response): bool
     {
         if ($request->getMethod() === Http::HEAD) {

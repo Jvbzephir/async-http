@@ -22,6 +22,15 @@ use KoolKode\Async\Http\StringBody;
  */
 class ContentDecoderTest extends AsyncTestCase
 {
+    protected function setUp()
+    {
+        return parent::setUp();
+    
+        if (!function_exists('inflate_init')) {
+            return $this->markTestSkipped('Test requires zlib support for incremental decompression');
+        }
+    }
+    
     public function provideEncodingSettings()
     {
         yield ['', 'trim'];
