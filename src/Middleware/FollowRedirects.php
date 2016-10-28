@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Http\BufferedBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -59,7 +60,7 @@ class FollowRedirects
         $body = $request->getBody();
         
         if (!$body->isCached()) {
-            $request = $request->withBody(new StringBody(yield $body->getContents()));
+            $request = $request->withBody(new BufferedBody(yield $body->getReadableStream()));
         }
         
         for ($i = -1; $i < $this->maxRedirects; $i++) {
