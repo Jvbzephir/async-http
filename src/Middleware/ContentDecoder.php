@@ -40,11 +40,7 @@ class ContentDecoder
     {
         static $zlib;
         
-        if ($zlib === null) {
-            $zlib = \function_exists('inflate_init');
-        }
-        
-        if ($zlib) {
+        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
             $request = $request->withAddedHeader('Accept-Encoding', 'gzip, deflate');
         }
         

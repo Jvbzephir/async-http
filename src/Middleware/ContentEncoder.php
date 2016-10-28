@@ -101,9 +101,11 @@ class ContentEncoder
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {
+        static $zlib;
+        
         $response = yield from $next($request);
         
-        if ($this->isCompressable($request, $response)) {
+        if (($zlib ?? ($zlib = \function_exists('deflate_init'))) && $this->isCompressable($request, $response)) {
             $compress = null;
             
             foreach ($request->getHeaderTokens('Accept-Encoding') as $encoding) {
