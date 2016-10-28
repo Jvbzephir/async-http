@@ -28,4 +28,36 @@ class ConnectorContext extends HttpConnectorContext
      * @var int
      */
     public $remaining;
+
+    /**
+     * Expiry date of the connection.
+     * 
+     * @var int
+     */
+    public $expires;
+
+    /**
+     * Dispose callback.
+     * 
+     * @var callback
+     */
+    protected $disposer;
+
+    /**
+     * Create a new HTTP/1 connector context.
+     * 
+     * @param callable $disposer
+     */
+    public function __construct(callable $disposer)
+    {
+        $this->disposer = $disposer;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function dispose()
+    {
+        ($this->disposer)($this);
+    }
 }

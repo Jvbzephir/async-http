@@ -49,7 +49,7 @@ interface HttpConnector
      * @param Uri $uri
      * @return HttpConnectorContext
      */
-    public function getConnectorContext(Uri $uri): HttpConnectorContext;
+    public function getConnectorContext(Uri $uri): Awaitable;
     
     /**
      * Send the given request using a connection specified by the given context.

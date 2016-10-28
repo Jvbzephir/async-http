@@ -51,8 +51,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = new HttpRequest('http://localhost/api?test=yes');
                 $request = $request->withProtocolVersion('1.0');
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
@@ -100,8 +99,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = $request->withHeader('Content-Type', 'application/json');
                 $request = $request->withBody(new StringBody(json_encode($payload)));
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
@@ -161,8 +159,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = $request->withProtocolVersion('1.0');
                 $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
@@ -198,8 +195,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withBody(new FileBody(__FILE__));
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
@@ -240,8 +236,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);
@@ -272,14 +267,14 @@ class ConnectorTest extends AsyncTestCase
         $logger = new TestLogger();
         
         yield new SocketStreamTester(function (DuplexStream $socket) use ($logger) {
-            $connector = new Connector(null, $logger);
+            $connector = new Connector(null, null, $logger);
             
             try {
                 for ($i = 0; $i < 3; $i++) {
                     $request = new HttpRequest('http://localhost/api');
                     $request = $request->withProtocolVersion('2.0');
                     
-                    $context = $connector->getConnectorContext($request->getUri());
+                    $context = yield $connector->getConnectorContext($request->getUri());
                     
                     if (!$context->connected) {
                         $context->socket = $socket;
@@ -315,7 +310,7 @@ class ConnectorTest extends AsyncTestCase
             }
         });
         
-        $this->assertCount(10, $logger);
+        $this->assertCount(6, $logger);
     }
     
     public function testFinalResponseBeforeExpectContinue()
@@ -329,8 +324,7 @@ class ConnectorTest extends AsyncTestCase
                 $request = new HttpRequest('http://localhost/api', Http::POST);
                 $request = $request->withBody(new StringBody($payload));
                 
-                $context = $connector->getConnectorContext($request->getUri());
-                $context->connected = true;
+                $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
                 
                 $response = yield $connector->send($context, $request);

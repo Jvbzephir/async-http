@@ -16,11 +16,13 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Success;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -35,6 +37,8 @@ class Connector implements HttpConnector
     protected $logger;
  
     protected $connections = [];
+    
+    protected $connecting = [];
     
     public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
     {
@@ -81,21 +85,41 @@ class Connector implements HttpConnector
     /**
      * {@inheritdoc}
      */
-    public function getConnectorContext(Uri $uri): HttpConnectorContext
+    public function getConnectorContext(Uri $uri): Awaitable
     {
         $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
-        $context = new ConnectorContext();
         
         if (isset($this->connections[$key])) {
             if ($this->connections[$key]->isAlive()) {
+                $context = new ConnectorContext();
                 $context->connected = true;
                 $context->conn = $this->connections[$key];
-            } else {
-                unset($this->connections[$key]);
+                
+                return new Success($context);
             }
+            
+            unset($this->connections[$key]);
         }
         
-        return $context;
+        if (isset($this->connecting[$key])) {
+            $defer = new Deferred();
+            
+            $this->connecting[$key]->enqueue($defer);
+            
+            return $defer;
+        }
+        
+        $this->connecting[$key] = new \SplQueue();
+        
+        $context = new ConnectorContext(function ($context) use ($key) {
+            if ($this->connecting[$key]->isEmpty()) {
+                unset($this->connecting[$key]);
+            } else {
+                $this->connecting[$key]->dequeue()->resolve($context);
+            }
+        });
+        
+        return new Success($context);
     }
 
     /**
@@ -103,16 +127,22 @@ class Connector implements HttpConnector
      */
     public function send(HttpConnectorContext $context, HttpRequest $request): Awaitable
     {
+        if (!$context instanceof ConnectorContext) {
+            throw new \InvalidArgumentException('Invalid connector context passed');
+        }
+        
         return new Coroutine(function () use ($context, $request) {
-            if ($context instanceof ConnectorContext && $context->conn) {
+            $uri = $request->getUri();
+            $key = \sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true));
+            
+            if ($context->conn) {
                 $conn = $context->conn;
             } else {
                 $conn = new Connection($context->socket, new HPack($this->hpackContext), $this->logger);
                 
                 yield $conn->performClientHandshake();
                 
-                $uri = $request->getUri();
-                $this->connections[\sprintf('%s://%s', $uri->getScheme(), $uri->getHostWithPort(true))] = $conn;
+                $this->connections[$key] = $conn;
             }
             
             if ($this->logger) {
@@ -131,6 +161,13 @@ class Connector implements HttpConnector
                 }
                 
                 $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+            }
+            
+            if (isset($this->connecting[$key])) {
+                $context->connected = true;
+                $context->conn = $conn;
+                
+                $context->dispose();
             }
             
             return $response;

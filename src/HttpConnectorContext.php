@@ -20,7 +20,7 @@ use KoolKode\Async\Socket\SocketStream;
  * 
  * @author Martin Schröder
  */
-class HttpConnectorContext
+abstract class HttpConnectorContext
 {
     /**
      * Is the context already connected (no new socket connection needed)?
@@ -35,4 +35,11 @@ class HttpConnectorContext
      * @var SocketStream
      */
     public $socket;
+    
+    /**
+     * Dispose the underlying connection attempt.
+     * 
+     * The connection can be re-used after it has been disposed (if the socket connection is alive).
+     */
+    public abstract function dispose();
 }

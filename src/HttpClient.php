@@ -113,31 +113,46 @@ class HttpClient
         }
         
         $next = new NextMiddleware($this->middleware, function (HttpRequest $request) {
+            $connecting = new \SplObjectStorage();
             $uri = $request->getUri();
             
             foreach ($this->connectors as $connector) {
-                $context = $connector->getConnectorContext($uri);
+                $context = yield $connector->getConnectorContext($uri);
                 
                 if ($context->connected) {
+                    foreach ($connecting as $conn) {
+                        $connecting[$conn]->dispose();
+                    }
+                    
                     return yield $connector->send($context, $request);
                 }
+                
+                $connecting[$connector] = $context;
             }
-            
-            $socket = yield $this->connectSocket($request->getUri());
-            $meta = $socket->getMetadata();
             
             try {
-                $connector = $this->chooseConnector(\trim($meta['crypto']['alpn_protocol'] ?? ''), $meta);
-            } catch (\Throwable $e) {
-                $socket->close();
+                $socket = yield $this->connectSocket($request->getUri());
+                $meta = $socket->getMetadata();
                 
-                throw $e;
+                try {
+                    $connector = $this->chooseConnector(\trim($meta['crypto']['alpn_protocol'] ?? ''), $meta);
+                } catch (\Throwable $e) {
+                    $socket->close();
+                    
+                    throw $e;
+                }
+                
+                $context = $connecting[$connector];
+                $context->socket = $socket;
+                
+                $connecting->detach($connector);
+                
+                return yield $connector->send($context, $request);
+            } finally {
+                foreach ($connecting as $conn) {
+                    $connecting[$conn]->dispose();
+                }
             }
-            
-            $context = new HttpConnectorContext();
-            $context->socket = $socket;
-            
-            return yield $connector->send($context, $request);
         });
         
         return new Coroutine($next($request));

@@ -50,7 +50,7 @@ abstract class EndToEndTest extends AsyncTestCase
     protected function send(HttpRequest $request, callable $action): \Generator
     {
         $next = new NextMiddleware($this->clientMiddleware, function (HttpRequest $request) use ($action) {
-            $context = $this->connector->getConnectorContext($request->getUri());
+            $context = yield $this->connector->getConnectorContext($request->getUri());
             
             if (!$context->connected) {
                 list ($a, $b) = Socket::createPair();

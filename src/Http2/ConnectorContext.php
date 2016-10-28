@@ -28,4 +28,18 @@ class ConnectorContext extends HttpConnectorContext
      * @var Connection
      */
     public $conn;
+    
+    protected $disposer;
+    
+    public function __construct(callable $disposer = null)
+    {
+        $this->disposer = $disposer;
+    }
+    
+    public function dispose()
+    {
+        if ($this->disposer) {
+            ($this->disposer)($this);
+        }
+    }
 }
