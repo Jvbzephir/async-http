@@ -15,11 +15,45 @@ namespace KoolKode\Async\Http\Middleware;
 
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StringBody;
+use KoolKode\Async\Http\Uri;
 
+/**
+ * Middleware that automatically follows HTTP redirects.
+ * 
+ * @author Martin Schröder
+ */
 class FollowRedirects
 {
+    /**
+     * Max number of redirects that are allowed for a single request.
+     * 
+     * @var int
+     */
+    protected $maxRedirects;
+    
+    /**
+     * Create new HTTP redirect middleware.
+     * 
+     * @param int $maxRedirects Max number of redirects that are allowed for a single request.
+     */
+    public function __construct(int $maxRedirects = 5)
+    {
+        $this->maxRedirects = $maxRedirects;
+    }
+    
+    /**
+     * Automatically follow HTTP redirects according to HTTP status code and location header.
+     * 
+     * Uncached HTTP request bodies will be cached prior to being sent to the remote endpoint.
+     * 
+     * @param HttpRequest $request
+     * @param NextMiddleware $next
+     * @return HttpResponse
+     * 
+     * @throws TooManyRedirectsException When the maximum number of redirects for a single HTTP request has been exceeded.
+     */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {
         $body = $request->getBody();
@@ -28,9 +62,7 @@ class FollowRedirects
             $request = $request->withBody(new StringBody(yield $body->getContents()));
         }
         
-        $i = 0;
-        
-        do {
+        for ($i = -1; $i < $this->maxRedirects; $i++) {
             $response = yield from $next($request);
             
             switch ($response->getStatusCode()) {
@@ -39,6 +71,7 @@ class FollowRedirects
                 case Http::SEE_OTHER:
                     $request = $request->withMethod(Http::GET);
                     $request = $request->withoutHeader('Content-Type');
+                    $request = $request->withBody(new StringBody());
                     break;
                 case Http::TEMPORARY_REDIRECT:
                 case Http::PERMANENT_REDIRECT:
@@ -61,6 +94,8 @@ class FollowRedirects
             } finally {
                 yield $response->getBody()->discard();
             }
-        } while ($i++ < 3);
+        }
+        
+        throw new TooManyRedirectsException(\sprintf('Limit of %s HTTP redirects exceeded', $this->maxRedirects));
     }
 }
