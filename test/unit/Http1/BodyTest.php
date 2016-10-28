@@ -97,14 +97,6 @@ class BodyTest extends AsyncTestCase
         $this->assertTrue($input->isClosed());
     }
     
-    public function testDoesNotModifyMessage()
-    {
-        $body = new Body(new ReadableMemoryStream());
-        $message = new HttpResponse();
-        
-        $this->assertSame($message, $body->prepareMessage($message));
-    }
-    
     public function testExpectContinue()
     {
         $expect = new WritableMemoryStream();

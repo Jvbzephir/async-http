@@ -62,14 +62,6 @@ class StringBody implements HttpBody
     /**
      * {@inheritdoc}
      */
-    public function prepareMessage(HttpMessage $message): HttpMessage
-    {
-        return $message;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
     public function getSize(): Awaitable
     {
         return new Success(\strlen($this->contents));

@@ -22,12 +22,9 @@ class BufferedBodyTest extends AsyncTestCase
 {
     public function testCanAccessInMemoryData()
     {
-        $response = new HttpResponse();
-        
         $body = new BufferedBody(new ReadableMemoryStream($payload = 'Hello World'));
         
         $this->assertTrue($body->isCached());
-        $this->assertSame($response, $body->prepareMessage($response));
         $this->assertEquals(\strlen($payload), yield $body->getSize());
         $this->assertEquals($payload, yield $body->getContents());
         $this->assertEquals($payload, yield $body->getContents());

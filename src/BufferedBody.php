@@ -106,14 +106,6 @@ class BufferedBody implements HttpBody
     /**
      * {@inheritdoc}
      */
-    public function prepareMessage(HttpMessage $message): HttpMessage
-    {
-        return $message;
-    }
-    
-    /**
-     * {@inheritdoc}
-     */
     public function getSize(): Awaitable
     {
         if ($this->size === null && !$this->temp) {

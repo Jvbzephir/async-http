@@ -41,9 +41,6 @@ class FileBodyTest extends AsyncTestCase
         $this->assertEquals(__FILE__, $body->getFile());
         $this->assertTrue($body->isCached());
         $this->assertEquals(filesize(__FILE__), yield $body->getSize());
-        
-        $message = $body->prepareMessage(new HttpResponse());
-        $this->assertEquals('application/x-httpd-php', $message->getHeaderLine('Content-Type'));
     }
     
     public function testCanDiscardBody()

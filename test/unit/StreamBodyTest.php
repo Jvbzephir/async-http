@@ -40,11 +40,9 @@ class StreamBodyTest extends AsyncTestCase
     public function testCanAccessMetaData()
     {
         $body = new StreamBody(new ReadableMemoryStream('Hello World'));
-        $message = new HttpResponse();
         
         $this->assertFalse($body->isCached());
         $this->assertnull(yield $body->getSize());
-        $this->assertSame($message, $body->prepareMessage($message));
     }
     
     public function testCanDiscardBody()

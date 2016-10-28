@@ -18,7 +18,6 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Success;
-use KoolKode\Util\Filesystem;
 
 /**
  * HTTP body that can stream contents of a file.
@@ -51,19 +50,7 @@ class FileBody implements HttpBody
     {
         return true;
     }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function prepareMessage(HttpMessage $message): HttpMessage
-    {
-        if (!$message->hasHeader('Content-Type')) {
-            $message = $message->withHeader('Content-Type', Filesystem::guessMimeTypeFromFilename($this->file));
-        }
-        
-        return $message;
-    }
-
+    
     /**
      * Get the path of the transfered file.
      * 
