@@ -110,10 +110,10 @@ class ConnectionHandler implements UpgradeResultHandler
             yield from $this->invokeAsync($endpoint->onOpen($conn));
             
             while (null !== ($message = yield $conn->readNextMessage())) {
-                if ($message instanceof TextMessage) {
-                    yield from $this->invokeAsync($endpoint->onTextMessage($conn, $message));
-                } elseif ($message instanceof BinaryMessage) {
+                if ($message instanceof BinaryMessage) {
                     yield from $this->invokeAsync($endpoint->onBinaryMessage($conn, $message));
+                } elseif (\is_string($message)) {
+                    yield from $this->invokeAsync($endpoint->onTextMessage($conn, $message));
                 }
             }
         } catch (\Throwable $e) {

@@ -15,7 +15,6 @@ use Interop\Async\Loop;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\WebSocket\Connection;
 use KoolKode\Async\Http\WebSocket\Endpoint;
-use KoolKode\Async\Http\WebSocket\TextMessage;
 use KoolKode\Async\Pause;
 
 /**
@@ -60,11 +59,11 @@ class ExampleEndpoint extends Endpoint
         }
     }
 
-    public function onTextMessage(Connection $conn, TextMessage $message)
+    public function onTextMessage(Connection $conn, string $message)
     {
         $json = json_encode([
             'type' => 'user',
-            'message' => sprintf('Broadcast: "%s"', strtoupper((string) $message))
+            'message' => sprintf('Broadcast: "%s"', strtoupper($message))
         ]);
         
         foreach ($this->clients as $client) {

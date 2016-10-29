@@ -227,7 +227,7 @@ class Connection
                 throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
             }
             
-            yield $this->messages->send(new TextMessage($frame->data));
+            yield $this->messages->send($frame->data);
         } else {
             $this->buffer = $frame->data;
         }
@@ -279,7 +279,7 @@ class Connection
                         throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
                     }
                     
-                    yield $this->messages->send(new TextMessage($this->buffer));
+                    yield $this->messages->send($this->buffer);
                 }
             }
         } catch (\Throwable $e) {

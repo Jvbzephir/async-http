@@ -19,7 +19,7 @@ abstract class Endpoint
     
     public function onClose(Connection $conn) { }
 
-    public function onTextMessage(Connection $conn, TextMessage $message) { }
+    public function onTextMessage(Connection $conn, string $message) { }
 
     public function onBinaryMessage(Connection $conn, BinaryMessage $message)
     {
