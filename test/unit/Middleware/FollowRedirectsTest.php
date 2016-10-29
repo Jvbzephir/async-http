@@ -11,30 +11,25 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Http\Test\EndToEndTest;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Test\AsyncTestCase;
 
 /**
  * @covers \KoolKode\Async\Http\Middleware\FollowRedirects
  */
-class RedirectTest extends EndToEndTest
+class FollowRedirectsTest extends AsyncTestCase
 {
     public function testFollowsRedirectWithIdenticalRequest()
     {
-        $this->clientMiddleware->insert(new FollowRedirects(), 0);
+        $middleware = new \SplPriorityQueue();
+        $middleware->insert(new FollowRedirects(), 0);
         
-        $payload = 'Test Payload :)';
-        
-        $request = new HttpRequest('http://localhost/test', Http::POST);
-        $request = $request->withHeader('Content-Type', 'text/plain');
-        $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
-        
-        $response = yield from $this->send($request, function (HttpRequest $request) {
+        $next = new NextMiddleware($middleware, function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             if ($request->getRequestTarget() === '/test') {
@@ -51,6 +46,14 @@ class RedirectTest extends EndToEndTest
             return $response;
         });
         
+        $payload = 'Test Payload :)';
+        
+        $request = new HttpRequest('http://localhost/test', Http::POST);
+        $request = $request->withHeader('Content-Type', 'text/plain');
+        $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
+        
+        $response = yield from $next($request);
+        
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('text/plain', $response->getHeaderLine('Content-Type'));
@@ -59,13 +62,10 @@ class RedirectTest extends EndToEndTest
 
     public function testWillSwitchToGet()
     {
-        $this->clientMiddleware->insert(new FollowRedirects(), 0);
+        $middlewares = new \SplPriorityQueue();
+        $middlewares->insert(new FollowRedirects(), 0);
         
-        $request = new HttpRequest('http://localhost/test', Http::POST);
-        $request = $request->withHeader('Content-Type', 'text/plain');
-        $request = $request->withBody(new StringBody('Test Body'));
-        
-        $response = yield from $this->send($request, function (HttpRequest $request) {
+        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
             if ($request->getRequestTarget() === '/test') {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
@@ -88,6 +88,12 @@ class RedirectTest extends EndToEndTest
             return $response;
         });
         
+        $request = new HttpRequest('http://localhost/test', Http::POST);
+        $request = $request->withHeader('Content-Type', 'text/plain');
+        $request = $request->withBody(new StringBody('Test Body'));
+        
+        $response = yield from $next($request);
+        
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('text/plain', $response->getHeaderLine('Content-Type'));
@@ -95,18 +101,19 @@ class RedirectTest extends EndToEndTest
     }
 
     public function testEnforcesRedirectLimit()
-    {
-        $this->clientMiddleware->insert(new FollowRedirects(3), 0);
+    {    
+        $middlewares = new \SplPriorityQueue();
+        $middlewares->insert(new FollowRedirects(3), 0);
         
-        $request = new HttpRequest('http://localhost/test');
-        
-        $this->expectException(TooManyRedirectsException::class);
-        
-        yield from $this->send($request, function (HttpRequest $request) {
+        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
             $response = new HttpResponse(Http::REDIRECT_IDENTICAL);
             $response = $response->withHeader('Location', 'http://localhost/redirected');
             
             return $response;
         });
+        
+        $this->expectException(TooManyRedirectsException::class);
+        
+        yield from $next(new HttpRequest('http://localhost/test'));
     }
 }

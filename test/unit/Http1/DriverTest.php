@@ -26,6 +26,7 @@ use KoolKode\Async\Http\HttpDriverContext;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Driver
+ * @covers \KoolKode\Async\Http\HttpDriverContext
  */
 class DriverTest extends AsyncTestCase
 {

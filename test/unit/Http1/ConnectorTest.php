@@ -22,9 +22,12 @@ use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Test\SocketStreamTester;
 use KoolKode\Async\Http\FileBody;
+use KoolKode\Async\Http\HttpConnectorContext;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Connector
+ * @covers \KoolKode\Async\Http\Http1\ConnectorContext
+ * @covers \KoolKode\Async\Http\HttpConnectorContext
  */
 class ConnectorTest extends AsyncTestCase
 {
@@ -39,6 +42,18 @@ class ConnectorTest extends AsyncTestCase
         $this->assertTrue($connector->isSupported('http/1.1'));
         $this->assertTrue($connector->isSupported(''));
         $this->assertFalse($connector->isSupported('h2'));
+    }
+
+    public function testDetectsInvalidConnectorContext()
+    {
+        $connector = new Connector();
+        
+        $this->expectException(\InvalidArgumentException::class);
+        
+        $connector->send(new class() extends HttpConnectorContext {
+
+            public function dispose() { }
+        }, new HttpRequest('/'));
     }
     
     public function testBasicGetRequest()

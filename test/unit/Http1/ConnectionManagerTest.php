@@ -19,6 +19,7 @@ use KoolKode\Async\Deferred;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\ConnectionManager
+ * @covers \KoolKode\Async\Http\Http1\ConnectorContext
  */
 class ConnectionManagerTest extends AsyncTestCase
 {
