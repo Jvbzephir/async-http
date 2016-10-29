@@ -240,11 +240,11 @@ class Connection
         }
         
         if ($frame->finished) {
-            yield $this->messages->send(new BinaryMessage(new ReadableMemoryStream($frame->data)));
+            yield $this->messages->send(new ReadableMemoryStream($frame->data));
         } else {
             $this->buffer = new Channel(16);
             
-            yield $this->messages->send(new BinaryMessage(new ReadableChannelStream($this->buffer)));
+            yield $this->messages->send(new ReadableChannelStream($this->buffer));
             
             foreach (\str_split($frame->data, 4096) as $chunk) {
                 yield $this->buffer->send($chunk);

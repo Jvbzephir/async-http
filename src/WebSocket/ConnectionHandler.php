@@ -19,6 +19,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
+use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -110,8 +111,12 @@ class ConnectionHandler implements UpgradeResultHandler
             yield from $this->invokeAsync($endpoint->onOpen($conn));
             
             while (null !== ($message = yield $conn->readNextMessage())) {
-                if ($message instanceof BinaryMessage) {
-                    yield from $this->invokeAsync($endpoint->onBinaryMessage($conn, $message));
+                if ($message instanceof ReadableStream) {
+                    try {
+                        yield from $this->invokeAsync($endpoint->onBinaryMessage($conn, $message));
+                    } finally {
+                        $message->close();
+                    }
                 } elseif (\is_string($message)) {
                     yield from $this->invokeAsync($endpoint->onTextMessage($conn, $message));
                 }

@@ -13,6 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\Stream\ReadableStream;
+
 abstract class Endpoint
 {
     public function onOpen(Connection $conn) { }
@@ -21,16 +23,7 @@ abstract class Endpoint
 
     public function onTextMessage(Connection $conn, string $message) { }
 
-    public function onBinaryMessage(Connection $conn, BinaryMessage $message)
-    {
-        $stream = $message->getStream();
-        
-        try {
-            while (null !== (yield $stream->read()));
-        } finally {
-            $stream->close();
-        }
-    }
+    public function onBinaryMessage(Connection $conn, ReadableStream $message) { }
 
     public function onError(Connection $conn, \Throwable $e) { }
 }
