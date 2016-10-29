@@ -223,6 +223,10 @@ class Connection
         }
         
         if ($frame->finished) {
+            if (!\preg_match('//u', $frame->data)) {
+                throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
+            }
+            
             yield $this->messages->send(new TextMessage($frame->data));
         } else {
             $this->buffer = $frame->data;
@@ -271,6 +275,10 @@ class Connection
                 $this->buffer .= $frame->data;
                 
                 if ($frame->finished) {
+                    if (!\preg_match('//u', $this->buffer)) {
+                        throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
+                    }
+                    
                     yield $this->messages->send(new TextMessage($this->buffer));
                 }
             }
