@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\FileBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
@@ -25,6 +26,7 @@ use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
@@ -505,22 +507,24 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        $bodyStream = yield $body->getReadableStream();
-        
-        if ($nobody || $size === 0) {
-            $chunk = null;
-            $size = 0;
-            $len = 0;
-        } else {
-            $clen = ($size === null) ? 4089 : 4096;
-            $chunk = yield $bodyStream->readBuffer($clen);
-            $len = \strlen($chunk);
-        }
-        
-        if ($chunk === null) {
-            $size = 0;
-        } elseif ($len < $clen) {
-            $size = $len;
+        if (!$body instanceof FileBody) {
+            $bodyStream = yield $body->getReadableStream();
+            
+            if ($nobody || $size === 0) {
+                $chunk = null;
+                $size = 0;
+                $len = 0;
+            } else {
+                $clen = ($size === null) ? 4089 : 4096;
+                $chunk = yield $bodyStream->readBuffer($clen);
+                $len = \strlen($chunk ?? '');
+            }
+            
+            if ($chunk === null) {
+                $size = 0;
+            } elseif ($len < $clen) {
+                $size = $len;
+            }
         }
         
         if ($http11) {
@@ -554,7 +558,11 @@ class Driver implements HttpDriver
         yield $stream->flush();
         
         try {
-            if ($http11 && $size === null) {
+            if ($body instanceof FileBody) {
+                if ($size > 0) {
+                    LoopConfig::currentFilesystem()->sendfile($body->getFile(), $stream->getSocket(), $size);
+                }
+            } elseif ($http11 && $size === null) {
                 yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                 
                 if ($len === $clen) {
@@ -574,7 +582,9 @@ class Driver implements HttpDriver
             
             yield $stream->flush();
         } finally {
-            $bodyStream->close();
+            if (isset($bodyStream)) {
+                $bodyStream->close();
+            }
         }
         
         return !$close;
