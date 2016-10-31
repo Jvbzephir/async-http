@@ -484,32 +484,12 @@ class Driver implements HttpDriver
         
         $response = $this->normalizeResponse($request, $response);
         
-        if ($this->logger) {
-            $reason = \rtrim(' ' . $response->getReasonPhrase());
-            
-            if ($reason === '') {
-                $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
-            }
-            
-            $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
-        }
-        
         $http11 = ($response->getProtocolVersion() == '1.1');
         $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));
         $body = $response->getBody();
         $size = yield $body->getSize();
         
-        $reason = \trim($response->getReasonPhrase());
-        
-        if ($reason === '') {
-            $reason = Http::getReason($response->getStatusCode());
-        }
-        
-        $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
-        
-        if ($body instanceof FileBody && !$socket->isEncrypted()) {
-            // We can use sendfile in this case :)
-        } else {
+        if (!$body instanceof FileBody || $socket->isEncrypted()) {
             $bodyStream = yield $body->getReadableStream();
             
             if ($nobody || $size === 0) {
@@ -529,40 +509,13 @@ class Driver implements HttpDriver
             }
         }
         
-        if ($http11) {
-            if ($size === null) {
-                $buffer .= "Transfer-Encoding: chunked\r\n";
-            } else {
-                $buffer .= "Content-Length: $size\r\n";
-            }
-        } elseif ($size !== null) {
-            $buffer .= "Content-Length: $size\r\n";
-        } else {
-            $close = true;
-        }
-        
-        if ($close) {
-            $buffer .= "Connection: close\r\n";
-        } else {
-            $buffer .= "Connection: keep-alive\r\n";
-            $buffer .= "Keep-Alive: timeout=30\r\n";
-        }
-        
-        foreach ($response->getHeaders() as $name => $header) {
-            $name = Http::normalizeHeaderName($name);
-            
-            foreach ($header as $value) {
-                $buffer .= $name . ': ' . $value . "\r\n";
-            }
-        }
-        
-        yield $socket->write($buffer . "\r\n");
+        yield $socket->write($this->serializeHeaders($response, $close, $size) . "\r\n");
         yield $socket->flush();
         
         try {
             if ($body instanceof FileBody && !$socket->isEncrypted()) {
                 if ($size) {
-                    LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                    yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
                 }
             } elseif ($http11 && $size === null) {
                 yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
@@ -612,5 +565,49 @@ class Driver implements HttpDriver
         }
         
         return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
+    }
+    
+    protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null): string
+    {
+        $reason = \trim($response->getReasonPhrase());
+        
+        if ($reason === '') {
+            $reason = Http::getReason($response->getStatusCode());
+        }
+        
+        $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
+        
+        if ($this->logger) {
+            $this->logger->info(\rtrim($buffer));
+        }
+        
+        if ((float) $response->getProtocolVersion() > 1) {
+            if ($size === null) {
+                $buffer .= "Transfer-Encoding: chunked\r\n";
+            } else {
+                $buffer .= "Content-Length: $size\r\n";
+            }
+        } elseif ($size !== null) {
+            $buffer .= "Content-Length: $size\r\n";
+        } else {
+            $close = true;
+        }
+        
+        if ($close) {
+            $buffer .= "Connection: close\r\n";
+        } else {
+            $buffer .= "Connection: keep-alive\r\n";
+            $buffer .= "Keep-Alive: timeout=30\r\n";
+        }
+        
+        foreach ($response->getHeaders() as $name => $header) {
+            $name = Http::normalizeHeaderName($name);
+        
+            foreach ($header as $value) {
+                $buffer .= $name . ': ' . $value . "\r\n";
+            }
+        }
+        
+        return $buffer;
     }
 }
