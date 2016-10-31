@@ -56,16 +56,16 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(HttpDriverContext $context, SocketStream $stream, callable $action): Awaitable
+    public function handleConnection(HttpDriverContext $context, SocketStream $socket, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($context, $stream, $action) {
-            $remotePeer = $stream->getRemoteAddress();
+        return new Coroutine(function () use ($context, $socket, $action) {
+            $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
                 $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
             }
             
-            $conn = new Connection($stream, new HPack($this->hpackContext), $this->logger);
+            $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
             
             yield $conn->performServerHandshake();
             

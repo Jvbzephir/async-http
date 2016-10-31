@@ -210,7 +210,7 @@ class Connector implements HttpConnector
         return false;
     }
     
-    protected function sendRequest(SocketStream $stream, HttpRequest $request): \Generator
+    protected function sendRequest(SocketStream $socket, HttpRequest $request): \Generator
     {
         $request = $this->normalizeRequest($request);
         
@@ -221,7 +221,7 @@ class Connector implements HttpConnector
         $body = $request->getBody();
         $size = yield $body->getSize();
         
-        if ($body instanceof FileBody && !$stream->isEncrypted()) {
+        if ($body instanceof FileBody && !$socket->isEncrypted()) {
             $chunk = $size ? '' : null;
         } else {
             if ($request->getProtocolVersion() == '1.0' && $size === null) {
@@ -255,11 +255,11 @@ class Connector implements HttpConnector
             $buffer .= "Expect: 100-continue\r\n";
         }
         
-        yield $stream->write($buffer . "\r\n");
-        yield $stream->flush();
+        yield $socket->write($buffer . "\r\n");
+        yield $socket->flush();
         
         if ($expect) {
-            if (!\preg_match("'^HTTP/1\\.1\s+100(?:$|\s)'i", ($line = yield $stream->readLine()))) {
+            if (!\preg_match("'^HTTP/1\\.1\s+100(?:$|\s)'i", ($line = yield $socket->readLine()))) {
                 try {
                     return $line;
                 } finally {
@@ -270,30 +270,30 @@ class Connector implements HttpConnector
             }
         }
         
-        if ($body instanceof FileBody && !$stream->isEncrypted()) {
+        if ($body instanceof FileBody && !$socket->isEncrypted()) {
             if ($size) {
-                yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $stream->getSocket(), $size);
+                yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
             }
         } elseif ($size === null) {
-            yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+            yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
             
             if ($len === $clen) {
                 // Align each chunk with length and line breaks to fit into 4 KB payload.
-                yield new CopyBytes($bodyStream, $stream, true, null, 4089, function (string $chunk) {
+                yield new CopyBytes($bodyStream, $socket, true, null, 4089, function (string $chunk) {
                     return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
                 });
             }
             
-            yield $stream->write("0\r\n\r\n");
+            yield $socket->write("0\r\n\r\n");
         } elseif ($size > 0) {
-            yield $stream->write($chunk);
+            yield $socket->write($chunk);
             
             if ($len === $clen) {
-                yield new CopyBytes($bodyStream, $stream, true, $size - $len);
+                yield new CopyBytes($bodyStream, $socket, true, $size - $len);
             }
         }
         
-        yield $stream->flush();
+        yield $socket->flush();
     }
 
     protected function normalizeRequest(HttpRequest $request): HttpRequest

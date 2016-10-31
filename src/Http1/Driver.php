@@ -137,25 +137,25 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
-    public function handleConnection(HttpDriverContext $context, SocketStream $stream, callable $action): Awaitable
+    public function handleConnection(HttpDriverContext $context, SocketStream $socket, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($stream, $action, $context) {
-            $remotePeer = $stream->getRemoteAddress();
+        return new Coroutine(function () use ($socket, $action, $context) {
+            $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
                 $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
             }
             
             try {
-                $request = yield from $this->parseNextRequest($context, $stream);
+                $request = yield from $this->parseNextRequest($context, $socket);
                 
                 if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
                     try {
-                        if (yield from $this->upgradeConnection($stream, $request, $action)) {
+                        if (yield from $this->upgradeConnection($socket, $request, $action)) {
                             return;
                         }
                     } catch (\Throwable $e) {
-                        return yield from $this->sendErrorResponse($stream, $request, $e);
+                        return yield from $this->sendErrorResponse($socket, $request, $e);
                     }
                 }
                 
@@ -174,13 +174,13 @@ class Driver implements HttpDriver
                     ])));
                 }
                 
-                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($stream, $request, $context) {
-                    yield from $this->parseIncomingRequests($context, $stream, $channel, $request);
+                $pipeline = Channel::fromGenerator(10, function (Channel $channel) use ($socket, $request, $context) {
+                    yield from $this->parseIncomingRequests($context, $socket, $channel, $request);
                 });
                 
                 try {
                     while (null !== ($next = yield $pipeline->receive())) {
-                        if (!yield from $this->processRequest($context, $stream, $action, ...$next)) {
+                        if (!yield from $this->processRequest($context, $socket, $action, ...$next)) {
                             break;
                         }
                     }
@@ -191,7 +191,7 @@ class Driver implements HttpDriver
                 }
             } finally {
                 try {
-                    yield $stream->close();
+                    yield $socket->close();
                 } finally {
                     if ($this->logger) {
                         $this->logger->debug(\sprintf('Closed connection to %s', $remotePeer));
@@ -235,15 +235,15 @@ class Driver implements HttpDriver
     /**
      * Coroutine that parses incoming requests and queues them into the request pipeline.
      * 
-     * @param DuplexStream $stream Stream being used to transmit HTTP messages.
+     * @param DuplexStream $socket Stream being used to transmit HTTP messages.
      * @param Channel $pipeline HTTP request pipeline.
      * @param HttpRequest $request First HTTP request within the pipeline.
      */
-    protected function parseIncomingRequests(HttpDriverContext $context, SocketStream $stream, Channel $pipeline, HttpRequest $request): \Generator
+    protected function parseIncomingRequests(HttpDriverContext $context, SocketStream $socket, Channel $pipeline, HttpRequest $request): \Generator
     {
         try {
             do {
-                $request = $request ?? yield from $this->parseNextRequest($context, $stream);
+                $request = $request ?? yield from $this->parseNextRequest($context, $socket);
                 $close = $this->shouldConnectionBeClosed($request);
                 
                 yield $pipeline->send([
@@ -265,17 +265,17 @@ class Driver implements HttpDriver
     /**
      * Parse the next HTTP request that arrives via the given stream.
      * 
-     * @param SocketStream $stream
+     * @param SocketStream $socket
      * @return HttpRequest
      */
-    protected function parseNextRequest(HttpDriverContext $context, SocketStream $stream): \Generator
+    protected function parseNextRequest(HttpDriverContext $context, SocketStream $socket): \Generator
     {
-        $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($stream)));
+        $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($socket)));
         $request->getBody()->setCascadeClose(false);
         
         if ($request->getProtocolVersion() == '1.1') {
             if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
-                $request->getBody()->setExpectContinue($stream);
+                $request->getBody()->setExpectContinue($socket);
             }
         }
         
@@ -289,7 +289,7 @@ class Driver implements HttpDriver
         }
         
         if ($process) {
-            $protocol = isset($stream->getMetadata()['crypto']['protocol']) ? 'https' : 'http';
+            $protocol = $socket->isEncrypted() ? 'https' : 'http';
             $target = $request->getRequestTarget();
             
             if (\substr($target, 0, 1) === '/') {
@@ -450,7 +450,7 @@ class Driver implements HttpDriver
     /**
      * Send an HTTP error response (will contain some useful data in debug mode).
      */
-    protected function sendErrorResponse(SocketStream $stream, HttpRequest $request, \Throwable $e): \Generator
+    protected function sendErrorResponse(SocketStream $socket, HttpRequest $request, \Throwable $e): \Generator
     {
         $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
         
@@ -471,13 +471,13 @@ class Driver implements HttpDriver
             $response = $response->withBody(new StringBody($e->getMessage()));
         }
         
-        return yield from $this->sendResponse($stream, $request, $response, true);
+        return yield from $this->sendResponse($socket, $request, $response, true);
     }
     
     /**
      * Coroutine that sends the given HTTP response to the connected client.
      */
-    protected function sendResponse(SocketStream $stream, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    protected function sendResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response, bool $close): \Generator
     {
         // Discard request body in another coroutine.
         $request->getBody()->discard();
@@ -507,7 +507,9 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        if (!$body instanceof FileBody) {
+        if ($body instanceof FileBody && !$socket->isEncrypted()) {
+            // We can use sendfile in this case :)
+        } else {
             $bodyStream = yield $body->getReadableStream();
             
             if ($nobody || $size === 0) {
@@ -554,33 +556,33 @@ class Driver implements HttpDriver
             }
         }
         
-        yield $stream->write($buffer . "\r\n");
-        yield $stream->flush();
+        yield $socket->write($buffer . "\r\n");
+        yield $socket->flush();
         
         try {
-            if ($body instanceof FileBody) {
-                if ($size > 0) {
-                    LoopConfig::currentFilesystem()->sendfile($body->getFile(), $stream->getSocket(), $size);
+            if ($body instanceof FileBody && !$socket->isEncrypted()) {
+                if ($size) {
+                    LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
                 }
             } elseif ($http11 && $size === null) {
-                yield $stream->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+                yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                 
                 if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $stream, false, null, 4089, function (string $chunk) {
+                    yield new CopyBytes($bodyStream, $socket, false, null, 4089, function (string $chunk) {
                         return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
                     });
                 }
                 
-                yield $stream->write("0\r\n\r\n");
+                yield $socket->write("0\r\n\r\n");
             } elseif ($chunk !== null) {
-                yield $stream->write($chunk);
+                yield $socket->write($chunk);
                 
                 if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $stream, false, ($size === null) ? null : ($size - $len));
+                    yield new CopyBytes($bodyStream, $socket, false, ($size === null) ? null : ($size - $len));
                 }
             }
             
-            yield $stream->flush();
+            yield $socket->flush();
         } finally {
             if (isset($bodyStream)) {
                 $bodyStream->close();

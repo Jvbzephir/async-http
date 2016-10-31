@@ -34,8 +34,8 @@ interface HttpDriver
      * Handle HTTP request(s) coming in on the given stream.
      * 
      * @param HttpDriverContext $context
-     * @param SocketStream $stream
+     * @param SocketStream $socket
      * @param callable $action
      */
-    public function handleConnection(HttpDriverContext $context, SocketStream $stream, callable $action): Awaitable;
+    public function handleConnection(HttpDriverContext $context, SocketStream $socket, callable $action): Awaitable;
 }
