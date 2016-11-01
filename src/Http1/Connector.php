@@ -130,7 +130,9 @@ class Connector implements HttpConnector
                 
                 $response = yield from $this->parser->parseResponse($context->socket, $line, $request->getMethod() === Http::HEAD);
                 
-                if (!$this->shouldConnectionBeClosed($response)) {
+                if ($response->getStatusCode() === Http::SWITCHING_PROTOCOLS) {
+                    $response = $response->withAttribute(SocketStream::class, $context->socket);
+                } elseif (!$this->shouldConnectionBeClosed($response)) {
                     $ttl = null;
                     $max = null;
                     
@@ -299,7 +301,6 @@ class Connector implements HttpConnector
     protected function normalizeRequest(HttpRequest $request): HttpRequest
     {
         static $remove = [
-            'Connection',
             'Content-Length',
             'Expect',
             'Keep-Alive',
@@ -319,6 +320,20 @@ class Connector implements HttpConnector
                 $request = $request->withProtocolVersion('1.1');
         }
         
+        $tokens = [];
+        
+        foreach ($request->getHeaderTokens('Connection') as $token) {
+            if ($token !== 'close' && $token !== 'keep-alive') {
+                $tokens[] = $token;
+            }
+        }
+        
+        if (empty($tokens)) {
+            $request = $request->withoutHeader('Connection');
+        } else {
+            $request = $request->withHeader('Connection', \implode(', ', $tokens));
+        }
+        
         foreach ($remove as $name) {
             $request = $request->withoutHeader($name);
         }
@@ -328,8 +343,15 @@ class Connector implements HttpConnector
 
     protected function serializeHeaders(HttpRequest $request, int $size = null)
     {
+        if ($request->hasHeader('Connection')) {
+            $request = $request->withAddedHeader('Connection', \implode(', ', \array_merge([
+                $this->keepAlive ? 'keep-alive' : 'close'
+            ], $request->getHeaderTokens('Connection'))));
+        } else {
+            $request = $request->withHeader('Connection', $this->keepAlive ? 'keep-alive' : 'close');
+        }
+        
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        $buffer .= \sprintf("Connection: %s\r\n", $this->keepAlive ? 'keep-alive' : 'close');
         
         if ($this->keepAlive) {
             $buffer .= \sprintf("Keep-Alive: timeout=%u\r\n", $this->pool->getMaxLifetime());
