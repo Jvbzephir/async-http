@@ -31,6 +31,8 @@ class Connection
     
     protected $client;
     
+    protected $protocol;
+    
     protected $processor;
     
     protected $messages;
@@ -45,15 +47,21 @@ class Connection
     
     protected $pings = [];
     
-    public function __construct(SocketStream $socket, bool $client = true)
+    public function __construct(SocketStream $socket, bool $client = true, string $protocol = '')
     {
         $this->socket = $socket;
         $this->client = $client;
+        $this->protocol = $protocol;
         
         $this->messages = new Channel(100);
         $this->writer = new Executor();
         
         $this->processor = new Coroutine($this->processIncomingFrames(), true);
+    }
+    
+    public function getProtocol(): string
+    {
+        return $this->protocol;
     }
 
     public function shutdown(): Awaitable
