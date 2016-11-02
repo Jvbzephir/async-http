@@ -73,12 +73,13 @@ class ConnectionHandler implements UpgradeResultHandler
         
         $accept = \base64_encode(\sha1($request->getHeaderLine('Sec-WebSocket-Key') . self::GUID, true));
         
-        $response = new HttpResponse(Http::SWITCHING_PROTOCOLS);
+        $response = new HttpResponse(Http::SWITCHING_PROTOCOLS, [
+            'Upgrade' => 'websocket',
+            'Sec-WebSocket-Version' => '13',
+            'Sec-WebSocket-Accept' => $accept
+        ]);
         
-        $response = $response->withHeader('Upgrade', 'websocket');
-        $response = $response->withHeader('Sec-WebSocket-Accept', $accept);
-        $response = $response->withHeader('Sec-WebSocket-Version', '13');
-        
+        $response = $response->withReason('WebSocket Handshake');
         $response = $response->withAttribute(Endpoint::class, $endpoint);
         
         return $response;
@@ -96,10 +97,10 @@ class ConnectionHandler implements UpgradeResultHandler
         }
         
         if ($this->logger) {
-            $this->logger->info(\sprintf('HTTP/%s connection upgraded to WebSocket', $request->getProtocolVersion()));
+            $this->logger->debug(\sprintf('HTTP/%s connection upgraded to WebSocket', $request->getProtocolVersion()));
         }
         
-        yield from $this->delegateToEndpoint(new Connection($socket, false), $endpoint);
+        yield from $this->delegateToEndpoint(new Connection($socket, false, '', $this->logger), $endpoint);
     }
 
     /**

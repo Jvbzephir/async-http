@@ -70,6 +70,14 @@ class HttpResponse extends HttpMessage
         
         return $response;
     }
+    
+    public function withReason(string $reason)
+    {
+        $response = clone $this;
+        $response->reason = \trim($reason);
+        
+        return $response;
+    }
 
     protected function filterStatus(int $status): int
     {

@@ -20,6 +20,7 @@ use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
+use Psr\Log\LogLevel;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/websocket.php';
@@ -29,7 +30,9 @@ $logger = new class() implements LoggerInterface {
 
     public function log($level, $message, array $context = [])
     {
-        fwrite(STDERR, sprintf("[%s] %s%s", strtoupper($level), $message, PHP_EOL));
+        if ($level != LogLevel::DEBUG) {
+            fwrite(STDERR, sprintf("[%s] %s%s", strtoupper($level), $message, PHP_EOL));
+        }
     }
 };
 

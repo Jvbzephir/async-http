@@ -83,7 +83,7 @@ class Client
         }
         
         if ($this->logger) {
-            $this->logger->info(\sprintf('Established WebSocket connection to %s', $uri));
+            $this->logger->debug(\sprintf('Established WebSocket connection to %s (%s)', $socket->getRemoteAddress(), $uri));
         }
         
         return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);

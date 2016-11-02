@@ -206,7 +206,7 @@ class Connection
                 }
             } finally {
                 if ($this->logger) {
-                    $this->logger->info('WebSocket connection closed');
+                    $this->logger->debug(\sprintf('WebSocket connection to %s closed', $this->socket->getRemoteAddress()));
                 }
                 
                 $this->socket->close();

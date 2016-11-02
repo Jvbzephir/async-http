@@ -62,7 +62,7 @@ class Driver implements HttpDriver, UpgradeHandler
             $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
+                $this->logger->debug(\sprintf('Accepted new HTTP/2 connection from %s', $remotePeer));
             }
             
             $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
@@ -78,7 +78,7 @@ class Driver implements HttpDriver, UpgradeHandler
                     yield $conn->shutdown();
                 } finally {
                     if ($this->logger) {
-                        $this->logger->debug(\sprintf('Closed connection to %s', $remotePeer));
+                        $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
                     }
                 }
             }
@@ -124,6 +124,11 @@ class Driver implements HttpDriver, UpgradeHandler
         yield $request->getBody()->discard();
         
         $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
+        
+        if ($this->logger) {
+            $this->logger->info(\rtrim($buffer));
+        }
+        
         $buffer .= "Connection: upgrade\r\n";
         $buffer .= "Upgrade: h2c\r\n";
         
@@ -137,12 +142,20 @@ class Driver implements HttpDriver, UpgradeHandler
             $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
         }
         
+        $remotePeer = $socket->getRemoteAddress();
+        
         try {
             while (null !== ($received = yield $conn->nextRequest())) {
                 new Coroutine($this->processRequest($conn, $action, ...$received), true);
             }
         } finally {
-            yield $conn->shutdown();
+            try {
+                yield $conn->shutdown();
+            } finally {
+                if ($this->logger) {
+                    $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
+                }
+            }
         }
     }
 
@@ -161,6 +174,10 @@ class Driver implements HttpDriver, UpgradeHandler
             throw new StatusException(Http::BAD_REQUEST, 'Invalid HTTP/2 connection preface body');
         }
         
+        if ($this->logger) {
+            $this->logger->info(Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()));
+        }
+        
         $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
         
         yield $conn->performServerHandshake(null, true);
@@ -169,12 +186,20 @@ class Driver implements HttpDriver, UpgradeHandler
             $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
         }
         
+        $remotePeer = $socket->getRemoteAddress();
+        
         try {
             while (null !== ($received = yield $conn->nextRequest())) {
                 new Coroutine($this->processRequest($conn, $action, ...$received), true);
             }
         } finally {
-            yield $conn->shutdown();
+            try {
+                yield $conn->shutdown();
+            } finally {
+                if ($this->logger) {
+                    $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
+                }
+            }
         }
     }
     

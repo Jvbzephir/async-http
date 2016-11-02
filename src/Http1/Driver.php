@@ -143,7 +143,7 @@ class Driver implements HttpDriver
             $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new connection from %s', $remotePeer));
+                $this->logger->debug(\sprintf('Accepted new HTTP/1 connection from %s', $remotePeer));
             }
             
             try {
@@ -194,7 +194,7 @@ class Driver implements HttpDriver
                     yield $socket->close();
                 } finally {
                     if ($this->logger) {
-                        $this->logger->debug(\sprintf('Closed connection to %s', $remotePeer));
+                        $this->logger->debug(\sprintf('Closed HTTP/1 connection to %s', $remotePeer));
                     }
                 }
             }
@@ -430,7 +430,18 @@ class Driver implements HttpDriver
         
         $response = $this->normalizeResponse($request, $response);
         
-        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
+        $reason = \trim($response->getReasonPhrase());
+        
+        if ($reason === '') {
+            $reason = Http::getReason($response->getStatusCode());
+        }
+        
+        $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
+        
+        if ($this->logger) {
+            $this->logger->info(\rtrim($buffer));
+        }
+        
         $buffer .= "Connection: upgrade\r\n";
         
         foreach ($response->getHeaders() as $name => $header) {
