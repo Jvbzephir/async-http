@@ -143,7 +143,9 @@ class Driver implements HttpDriver
             $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new HTTP/1 connection from %s', $remotePeer));
+                $this->logger->debug('Accepted new HTTP/1 connection from {peer}', [
+                    'peer' => $remotePeer
+                ]);
             }
             
             try {
@@ -194,7 +196,9 @@ class Driver implements HttpDriver
                     yield $socket->close();
                 } finally {
                     if ($this->logger) {
-                        $this->logger->debug(\sprintf('Closed HTTP/1 connection to %s', $remotePeer));
+                        $this->logger->debug('Closed HTTP/1 connection to {peer}', [
+                            'peer' => $remotePeer
+                        ]);
                     }
                 }
             }
@@ -338,7 +342,11 @@ class Driver implements HttpDriver
         ];
         
         if ($this->logger) {
-            $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            $this->logger->info('{method} {target} HTTP/{protocol}', [
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion()
+            ]);
         }
         
         try {
@@ -433,15 +441,18 @@ class Driver implements HttpDriver
         $reason = \trim($response->getReasonPhrase());
         
         if ($reason === '') {
-            $reason = Http::getReason($response->getStatusCode());
+            $reason = \trim(Http::getReason($response->getStatusCode()));
+        }
+        
+        if ($this->logger) {
+            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                'protocol' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'reason' => $reason
+            ]);
         }
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
-        
-        if ($this->logger) {
-            $this->logger->info(\rtrim($buffer));
-        }
-        
         $buffer .= "Connection: upgrade\r\n";
         
         foreach ($response->getHeaders() as $name => $header) {
@@ -474,7 +485,12 @@ class Driver implements HttpDriver
                 }
             }
         } elseif ($this->logger) {
-            $this->logger->critical(sprintf('[%s] "%s" in %s at line %s', \get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()));
+            $this->logger->critical('{error} "{message}" in {file} at line {line}', [
+                'error' => \get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
         }
         
         if ($this->debug) {
@@ -583,14 +599,18 @@ class Driver implements HttpDriver
         $reason = \trim($response->getReasonPhrase());
         
         if ($reason === '') {
-            $reason = Http::getReason($response->getStatusCode());
+            $reason = \trim(Http::getReason($response->getStatusCode()));
+        }
+        
+        if ($this->logger) {
+            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                'protocol' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'reason' => $reason
+            ]);
         }
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
-        
-        if ($this->logger) {
-            $this->logger->info(\rtrim($buffer));
-        }
         
         if ((float) $response->getProtocolVersion() > 1) {
             if ($size === null) {

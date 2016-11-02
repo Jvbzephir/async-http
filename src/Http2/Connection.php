@@ -187,7 +187,7 @@ class Connection
             $this->processor = new Coroutine($this->processIncomingFrames($frames), true);
             
             if ($this->logger) {
-                $this->logger->debug("Performed HTTP/2 client handshake");
+                $this->logger->debug('Performed HTTP/2 client handshake');
             }
         });
     }
@@ -234,7 +234,7 @@ class Connection
             $this->processor = new Coroutine($this->processIncomingFrames(), true);
             
             if ($this->logger) {
-                $this->logger->debug("Performed HTTP/2 server handshake");
+                $this->logger->debug('Performed HTTP/2 server handshake');
             }
         });
     }
@@ -244,7 +244,9 @@ class Connection
         $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
         
         if ($this->logger) {
-            $this->logger->debug("New stream created: {$this->nextStreamId}");
+            $this->logger->debug('New stream created: {id}', [
+                'id' => $stream->getId()
+            ]);
         }
         
         $this->nextStreamId += 2;
@@ -274,7 +276,9 @@ class Connection
         });
         
         if ($this->logger) {
-            $this->logger->debug("Accepted stream initiated by client: {$streamId}");
+            $this->logger->debug('Accepted stream initiated by client: {id}', [
+                'id' => $streamId
+            ]);
         }
         
         return $this->streams[$streamId] = $stream;
@@ -288,7 +292,9 @@ class Connection
             unset($this->streams[$streamId]);
             
             if ($this->logger) {
-                $this->logger->debug("Closed stream: {$streamId}");
+                $this->logger->debug('Closed stream: {id}', [
+                    'id' => $streamId
+                ]);
             }
         }
     }
@@ -324,14 +330,6 @@ class Connection
             $frame = new Frame($type, yield $this->socket->readBuffer($length, true), \ord($header[4]));
         } else {
             $frame = new Frame($type, '', \ord($header[4]));
-        }
-        
-        if ($this->logger) {
-            if ($stream) {
-                $this->logger->debug("IN [$stream] $frame");
-            } else {
-                $this->logger->debug("IN $frame");
-            }
         }
         
         return $frame;
@@ -574,10 +572,6 @@ class Connection
     public function writeFrame(Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($frame) {
-            if ($this->logger) {
-                $this->logger->debug("OUT $frame");
-            }
-            
             return $this->socket->write($frame->encode(0));
         }, $priority);
     }
@@ -585,10 +579,6 @@ class Connection
     public function writeStreamFrame(int $stream, Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream, $frame) {
-            if ($this->logger) {
-                $this->logger->debug("OUT [$stream] $frame");
-            }
-            
             return $this->socket->write($frame->encode($stream));
         }, $priority);
     }
@@ -599,10 +589,6 @@ class Connection
             $len = 0;
             
             foreach ($frames as $frame) {
-                if ($this->logger) {
-                    $this->logger->debug("OUT [$stream] $frame");
-                }
-                
                 $len += yield $this->socket->write($frame->encode($stream));
             }
             

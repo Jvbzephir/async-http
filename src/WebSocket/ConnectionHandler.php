@@ -97,7 +97,10 @@ class ConnectionHandler implements UpgradeResultHandler
         }
         
         if ($this->logger) {
-            $this->logger->debug(\sprintf('HTTP/%s connection upgraded to WebSocket', $request->getProtocolVersion()));
+            $this->logger->debug('HTTP/{protocol} connection from {peer} upgraded to WebSocket', [
+                'protocol' => $request->getProtocolVersion(),
+                'peer' => $socket->getRemoteAddress()
+            ]);
         }
         
         yield from $this->delegateToEndpoint(new Connection($socket, false, '', $this->logger), $endpoint);

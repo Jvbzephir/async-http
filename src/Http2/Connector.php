@@ -146,7 +146,11 @@ class Connector implements HttpConnector
             }
             
             if ($this->logger) {
-                $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+                $this->logger->info('{method} {target} HTTP/{protocol}', [
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'protocol' => $request->getProtocolVersion()
+                ]);
             }
             
             $request = $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
@@ -154,13 +158,17 @@ class Connector implements HttpConnector
             $response = yield $conn->openStream()->sendRequest($request);
             
             if ($this->logger) {
-                $reason = \rtrim(' ' . $response->getReasonPhrase());
+                $reason = \trim($response->getReasonPhrase());
                 
                 if ($reason === '') {
-                    $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
+                    $reason = \trim(Http::getReason($response->getStatusCode()));
                 }
                 
-                $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+                $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                    'protocol' => $response->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'reason' => $reason
+                ]);
             }
             
             if (isset($this->connecting[$key])) {

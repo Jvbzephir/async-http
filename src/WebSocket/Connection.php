@@ -148,10 +148,6 @@ class Connection
 
     protected function writeFrame(Frame $frame): Awaitable
     {
-        if ($this->logger) {
-            $this->logger->debug("OUT $frame");
-        }
-        
         return $this->socket->write($frame->encode($this->client ? \random_bytes(4) : null));
     }
 
@@ -162,10 +158,6 @@ class Connection
         try {
             while (true) {
                 $frame = yield from $this->readNextFrame();
-                
-                if ($this->logger) {
-                    $this->logger->debug("IN $frame");
-                }
                 
                 if ($frame->isControlFrame()) {
                     if (!yield from $this->handleControlFrame($frame)) {
@@ -206,7 +198,9 @@ class Connection
                 }
             } finally {
                 if ($this->logger) {
-                    $this->logger->debug(\sprintf('WebSocket connection to %s closed', $this->socket->getRemoteAddress()));
+                    $this->logger->debug('WebSocket connection to {peer} closed', [
+                        'peer' => $this->socket->getRemoteAddress()
+                    ]);
                 }
                 
                 $this->socket->close();

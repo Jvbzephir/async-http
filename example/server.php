@@ -18,23 +18,23 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
-use Psr\Log\LoggerInterface;
-use Psr\Log\LoggerTrait;
-use Psr\Log\LogLevel;
+
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+use Monolog\Processor\IntrospectionProcessor;
+use Monolog\Processor\PsrLogMessageProcessor;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/websocket.php';
 
-$logger = new class() implements LoggerInterface {
-    use LoggerTrait;
+$stderr = new StreamHandler(STDERR, Logger::DEBUG);
+$stderr->setFormatter(new LineFormatter("[%extra.class%] [%level_name%] %message%\n"));
 
-    public function log($level, $message, array $context = [])
-    {
-        if ($level != LogLevel::DEBUG) {
-            fwrite(STDERR, sprintf("[%s] %s%s", strtoupper($level), $message, PHP_EOL));
-        }
-    }
-};
+$logger = new Logger('server');
+$logger->pushHandler($stderr);
+$logger->pushProcessor(new IntrospectionProcessor());
+$logger->pushProcessor(new PsrLogMessageProcessor());
 
 Loop::setErrorHandler(function (\Throwable $e) {
     fwrite(STDERR, "$e\n\n");

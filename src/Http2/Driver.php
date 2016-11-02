@@ -62,7 +62,9 @@ class Driver implements HttpDriver, UpgradeHandler
             $remotePeer = $socket->getRemoteAddress();
             
             if ($this->logger) {
-                $this->logger->debug(\sprintf('Accepted new HTTP/2 connection from %s', $remotePeer));
+                $this->logger->debug('Accepted new HTTP/2 connection from {peer}', [
+                    'peer' => $remotePeer
+                ]);
             }
             
             $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
@@ -78,7 +80,9 @@ class Driver implements HttpDriver, UpgradeHandler
                     yield $conn->shutdown();
                 } finally {
                     if ($this->logger) {
-                        $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
+                        $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                            'peer' => $remotePeer
+                        ]);
                     }
                 }
             }
@@ -123,12 +127,15 @@ class Driver implements HttpDriver, UpgradeHandler
         // Discard request body before switching to HTTP/2.
         yield $request->getBody()->discard();
         
-        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
-        
         if ($this->logger) {
-            $this->logger->info(\rtrim($buffer));
+            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                'protocol' => $request->getProtocolVersion(),
+                'status' => Http::SWITCHING_PROTOCOLS,
+                'reason' => \trim(Http::getReason(Http::SWITCHING_PROTOCOLS))
+            ]);
         }
         
+        $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
         $buffer .= "Connection: upgrade\r\n";
         $buffer .= "Upgrade: h2c\r\n";
         
@@ -139,7 +146,10 @@ class Driver implements HttpDriver, UpgradeHandler
         yield $conn->performServerHandshake(new Frame(Frame::SETTINGS, $settings));
         
         if ($this->logger) {
-            $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
+            $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
+                'protocol' => $request->getProtocolVersion(),
+                'peer' => $socket->getRemoteAddress()
+            ]);
         }
         
         $remotePeer = $socket->getRemoteAddress();
@@ -153,7 +163,9 @@ class Driver implements HttpDriver, UpgradeHandler
                 yield $conn->shutdown();
             } finally {
                 if ($this->logger) {
-                    $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
+                    $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                        'peer' => $remotePeer
+                    ]);
                 }
             }
         }
@@ -175,7 +187,11 @@ class Driver implements HttpDriver, UpgradeHandler
         }
         
         if ($this->logger) {
-            $this->logger->info(Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()));
+            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                'protocol' => $request->getProtocolVersion(),
+                'status' => Http::SWITCHING_PROTOCOLS,
+                'reason' => \trim(Http::getReason(Http::SWITCHING_PROTOCOLS))
+            ]);
         }
         
         $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
@@ -183,7 +199,10 @@ class Driver implements HttpDriver, UpgradeHandler
         yield $conn->performServerHandshake(null, true);
         
         if ($this->logger) {
-            $this->logger->info(\sprintf('HTTP/%s connection upgraded to HTTP/2', $request->getProtocolVersion()));
+            $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
+                'protocol' => $request->getProtocolVersion(),
+                'peer' => $socket->getRemoteAddress()
+            ]);
         }
         
         $remotePeer = $socket->getRemoteAddress();
@@ -197,7 +216,9 @@ class Driver implements HttpDriver, UpgradeHandler
                 yield $conn->shutdown();
             } finally {
                 if ($this->logger) {
-                    $this->logger->debug(\sprintf('Closed HTTP/2 connection to %s', $remotePeer));
+                    $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                        'peer' => $remotePeer
+                    ]);
                 }
             }
         }
@@ -229,7 +250,11 @@ class Driver implements HttpDriver, UpgradeHandler
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
         if ($this->logger) {
-            $this->logger->info(\sprintf('%s %s HTTP/%s', $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion()));
+            $this->logger->info('{method} {target} HTTP/{protocol}', [
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion()
+            ]);
         }
         
         $next = new NextMiddleware($context->middleware, $action);
@@ -240,7 +265,9 @@ class Driver implements HttpDriver, UpgradeHandler
             if ($this->logger) {
                 $type = \is_object($response) ? \get_class($response) : \gettype($response);
                 
-                $this->logger->error(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                $this->logger->error('Expecting HTTP response, server action returned {type}', [
+                    'type' => $type
+                ]);
             }
             
             $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
@@ -250,13 +277,17 @@ class Driver implements HttpDriver, UpgradeHandler
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         
         if ($this->logger) {
-            $reason = \rtrim(' ' . $response->getReasonPhrase());
+            $reason = \trim($response->getReasonPhrase());
             
             if ($reason === '') {
-                $reason = \rtrim(' ' . Http::getReason($response->getStatusCode()));
+                $reason = \trim(Http::getReason($response->getStatusCode()));
             }
             
-            $this->logger->info(\sprintf('HTTP/%s %03u%s', $response->getProtocolVersion(), $response->getStatusCode(), $reason));
+            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                'protocol' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'reason' => $reason
+            ]);
         }
         
         yield $stream->sendResponse($request, $response);
