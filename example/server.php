@@ -36,10 +36,6 @@ $logger->pushHandler($stderr);
 $logger->pushProcessor(new IntrospectionProcessor());
 $logger->pushProcessor(new PsrLogMessageProcessor());
 
-Loop::setErrorHandler(function (\Throwable $e) {
-    fwrite(STDERR, "$e\n\n");
-});
-
 Loop::execute(function () use ($logger) {
     $websocket = new ExampleEndpoint();
     

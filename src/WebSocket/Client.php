@@ -48,6 +48,7 @@ class Client
 
     protected function handshake(string $uri, array $protocols): \Generator
     {
+        $location = $uri;
         $m = null;
         
         if (\preg_match("'^(wss?)://.+$'i", $uri, $m)) {
@@ -85,7 +86,7 @@ class Client
         if ($this->logger) {
             $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
                 'peer' => $socket->getRemoteAddress(),
-                'uri' => $uri
+                'uri' => $location
             ]);
         }
         
