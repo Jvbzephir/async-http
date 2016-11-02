@@ -18,25 +18,14 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
-
-use Monolog\Formatter\LineFormatter;
-use Monolog\Handler\StreamHandler;
-use Monolog\Logger;
-use Monolog\Processor\IntrospectionProcessor;
-use Monolog\Processor\PsrLogMessageProcessor;
+use KoolKode\Async\Test\TestLogger;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/websocket.php';
 
-$stderr = new StreamHandler(STDERR, Logger::DEBUG);
-$stderr->setFormatter(new LineFormatter("[%extra.class%] [%level_name%] %message%\n"));
-
-$logger = new Logger('server');
-$logger->pushHandler($stderr);
-$logger->pushProcessor(new IntrospectionProcessor());
-$logger->pushProcessor(new PsrLogMessageProcessor());
-
-Loop::execute(function () use ($logger) {
+Loop::execute(function () {
+    $logger = new TestLogger(STDERR);
+    
     $websocket = new ExampleEndpoint();
     
     $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $logger);
