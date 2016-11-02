@@ -145,6 +145,9 @@ class Connector implements HttpConnector
                 $this->connections[$key] = $conn;
             }
             
+            $request = $request->withProtocolVersion('2.0');
+            $request = $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
+            
             if ($this->logger) {
                 $this->logger->info('{method} {target} HTTP/{protocol}', [
                     'method' => $request->getMethod(),
@@ -152,8 +155,6 @@ class Connector implements HttpConnector
                     'protocol' => $request->getProtocolVersion()
                 ]);
             }
-            
-            $request = $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
             
             $response = yield $conn->openStream()->sendRequest($request);
             
