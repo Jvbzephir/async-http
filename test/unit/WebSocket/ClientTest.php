@@ -19,7 +19,7 @@ class ClientTest extends AsyncTestCase
     {
         $client = new Client();
         
-        $conn = yield $client->connect('ws://echo.websocket.org/');
+        $conn = yield $client->connect('wss://echo.websocket.org/');
         
         $this->assertTrue($conn instanceof Connection);
         

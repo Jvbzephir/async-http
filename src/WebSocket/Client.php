@@ -20,6 +20,7 @@ use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
+use Psr\Log\LoggerInterface;
 
 class Client
 {
@@ -31,10 +32,13 @@ class Client
     const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     
     protected $httpClient;
+    
+    protected $logger;
 
-    public function __construct(HttpClient $httpClient = null)
+    public function __construct(HttpClient $httpClient = null, LoggerInterface $logger = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
+        $this->logger = $logger;
     }
 
     public function connect(string $uri, array $protocols = []): Awaitable
@@ -78,7 +82,11 @@ class Client
             throw new \RuntimeException('Failed to access HTTP socket stream via response attribute');
         }
         
-        return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'));
+        if ($this->logger) {
+            $this->logger->info(\sprintf('Established WebSocket connection to %s', $uri));
+        }
+        
+        return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
     }
     
     protected function assertHandshakeSucceeded(HttpResponse $response, string $nonce)

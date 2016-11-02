@@ -24,6 +24,7 @@ use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
+use Psr\Log\LoggerInterface;
 
 class Connection
 {
@@ -47,11 +48,14 @@ class Connection
     
     protected $pings = [];
     
-    public function __construct(SocketStream $socket, bool $client = true, string $protocol = '')
+    protected $logger;
+    
+    public function __construct(SocketStream $socket, bool $client = true, string $protocol = '', LoggerInterface $logger = null)
     {
         $this->socket = $socket;
         $this->client = $client;
         $this->protocol = $protocol;
+        $this->logger = $logger;
         
         $this->messages = new Channel(100);
         $this->writer = new Executor();
@@ -144,6 +148,10 @@ class Connection
 
     protected function writeFrame(Frame $frame): Awaitable
     {
+        if ($this->logger) {
+            $this->logger->debug("OUT $frame");
+        }
+        
         return $this->socket->write($frame->encode($this->client ? \random_bytes(4) : null));
     }
 
@@ -154,6 +162,10 @@ class Connection
         try {
             while (true) {
                 $frame = yield from $this->readNextFrame();
+                
+                if ($this->logger) {
+                    $this->logger->debug("IN $frame");
+                }
                 
                 if ($frame->isControlFrame()) {
                     if (!yield from $this->handleControlFrame($frame)) {
@@ -193,6 +205,10 @@ class Connection
                     yield $this->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));
                 }
             } finally {
+                if ($this->logger) {
+                    $this->logger->info('WebSocket connection closed');
+                }
+                
                 $this->socket->close();
             }
         }
