@@ -87,17 +87,7 @@ class Client
         }
         
         $nonce = \base64_encode(\random_bytes(16));
-        
-        $request = new HttpRequest($uri, Http::GET, [
-            'Connection' => 'upgrade',
-            'Upgrade' => 'websocket',
-            'Sec-WebSocket-Version' => '13',
-            'Sec-WebSocket-Key' => $nonce
-        ]);
-        
-        if (!empty($protocols)) {
-            $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));
-        }
+        $request = $this->createHandshakeRequest($uri, $nonce, $protocols);
         
         $response = yield $this->httpClient->send($request);
         
@@ -122,6 +112,30 @@ class Client
         }
         
         return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
+    }
+
+    /**
+     * Create an HTTP/1.1 request that initiates the WebSocket handshake.
+     * 
+     * @param string $uri URI using http(s) scheme.
+     * @param string $nonce Random nonce to be used to confirm the handshake response.
+     * @param array $protocols Application protocols supported by the client.
+     * @return HttpRequest Handshek request.
+     */
+    protected function createHandshakeRequest(string $uri, string $nonce, array $protocols): HttpRequest
+    {
+        $request = new HttpRequest($uri, Http::GET, [
+            'Connection' => 'upgrade',
+            'Upgrade' => 'websocket',
+            'Sec-WebSocket-Version' => '13',
+            'Sec-WebSocket-Key' => $nonce
+        ]);
+        
+        if (!empty($protocols)) {
+            $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));
+        }
+        
+        return $request;
     }
     
     /**
