@@ -13,4 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+/**
+ * Exception that will close a WebSocket connection if not handled within application code.
+ * 
+ * @author Martin Schröder
+ */
 class ConnectionException extends \RuntimeException { }

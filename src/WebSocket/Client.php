@@ -22,6 +22,11 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerInterface;
 
+/**
+ * WebSocket client that can be used to establish connections to remote WebSocket endpoints.
+ * 
+ * @author Martin Schröder
+ */
 class Client
 {
     /**
@@ -31,21 +36,47 @@ class Client
      */
     const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     
+    /**
+     * HTTP client being used to perform the initial handshake.
+     * 
+     * @var HttpClient
+     */
     protected $httpClient;
     
+    /**
+     * PSR logger instance (optional).
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
 
+    /**
+     * Cretae a new WebSocket client.
+     * 
+     * @param HttpClient $httpClient HTTP client to be used for handshake request (requires HTTP/1 connector).
+     * @param LoggerInterface $logger
+     */
     public function __construct(HttpClient $httpClient = null, LoggerInterface $logger = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
         $this->logger = $logger;
     }
 
+    /**
+     * Connect to the given WebSocket endpoint.
+     * 
+     * @param string $uri WebSocket ws(s):// or http(s):// URL.
+     * @param array $protocols Optional application protocols to be advertised to the remote endpoint.
+     * @return Connection
+     */
     public function connect(string $uri, array $protocols = []): Awaitable
     {
         return new Coroutine($this->handshake($uri, $protocols));
     }
 
+    /**
+     * Coroutine that performs the WebSocket handshake and upgrades the socket connection to a WebSocket in client mode.
+     */
     protected function handshake(string $uri, array $protocols): \Generator
     {
         $location = $uri;
@@ -93,6 +124,9 @@ class Client
         return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
     }
     
+    /**
+     * Assert that the given response indicates a succeeded WebSocket handshake.
+     */
     protected function assertHandshakeSucceeded(HttpResponse $response, string $nonce)
     {
         if ($response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {

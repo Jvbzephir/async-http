@@ -13,6 +13,11 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+/**
+ * Encapsulates a single WebSocket frame.
+ * 
+ * @author Martin Schröder
+ */
 class Frame
 {
     const CONTINUATION = 0x00;
@@ -27,12 +32,32 @@ class Frame
 
     const PONG = 0x0A;
 
+    /**
+     * Finished bit that indicates the end of a message.
+     * 
+     * @var int
+     */
     const FINISHED = 0b10000000;
 
+    /**
+     * Mask being used to read the opcode of a frame.
+     * 
+     * @var int
+     */
     const OPCODE = 0b00001111;
 
+    /**
+     * Masked bit being used to indicate a masked frame sent by a client.
+     * 
+     * @var int
+     */
     const MASKED = 0b10000000;
 
+    /**
+     * Mask being used to read the first length byte.
+     * 
+     * @var int
+     */
     const LENGTH = 0b01111111;
 
     /**
@@ -79,12 +104,34 @@ class Frame
      */
     const UNEXPECTED_CONDITION = 1011;
 
-    public $finished;
-
+    /**
+     * Opcode of the frame.
+     * 
+     * @var int
+     */
     public $opcode;
 
+    /**
+     * Finished flag (indicates the end of a message).
+     *
+     * @var bool
+     */
+    public $finished;
+    
+    /**
+     * Frame payload (masked frames must be unmasked before setting data).
+     * 
+     * @var string
+     */
     public $data;
 
+    /**
+     * Crate a new WebSocket frame.
+     * 
+     * @param int $opcode
+     * @param string $data
+     * @param bool $finished
+     */
     public function __construct(int $opcode, string $data, bool $finished = true)
     {
         $this->finished = $finished;
@@ -92,11 +139,17 @@ class Frame
         $this->data = $data;
     }
 
+    /**
+     * Display meta data and length of the frame.
+     */
     public function __toString(): string
     {
         return \sprintf("%s [%s] %u bytes", $this->getOpcodeName(), $this->finished ? 'F' : 'C', \strlen($this->data));
     }
 
+    /**
+     * Dump frame in a human-readable way.
+     */
     public function __debugInfo(): array
     {
         $debug = \get_object_vars($this);
@@ -106,6 +159,12 @@ class Frame
         return $debug;
     }
 
+    /**
+     * Encode the given frame for transmission.
+     * 
+     * @param string $mask Optional random mask to be applied to the frame (length must be 4 bytes exactly).
+     * @return string
+     */
     public function encode(string $mask = null): string
     {
         $header = \chr(($this->finished ? self::FINISHED : 0) | $this->opcode);
@@ -131,6 +190,9 @@ class Frame
         return $header . $mask . ($this->data ^ \str_pad($mask, $len, $mask, \STR_PAD_RIGHT));
     }
 
+    /**
+     * Get a human-readable name for the frame's opcode.
+     */
     public function getOpcodeName(): string
     {
         switch ($this->opcode) {
@@ -151,6 +213,11 @@ class Frame
         return '*UNKNOWN*';
     }
 
+    /**
+     * Check if the frame is a control frame.
+     * 
+     * @return bool
+     */
     public function isControlFrame(): bool
     {
         return $this->opcode >= self::CONNECTION_CLOSE;

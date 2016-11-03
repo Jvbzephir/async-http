@@ -43,6 +43,11 @@ class ConnectionHandler implements UpgradeResultHandler
      */
     protected $logger;
 
+    /**
+     * Create a new WebSocket HTTP/1 upgrade handler.
+     * 
+     * @param LoggerInterface $logger
+     */
     public function __construct(LoggerInterface $logger = null)
     {
         $this->logger = $logger;
@@ -136,6 +141,9 @@ class ConnectionHandler implements UpgradeResultHandler
         }
     }
 
+    /**
+     * Ensure endpoint generators / returned promises are completed before the next message is dispatched.
+     */
     protected function invokeAsync($result): \Generator
     {
         if ($result instanceof \Generator) {

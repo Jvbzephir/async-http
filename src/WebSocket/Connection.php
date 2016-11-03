@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Failure;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
@@ -26,30 +27,102 @@ use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerInterface;
 
+/**
+ * WebSocket connection based on a socket and the protocol defined in RFC 6455.
+ * 
+ * @link https://tools.ietf.org/html/rfc6455
+ * 
+ * @author Martin Schröder
+ */
 class Connection
 {
+    /**
+     * Socket stream being used to transmit frames.
+     * 
+     * @var SocketStream
+     */
     protected $socket;
     
+    /**
+     * Client mode flag.
+     * 
+     * @var bool
+     */
     protected $client;
     
+    /**
+     * Negotiated application protocol.
+     * 
+     * @var string
+     */
     protected $protocol;
     
+    /**
+     * Inbound WebSocket frame handler.
+     * 
+     * @var Coroutine
+     */
     protected $processor;
     
+    /**
+     * Buffer for received WebSocket messages.
+     * 
+     * @var Channel
+     */
     protected $messages;
     
+    /**
+     * Executor that syncs frames being written to the socket.
+     * 
+     * @var Executor
+     */
     protected $writer;
     
+    /**
+     * Message buffer that is being used to reassemble fragmented messages.
+     * 
+     * @var string|Channel
+     */
     protected $buffer;
     
+    /**
+     * Maximum frame size (in bytes).
+     * 
+     * @var int
+     */
     protected $maxFrameSize = 0xFFFF;
     
+    /**
+     * Maximum text message size (in bytes).
+     * 
+     * @var int
+     */
     protected $maxTextMessageSize = 0x80000;
     
+    /**
+     * Holds references to pings that are waiting for a pong frame.
+     * 
+     * Each ping transmits a payload of random bytes that is used as key in this array.
+     * 
+     * @var array
+     */
     protected $pings = [];
     
+    /**
+     * PSR logger instance (optional).
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
     
+    /**
+     * Create a new WebSocket connection.
+     * 
+     * @param SocketStream $socket Underlying socket transport.
+     * @param bool $client Use client mode?
+     * @param string $protocol Negotiated application protocol.
+     * @param LoggerInterface $logger Optional PSR logger.
+     */
     public function __construct(SocketStream $socket, bool $client = true, string $protocol = '', LoggerInterface $logger = null)
     {
         $this->socket = $socket;
@@ -57,17 +130,29 @@ class Connection
         $this->protocol = $protocol;
         $this->logger = $logger;
         
-        $this->messages = new Channel(100);
+        $this->messages = new Channel(4);
         $this->writer = new Executor();
         
         $this->processor = new Coroutine($this->processIncomingFrames(), true);
     }
     
+    /**
+     * Get the negotiated application protocol.
+     * 
+     * Returns an empty string if no protocol has been negotiated.
+     * 
+     * @return string
+     */
     public function getProtocol(): string
     {
         return $this->protocol;
     }
 
+    /**
+     * Shut down connection.
+     * 
+     * @return Awaitable
+     */
     public function shutdown(): Awaitable
     {
         if ($this->processor) {
@@ -81,6 +166,11 @@ class Connection
         return new Success(null);
     }
     
+    /**
+     * Ping the remote endpoint.
+     * 
+     * @return bool Returns true after pong frame has been received.
+     */
     public function ping(): Awaitable
     {
         $payload = \random_bytes(8);
@@ -100,13 +190,33 @@ class Connection
         return $defer;
     }
     
+    /**
+     * Await and consume the next message received by the WebSocket.
+     * 
+     * Text messages are received as strings, binaray messages are instances ReadableStream.
+     * 
+     * @return string|ReadableStream
+     */
     public function readNextMessage(): Awaitable
     {
         return $this->messages->receive();
     }
 
+    /**
+     * Send a text message to the remote endpoint.
+     * 
+     * @param string $text The text to be sent (must be UTF-8 encoded).
+     * @param int $priority Message priority.
+     * @return int Number of transmitted bytes.
+     * 
+     * @throws \InvalidArgumentException When the given message is not UTF-8 encoded.
+     */
     public function sendText(string $text, int $priority = 0): Awaitable
     {
+        if (!\preg_match('//u', $text)) {
+            return new Failure(new \InvalidArgumentException('Message is not UTF-8 encoded'));
+        }
+        
         return $this->writer->execute(function () use ($text) {
             $chunks = \str_split($text, 4092);
             
@@ -118,27 +228,45 @@ class Connection
         }, $priority);
     }
 
+    /**
+     * Send contents of the given stream as binary message.
+     * 
+     * @param ReadableStream $stream Source of data to be sent (will be closed after all bytes have been consumed).
+     * @param int $priority Message priority.
+     * @return int Number of transmitted bytes.
+     */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream) {
+            $len = 0;
+            
             try {
                 $chunk = yield $stream->readBuffer(4092);
                 
                 while (null !== ($next = yield $stream->readBuffer(4092))) {
-                    yield $this->writeFrame(new Frame(Frame::BINARY, $chunk, false));
+                    $len += yield $this->writeFrame(new Frame(Frame::BINARY, $chunk, false));
                     
                     $chunk = $next;
                 }
                 
                 if ($chunk !== null) {
-                    yield $this->writeFrame(new Frame(Frame::BINARY, $chunk));
+                    $len += yield $this->writeFrame(new Frame(Frame::BINARY, $chunk));
                 }
+                
+                return $len;
             } finally {
                 $stream->close();
             }
         }, $priority);
     }
 
+    /**
+     * Send the given frame over the socket.
+     * 
+     * @param Frame $frame
+     * @param int $priority
+     * @return int Number of transmitted bytes.
+     */
     protected function sendFrame(Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($frame) {
@@ -146,11 +274,20 @@ class Connection
         }, $priority);
     }
 
+    /**
+     * Write the given frame to the socket (does not honor concurrency control via writer).
+     * 
+     * @param Frame $frame
+     * @return int Number of transmitted bytes.
+     */
     protected function writeFrame(Frame $frame): Awaitable
     {
         return $this->socket->write($frame->encode($this->client ? \random_bytes(4) : null));
     }
 
+    /**
+     * Coroutine that handles incoming WebSocket frames.
+     */
     protected function processIncomingFrames(): \Generator
     {
         $e = null;
@@ -208,13 +345,18 @@ class Connection
         }
     }
 
+    /**
+     * Handle a WebSocket control frame.
+     * 
+     * Sending pong frames might happen at anytime between sending continuation frames.
+     */
     protected function handleControlFrame(Frame $frame): \Generator
     {
         switch ($frame->opcode) {
             case Frame::CONNECTION_CLOSE:
                 return false;
             case Frame::PING:
-                yield $this->sendFrame(new Frame(Frame::PONG, $frame->data), 1000);
+                yield $this->writeFrame(new Frame(Frame::PONG, $frame->data), 1000);
                 break;
             case Frame::PONG:
                 if (isset($this->pings[$frame->data])) {
@@ -230,6 +372,9 @@ class Connection
         return true;
     }
 
+    /**
+     * Handle / buffer a text frame.
+     */
     protected function handleTextFrame(Frame $frame): \Generator
     {
         if ($this->buffer !== null) {
@@ -251,6 +396,9 @@ class Connection
         }
     }
 
+    /**
+     * Handle / buffer a binary frame.
+     */
     protected function handleBinaryFrame(Frame $frame): \Generator
     {
         if ($this->buffer !== null) {
@@ -270,6 +418,9 @@ class Connection
         }
     }
 
+    /**
+     * Handle / buffer continuation frames of a fragmented message.
+     */
     protected function handleContinuationFrame(Frame $frame): \Generator
     {
         if ($this->buffer === null) {
@@ -313,6 +464,13 @@ class Connection
         }
     }
 
+    /**
+     * Reads the next WebSocket frame from the socket.
+     * 
+     * This method will unmask frames as needed and asserts frame size constraints.
+     * 
+     * @return Frame
+     */
     protected function readNextFrame(): \Generator
     {
         list ($byte1, $byte2) = \array_map('ord', \str_split(yield $this->socket->readBuffer(2, true), 1));
