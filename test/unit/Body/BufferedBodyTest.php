@@ -15,8 +15,8 @@ use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 
 /**
- * @covers \KoolKode\Async\Http\BufferedBody
- * @covers \KoolKode\Async\Http\BufferedBodyStream
+ * @covers \KoolKode\Async\Http\Body\BufferedBody
+ * @covers \KoolKode\Async\Http\Body\BufferedBodyStream
  */
 class BufferedBodyTest extends AsyncTestCase
 {

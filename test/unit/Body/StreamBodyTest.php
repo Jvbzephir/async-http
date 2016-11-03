@@ -16,7 +16,7 @@ use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
- * @covers \KoolKode\Async\Http\StreamBody
+ * @covers \KoolKode\Async\Http\Body\StreamBody
  */
 class StreamBodyTest extends AsyncTestCase
 {

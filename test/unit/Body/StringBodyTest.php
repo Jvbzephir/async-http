@@ -15,7 +15,7 @@ use KoolKode\Async\ReadContents;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
- * @covers \KoolKode\Async\Http\StringBody
+ * @covers \KoolKode\Async\Http\Body\StringBody
  */
 class StringBodyTest extends AsyncTestCase
 {
