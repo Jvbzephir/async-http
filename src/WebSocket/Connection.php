@@ -17,7 +17,6 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Failure;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
@@ -74,7 +73,7 @@ class Connection
     /**
      * Executor that syncs frames being written to the socket.
      * 
-     * @var Executor
+     * @var MessageWriter
      */
     protected $writer;
     
@@ -84,6 +83,14 @@ class Connection
      * @var string|Channel
      */
     protected $buffer;
+    
+    protected $compressed = false;
+    
+    protected $bufferCompressed = false;
+    
+    protected $decompression;
+    
+    protected $decompressionTakeover = false;
     
     /**
      * Maximum frame size (in bytes).
@@ -130,9 +137,8 @@ class Connection
         $this->protocol = $protocol;
         $this->logger = $logger;
         
+        $this->writer = new MessageWriter($socket, $client);
         $this->messages = new Channel(4);
-        $this->writer = new Executor();
-        
         $this->processor = new Coroutine($this->processIncomingFrames(), true);
     }
     
@@ -146,6 +152,35 @@ class Connection
     public function getProtocol(): string
     {
         return $this->protocol;
+    }
+    
+    public function enablePerMessageDeflate(array $settings)
+    {
+        $takeover = empty($settings['client_no_context_takeover']);
+        $window = $settings['client_max_window_bits'];
+        
+        $this->compressed = true;
+        $this->writer = new CompressedMessageWriter($this->socket, $this->client, $takeover, $window);
+        $this->decompressionTakeover = empty($settings['sever_no_context_takeover']);
+        
+        if ($this->logger) {
+            $this->logger->debug('Enabled permessage-deflate extension');
+        }
+    }
+    
+    protected function getDecompressionContext()
+    {
+        if ($this->decompression) {
+            return $this->decompression;
+        }
+        
+        $context = \inflate_init(\ZLIB_ENCODING_RAW);
+        
+        if ($this->decompressionTakeover) {
+            return $this->decompression = $context;
+        }
+        
+        return $context;
     }
 
     /**
@@ -179,7 +214,7 @@ class Connection
             unset($this->pings[$payload]);
         });
         
-        $this->sendFrame(new Frame(Frame::PING, $payload), 1000)->when(function (\Throwable $e = null) use ($defer, $payload) {
+        $this->writer->writeFrame(new Frame(Frame::PING, $payload))->when(function (\Throwable $e = null) use ($defer, $payload) {
             if ($e) {
                 $defer->fail($e);
             } else {
@@ -213,19 +248,7 @@ class Connection
      */
     public function sendText(string $text, int $priority = 0): Awaitable
     {
-        if (!\preg_match('//u', $text)) {
-            return new Failure(new \InvalidArgumentException('Message is not UTF-8 encoded'));
-        }
-        
-        return $this->writer->execute(function () use ($text) {
-            $chunks = \str_split($text, 4092);
-            
-            for ($size = \count($chunks) - 1, $i = 0; $i < $size; $i++) {
-                yield $this->writeFrame(new Frame(Frame::TEXT, $chunks[$i], false));
-            }
-            
-            yield $this->writeFrame(new Frame(Frame::TEXT, $chunks[$i]));
-        }, $priority);
+        return $this->writer->sendText($text, $priority);
     }
 
     /**
@@ -237,52 +260,7 @@ class Connection
      */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($stream) {
-            $len = 0;
-            
-            try {
-                $chunk = yield $stream->readBuffer(4092);
-                
-                while (null !== ($next = yield $stream->readBuffer(4092))) {
-                    $len += yield $this->writeFrame(new Frame(Frame::BINARY, $chunk, false));
-                    
-                    $chunk = $next;
-                }
-                
-                if ($chunk !== null) {
-                    $len += yield $this->writeFrame(new Frame(Frame::BINARY, $chunk));
-                }
-                
-                return $len;
-            } finally {
-                $stream->close();
-            }
-        }, $priority);
-    }
-
-    /**
-     * Send the given frame over the socket.
-     * 
-     * @param Frame $frame
-     * @param int $priority
-     * @return int Number of transmitted bytes.
-     */
-    protected function sendFrame(Frame $frame, int $priority = 0): Awaitable
-    {
-        return $this->writer->execute(function () use ($frame) {
-            return $this->writeFrame($frame);
-        }, $priority);
-    }
-
-    /**
-     * Write the given frame to the socket (does not honor concurrency control via writer).
-     * 
-     * @param Frame $frame
-     * @return int Number of transmitted bytes.
-     */
-    protected function writeFrame(Frame $frame): Awaitable
-    {
-        return $this->socket->write($frame->encode($this->client ? \random_bytes(4) : null));
+        return $this->sendBinary($stream, $priority);
     }
 
     /**
@@ -331,7 +309,7 @@ class Connection
                 if ($this->socket->isAlive()) {
                     $reason = ($e === null || $e->getCode() === 0) ? Frame::NORMAL_CLOSURE : $e->getCode();
                     
-                    yield $this->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));
+                    yield $this->writer->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));
                 }
             } finally {
                 if ($this->logger) {
@@ -356,7 +334,7 @@ class Connection
             case Frame::CONNECTION_CLOSE:
                 return false;
             case Frame::PING:
-                yield $this->writeFrame(new Frame(Frame::PONG, $frame->data), 1000);
+                yield $this->writer->writeFrame(new Frame(Frame::PONG, $frame->data), 1000);
                 break;
             case Frame::PONG:
                 if (isset($this->pings[$frame->data])) {
@@ -386,6 +364,13 @@ class Connection
         }
         
         if ($frame->finished) {
+            if ($this->compressed && $frame->reserved & Frame::RESERVED1) {
+                $flush = $this->decompressionTakeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
+                
+                $frame->data = \inflate_add($this->getDecompressionContext(), $frame->data . "\x00\x00\xFF\xFF", $flush);
+                $frame->reserved &= ~Frame::RESERVED1;
+            }
+            
             if (!\preg_match('//u', $frame->data)) {
                 throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
             }
@@ -393,6 +378,7 @@ class Connection
             yield $this->messages->send($frame->data);
         } else {
             $this->buffer = $frame->data;
+            $this->bufferCompressed = $this->compressed && (($frame->reserved & Frame::RESERVED1) ? true : false);
         }
     }
 
@@ -444,6 +430,12 @@ class Connection
                 $this->buffer .= $frame->data;
                 
                 if ($frame->finished) {
+                    if ($this->bufferCompressed) {
+                        $flush = $this->decompressionTakeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
+                        
+                        $this->buffer = \inflate_add($this->getDecompressionContext(), $this->buffer . "\x00\x00\xFF\xFF", $flush);
+                    }
+                    
                     if (!\preg_match('//u', $this->buffer)) {
                         throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
                     }
@@ -525,6 +517,6 @@ class Connection
             $data = (yield $this->socket->readBuffer($len, true)) ^ \str_pad($key, $len, $key, \STR_PAD_RIGHT);
         }
         
-        return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false);
+        return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false, $byte1 & Frame::RESERVED);
     }
 }

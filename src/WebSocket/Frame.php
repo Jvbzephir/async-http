@@ -38,7 +38,20 @@ class Frame
      * @var int
      */
     const FINISHED = 0b10000000;
+    
+    /**
+     * Reserved bits to be used by extensions.
+     * 
+     * @var int
+     */
+    const RESERVED = 0b01110000;
 
+    const RESERVED1 = 0b01000000;
+    
+    const RESERVED2 = 0b00100000;
+    
+    const RESERVED3 = 0b00010000;
+    
     /**
      * Mask being used to read the opcode of a frame.
      * 
@@ -119,6 +132,13 @@ class Frame
     public $finished;
     
     /**
+     * Reserved bit flags.
+     * 
+     * @var int
+     */
+    public $reserved;
+    
+    /**
      * Frame payload (masked frames must be unmasked before setting data).
      * 
      * @var string
@@ -132,11 +152,12 @@ class Frame
      * @param string $data
      * @param bool $finished
      */
-    public function __construct(int $opcode, string $data, bool $finished = true)
+    public function __construct(int $opcode, string $data, bool $finished = true, int $reserved = 0)
     {
         $this->finished = $finished;
         $this->opcode = $opcode;
         $this->data = $data;
+        $this->reserved = $reserved;
     }
 
     /**
@@ -167,7 +188,7 @@ class Frame
      */
     public function encode(string $mask = null): string
     {
-        $header = \chr(($this->finished ? self::FINISHED : 0) | $this->opcode);
+        $header = \chr(($this->finished ? self::FINISHED : 0) | $this->reserved | $this->opcode);
         $mbit = ($mask === null) ? 0 : self::MASKED;
         $len = \strlen($this->data);
         

@@ -93,7 +93,80 @@ class ConnectionHandler implements UpgradeResultHandler
             $response = $response->withHeader('Sec-WebSocket-Protocol', $protocol);
         }
         
+        $compression = $this->getCompressionSettings($request);
+        
+        if (!empty($compression)) {
+            $ext = 'permessage-deflate';
+            
+            foreach ($compression as $k => $v) {
+                if ($v === true) {
+                    $ext .= '; ' . $k;
+                } elseif ($v !== false) {
+                    $ext .= '; ' . $k . '=' . $v;
+                }
+            }
+            
+            $response = $response->withAddedHeader('Sec-WebSocket-Extensions', $ext);
+        }
+        
         return $endpoint->onHandshake($request, $response);
+    }
+    
+    protected function getCompressionSettings(HttpRequest $request): array
+    {
+        static $zlib;
+        static $defaults = [
+            'client_no_context_takeover' => false,
+            'server_no_context_takeover' => false,
+            'client_max_window_bits' => 14,
+            'server_max_window_bits' => 14
+        ];
+        
+        $settings = null;
+        
+        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+            foreach ($request->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
+                $tokens = \array_map('trim', \explode(';', $ext));
+                $ext = \array_shift($tokens);
+                
+                if ($ext === 'permessage-deflate') {
+                    $settings = $tokens;
+                    
+                    break;
+                }
+            }
+        }
+        
+        if ($settings === null) {
+            return [];
+        }
+        
+        $parsed = $defaults;
+        
+        foreach ($settings as $val) {
+            $parts = \array_map('trim', \explode('=', $val, 2));
+            
+            switch ($parts[0]) {
+                case 'client_no_context_takeover':
+                case 'server_no_context_takeover':
+                    $parsed[$parts[0]] = true;
+                    break;
+                case 'client_max_window_bits':
+                case 'server_max_window_bits':
+                    $bits = (int) $parts[0];
+                    
+                    if ($bits < 8 || $bits > 15) {
+                        return;
+                    }
+                    
+                    $settings[$parts[0]] = \min(14, $bits);
+                    break;
+                default:
+                    return;
+            }
+        }
+        
+        return $parsed;
     }
 
     /**
@@ -114,7 +187,15 @@ class ConnectionHandler implements UpgradeResultHandler
             ]);
         }
         
-        yield from $this->delegateToEndpoint(new Connection($socket, false, '', $this->logger), $endpoint);
+        $conn = new Connection($socket, false, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
+        
+        $compression = $this->getCompressionSettings($request);
+        
+        if (!empty($compression)) {
+            $conn->enablePerMessageDeflate($compression);
+        }
+        
+        yield from $this->delegateToEndpoint($conn, $endpoint);
     }
 
     /**
