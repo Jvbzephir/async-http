@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableStream;
 
 /**
@@ -34,6 +35,17 @@ abstract class Endpoint
     public function negotiateProtocol(array $protocols): string
     {
         return '';
+    }
+    
+    /**
+     * Process the HTTP upgrade / handshake response before it is sent to the client.
+     * 
+     * @param HttpResponse $response The prepared HTTP upgrade response.
+     * @return HttpResponse Modified HTTP response to be sent.
+     */
+    public function onHandshake(HttpResponse $response): HttpResponse
+    {
+        return $response;
     }
     
     /**
