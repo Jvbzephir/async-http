@@ -49,11 +49,6 @@ class HttpEndpoint
         
         $this->middleware = new \SplPriorityQueue();
     }
-
-    public function isEncrypted(): bool
-    {
-        return $this->factory->getOption('ssl', 'local_cert') !== null;
-    }
     
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
     {
@@ -115,7 +110,7 @@ class HttpEndpoint
         
         try {
             yield $this->server->listen(function (SocketStream $socket) use ($pending, $context, $action) {
-                if ($this->isEncrypted()) {
+                if ($socket->isEncrypted()) {
                     $alpn = \trim($socket->getMetadata()['crypto']['alpn_protocol'] ?? '');
                 } else {
                     $alpn = '';
