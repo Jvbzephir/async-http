@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableStream;
 
@@ -40,10 +41,11 @@ abstract class Endpoint
     /**
      * Process the HTTP upgrade / handshake response before it is sent to the client.
      * 
+     * @param HttpRequest $request The HTTP request that triggered the handshake.
      * @param HttpResponse $response The prepared HTTP upgrade response.
      * @return HttpResponse Modified HTTP response to be sent.
      */
-    public function onHandshake(HttpResponse $response): HttpResponse
+    public function onHandshake(HttpRequest $request, HttpResponse $response): HttpResponse
     {
         return $response;
     }

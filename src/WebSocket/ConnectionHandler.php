@@ -93,7 +93,7 @@ class ConnectionHandler implements UpgradeResultHandler
             $response = $response->withHeader('Sec-WebSocket-Protocol', $protocol);
         }
         
-        return $endpoint->onHandshake($response);
+        return $endpoint->onHandshake($request, $response);
     }
 
     /**
