@@ -13,5 +13,5 @@ sudo pecl config-set php_ini /etc/php/7.0/cli/php.ini
 
 sudo pecl channel-update pecl.php.net
 
-yes '' | sudo pecl install ev
-yes '' | sudo pecl install eio
+# yes '' | sudo pecl install ev
+# yes '' | sudo pecl install eio
