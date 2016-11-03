@@ -349,6 +349,11 @@ class Driver implements HttpDriver
             ]);
         }
         
+        // No need for TCP_NODELAY as the connection will be closed anyways flushing the last chunk without delay.
+        if ($close) {
+            $socket->setTcpNoDelay(false);
+        }
+        
         try {
             if ($request->getProtocolVersion() == '1.1' && !$request->hasHeader('Host')) {
                 throw new StatusException(Http::BAD_REQUEST, 'Missing HTTP Host header');
