@@ -141,6 +141,7 @@ class Driver implements HttpDriver
     {
         return new Coroutine(function () use ($socket, $action, $context) {
             $remotePeer = $socket->getRemoteAddress();
+            $upgraded = false;
             
             if ($this->logger) {
                 $this->logger->debug('Accepted new HTTP/1 connection from {peer}', [
@@ -153,7 +154,9 @@ class Driver implements HttpDriver
                 
                 if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
                     try {
-                        if (yield from $this->upgradeConnection($socket, $request, $action)) {
+                        yield from $this->upgradeConnection($socket, $request, $action, $upgraded);
+                        
+                        if ($upgraded) {
                             return;
                         }
                     } catch (\Throwable $e) {
@@ -182,7 +185,7 @@ class Driver implements HttpDriver
                 
                 try {
                     while (null !== ($next = yield $pipeline->receive())) {
-                        if (!yield from $this->processRequest($context, $socket, $action, ...$next)) {
+                        if (!yield from $this->processRequest($context, $socket, $action, $upgraded, ...$next)) {
                             break;
                         }
                     }
@@ -195,7 +198,7 @@ class Driver implements HttpDriver
                 try {
                     yield $socket->close();
                 } finally {
-                    if ($this->logger) {
+                    if ($this->logger && !$upgraded) {
                         $this->logger->debug('Closed HTTP/1 connection to {peer}', [
                             'peer' => $remotePeer
                         ]);
@@ -211,9 +214,9 @@ class Driver implements HttpDriver
      * @param SocketStream $socket
      * @param HttpRequest $request
      * @param callable $action
-     * @return bool Returns true when a connection upgrade has been performed.
+     * @param bool $upgraded Will be set to true when the connection has been upgraded.
      */
-    protected function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    protected function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action, bool & $upgraded): \Generator
     {
         $protocols = [
             ''
@@ -226,14 +229,12 @@ class Driver implements HttpDriver
         foreach ($protocols as $protocol) {
             foreach ($this->upgradeHandlers as $handler) {
                 if ($handler->isUpgradeSupported($protocol, $request)) {
-                    yield from $handler->upgradeConnection($socket, $request, $action);
+                    $upgraded = true;
                     
-                    return true;
+                    return yield from $handler->upgradeConnection($socket, $request, $action);
                 }
             }
         }
-        
-        return false;
     }
     
     /**
@@ -333,7 +334,7 @@ class Driver implements HttpDriver
     /**
      * Dispatch the given HTTP request to the given action.
      */
-    protected function processRequest(HttpDriverContext $context, SocketStream $socket, callable $action, HttpRequest $request, bool $close): \Generator
+    protected function processRequest(HttpDriverContext $context, SocketStream $socket, callable $action, bool & $upgraded, HttpRequest $request, bool $close): \Generator
     {
         static $remove = [
             'Keep-Alive',
@@ -391,6 +392,8 @@ class Driver implements HttpDriver
                 $handler = $response->getAttribute(UpgradeResultHandler::class);
                 
                 if ($handler instanceof UpgradeResultHandler) {
+                    $upgraded = true;
+                    
                     return yield from $this->upgradeResultConnection($handler, $socket, $request, $response);
                 }
             }
