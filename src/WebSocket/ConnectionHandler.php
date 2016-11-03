@@ -87,6 +87,12 @@ class ConnectionHandler implements UpgradeResultHandler
         $response = $response->withReason('WebSocket Handshake');
         $response = $response->withAttribute(Endpoint::class, $endpoint);
         
+        $protocol = $endpoint->negotiateProtocol($request->getHeaderTokens('Sec-WebSocket-Protocol'));
+        
+        if ($protocol !== '') {
+            $response = $response->withHeader('Sec-WebSocket-Protocol', $protocol);
+        }
+        
         return $response;
     }
 

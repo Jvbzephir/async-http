@@ -27,6 +27,16 @@ use KoolKode\Async\Stream\ReadableStream;
 abstract class Endpoint
 {
     /**
+     * Negotiate an application protocol to be used.
+     * 
+     * @param array $protocols All acceptable protocols as advertised by the client.
+     */
+    public function negotiateProtocol(array $protocols): string
+    {
+        return '';
+    }
+    
+    /**
      * WebSocket client connection has been established.
      * 
      * @param Connection $conn
