@@ -88,6 +88,7 @@ class HttpEndpoint
     {
         return new Coroutine(function () use ($action) {
             $factory = clone $this->factory;
+            $factory->setTcpNoDelay(true);
             
             if ($factory->isEncrypted() && Socket::isAlpnSupported()) {
                 $protocols = [];

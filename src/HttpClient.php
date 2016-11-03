@@ -168,6 +168,8 @@ class HttpClient
             $factory = new SocketFactory($uri->getHostWithPort(true), 'tcp');
         }
         
+        $factory->setTcpNoDelay(true);
+        
         if ($this->protocols && Socket::isAlpnSupported()) {
             $factory->setOption('ssl', 'alpn_protocols', \implode(',', $this->protocols));
         }
