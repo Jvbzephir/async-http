@@ -119,6 +119,11 @@ class Driver implements HttpDriver
         $this->upgradeHandlers[] = $handler;
     }
     
+    /**
+     * Add an HTTP/1 upgrade handler that bases the upgrade on the result of an action.
+     * 
+     * @param UpgradeResultHandler $handler
+     */
     public function addUpgradeResultHandler(UpgradeResultHandler $handler)
     {
         $this->upgradeResultHandlers[] = $handler;
@@ -602,6 +607,9 @@ class Driver implements HttpDriver
         return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
     }
     
+    /**
+     * Serialize HTTP response headers into a string.
+     */
     protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null): string
     {
         $reason = \trim($response->getReasonPhrase());

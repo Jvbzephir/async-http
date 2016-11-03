@@ -34,6 +34,12 @@ class HttpDriverContext
      */
     public $middleware;
     
+    /**
+     * Create a new HTTP server / driver context.
+     * 
+     * @param string $peerName
+     * @param \SplPriorityQueue $middleware
+     */
     public function __construct(string $peerName, \SplPriorityQueue $middleware = null)
     {
         $this->peerName = $peerName;
