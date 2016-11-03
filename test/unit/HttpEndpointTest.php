@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http1\Connector as Http1Connector;
 use KoolKode\Async\Http\Http2\Connector as Http2Connector;
 use KoolKode\Async\Http\Middleware\ContentDecoder;

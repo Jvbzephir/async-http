@@ -11,9 +11,10 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Success;
 

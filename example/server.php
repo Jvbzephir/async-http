@@ -12,7 +12,7 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
-use KoolKode\Async\Http\FileBody;
+use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;

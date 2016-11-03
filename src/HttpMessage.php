@@ -13,6 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Body\StringBody;
+
 /**
  * Base class for HTTP messages.
  * 

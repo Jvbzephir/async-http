@@ -11,36 +11,37 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\HttpBody;
+use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
-use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
 
 /**
- * HTTP message body based on an input stream.
+ * HTTP body that can stream contents of a file.
  * 
  * @author Martin Schröder
  */
-class StreamBody implements HttpBody
+class FileBody implements HttpBody
 {
     /**
-     * Body data stream.
+     * Path the file being transfered.
      * 
-     * @var ReadableStream
+     * @var string
      */
-    protected $stream;
-    
+    protected $file;
+
     /**
-     * Create message body backed by the given stream.
+     * Create a message body that can stream a file.
      * 
-     * @param ReadableStream $stream
+     * @param string $file
      */
-    public function __construct(ReadableStream $stream)
+    public function __construct(string $file)
     {
-        $this->stream = $stream;
+        $this->file = $file;
     }
 
     /**
@@ -48,7 +49,17 @@ class StreamBody implements HttpBody
      */
     public function isCached(): bool
     {
-        return false;
+        return true;
+    }
+    
+    /**
+     * Get the path of the transfered file.
+     * 
+     * @return string
+     */
+    public function getFile(): string
+    {
+        return $this->file;
     }
 
     /**
@@ -56,7 +67,7 @@ class StreamBody implements HttpBody
      */
     public function getSize(): Awaitable
     {
-        return new Success(null);
+        return LoopConfig::currentFilesystem()->size($this->file);
     }
 
     /**
@@ -64,7 +75,7 @@ class StreamBody implements HttpBody
      */
     public function getReadableStream(): Awaitable
     {
-        return new Success($this->stream);
+        return LoopConfig::currentFilesystem()->readStream($this->file);
     }
 
     /**
@@ -72,7 +83,9 @@ class StreamBody implements HttpBody
      */
     public function getContents(): Awaitable
     {
-        return new ReadContents($this->stream);
+        return new Coroutine(function () {
+            return yield new ReadContents(yield $this->getReadableStream());
+        });
     }
     
     /**
@@ -80,18 +93,6 @@ class StreamBody implements HttpBody
      */
     public function discard(): Awaitable
     {
-        return new Coroutine(function () {
-            $len = 0;
-            
-            try {
-                while (null !== ($chunk = yield $this->stream->read())) {
-                    $len += \strlen($chunk);
-                }
-                
-                return $len;
-            } finally {
-                $this->stream->close();
-            }
-        });
+        return new Success(0);
     }
 }

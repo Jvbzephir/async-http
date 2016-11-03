@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;

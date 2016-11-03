@@ -11,12 +11,12 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Body\StreamBody;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\StreamBody;
-use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;

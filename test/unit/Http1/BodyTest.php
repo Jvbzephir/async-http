@@ -11,9 +11,9 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\StreamBody;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;

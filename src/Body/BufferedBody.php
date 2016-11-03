@@ -11,11 +11,12 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Filesystem\FilesystemTempStream;
+use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;

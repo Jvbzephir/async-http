@@ -11,6 +11,8 @@
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Body\StringBody;
+
 /**
  * @covers \KoolKode\Async\Http\HttpMessage
  */

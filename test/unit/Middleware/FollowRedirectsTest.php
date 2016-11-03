@@ -11,11 +11,11 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Http\Body\StreamBody;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http;
-use KoolKode\Async\Http\StreamBody;
-use KoolKode\Async\Http\StringBody;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 

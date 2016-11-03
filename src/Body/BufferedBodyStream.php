@@ -11,7 +11,7 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Filesystem\FilesystemTempStream;
 use KoolKode\Async\Stream\ReadableStream;
