@@ -90,7 +90,7 @@ class Connection
     
     protected $decompression;
     
-    protected $decompressionTakeover = false;
+    protected $flushMode;
     
     /**
      * Maximum frame size (in bytes).
@@ -161,13 +161,15 @@ class Connection
         
         $this->compressed = true;
         $this->writer = new CompressedMessageWriter($this->socket, $this->client, $takeover, $window);
-        $this->decompressionTakeover = empty($settings['sever_no_context_takeover']);
+        $this->flushMode = empty($settings['sever_no_context_takeover']) ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
         
         if ($this->logger) {
-            $this->logger->debug('Enabled permessage-deflate extension');
+            $this->logger->debug('Enabled permessage-deflate extension: {settings}', [
+                'settings' => \json_encode($settings, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+            ]);
         }
     }
-    
+
     protected function getDecompressionContext()
     {
         if ($this->decompression) {
@@ -176,7 +178,7 @@ class Connection
         
         $context = \inflate_init(\ZLIB_ENCODING_RAW);
         
-        if ($this->decompressionTakeover) {
+        if ($this->flushMode === \ZLIB_SYNC_FLUSH) {
             return $this->decompression = $context;
         }
         
@@ -365,9 +367,7 @@ class Connection
         
         if ($frame->finished) {
             if ($this->compressed && $frame->reserved & Frame::RESERVED1) {
-                $flush = $this->decompressionTakeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
-                
-                $frame->data = \inflate_add($this->getDecompressionContext(), $frame->data . "\x00\x00\xFF\xFF", $flush);
+                $frame->data = \inflate_add($this->getDecompressionContext(), $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
                 $frame->reserved &= ~Frame::RESERVED1;
             }
             
@@ -431,9 +431,7 @@ class Connection
                 
                 if ($frame->finished) {
                     if ($this->bufferCompressed) {
-                        $flush = $this->decompressionTakeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
-                        
-                        $this->buffer = \inflate_add($this->getDecompressionContext(), $this->buffer . "\x00\x00\xFF\xFF", $flush);
+                        $this->buffer = \inflate_add($this->getDecompressionContext(), $this->buffer . "\x00\x00\xFF\xFF", $this->flushMode);
                     }
                     
                     if (!\preg_match('//u', $this->buffer)) {

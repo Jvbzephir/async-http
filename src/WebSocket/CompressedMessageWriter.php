@@ -22,8 +22,6 @@ class CompressedMessageWriter extends MessageWriter
 {
     protected $context;
     
-    protected $takeover;
-    
     protected $window;
     
     protected $flushMode;
@@ -32,11 +30,10 @@ class CompressedMessageWriter extends MessageWriter
     {
         parent::__construct($socket, $client);
         
-        $this->takeover = $takeover;
-        $this->window = $window;
         $this->flushMode = $takeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
+        $this->window = $window;
     }
-    
+
     protected function getCompressionContext()
     {
         if ($this->context) {
@@ -48,7 +45,7 @@ class CompressedMessageWriter extends MessageWriter
             'window' => $this->window
         ]);
         
-        if ($this->takeover) {
+        if ($this->flushMode === \ZLIB_SYNC_FLUSH) {
             return $this->context = $context;
         }
         
