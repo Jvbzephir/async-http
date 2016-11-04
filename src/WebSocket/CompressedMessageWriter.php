@@ -18,10 +18,27 @@ use KoolKode\Async\Failure;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 
+/**
+ * Message writer that takes care of permessa-deflate compression.
+ * 
+ * @author Martin Schröder
+ */
 class CompressedMessageWriter extends MessageWriter
 {
+    /**
+     * Deflate WebSocket protocol extension.
+     * 
+     * @var PerMessageDeflate
+     */
     protected $deflate;
     
+    /**
+     * Create a new compression-enabled message writer.
+     * 
+     * @param SocketStream $socket
+     * @param bool $client
+     * @param PerMessageDeflate $deflate
+     */
     public function __construct(SocketStream $socket, bool $client, PerMessageDeflate $deflate)
     {
         parent::__construct($socket, $client);
@@ -29,6 +46,9 @@ class CompressedMessageWriter extends MessageWriter
         $this->deflate = $deflate;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function sendText(string $text, int $priority = 0): Awaitable
     {
         if (!\preg_match('//u', $text)) {
@@ -56,6 +76,9 @@ class CompressedMessageWriter extends MessageWriter
         }, $priority);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream) {

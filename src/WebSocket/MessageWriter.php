@@ -19,10 +19,25 @@ use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Util\Executor;
 
+/**
+ * Default message writer being used to frame, prioritize and transmit WebSocket messages.
+ * 
+ * @author Martin Schröder
+ */
 class MessageWriter
 {
+    /**
+     * Underlying socket stream.
+     * 
+     * @var SocketStream
+     */
     protected $socket;
     
+    /**
+     * Is the connection in client mode?
+     * 
+     * @var bool
+     */
     protected $client;
     
     /**
@@ -32,6 +47,12 @@ class MessageWriter
      */
     protected $writer;
     
+    /**
+     * Create a new WebSocket message writer.
+     * 
+     * @param SocketStream $socket
+     * @param bool $client
+     */
     public function __construct(SocketStream $socket, bool $client)
     {
         $this->socket = $socket;
@@ -51,6 +72,15 @@ class MessageWriter
         return $this->socket->write($frame->encode($this->client ? \random_bytes(4) : null));
     }
 
+    /**
+     * Send a text message.
+     * 
+     * @param string $text
+     * @param int $priority
+     * @return int Number of transmitted bytes.
+     * 
+     * @throws \InvalidArgumentException When the text is not UTF-8 encoded.
+     */
     public function sendText(string $text, int $priority = 0): Awaitable
     {
         if (!\preg_match('//u', $text)) {
@@ -71,6 +101,15 @@ class MessageWriter
         }, $priority);
     }
 
+    /**
+     * Stream a binary WebSocket message.
+     * 
+     * @param ReadableStream $stream
+     * @param int $priority
+     * @return int Number of transmitted bytes.
+     * 
+     * @throws \InvalidArgumentException When the text is not UTF-8 encoded.
+     */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
         return $this->writer->execute(function () use ($stream) {

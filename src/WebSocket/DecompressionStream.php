@@ -17,12 +17,34 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
+/**
+ * Decompresses contents of a binary WebSocket message during reads.
+ * 
+ * @author Martin Schröder
+ */
 class DecompressionStream extends ReadableStreamDecorator
 {
+    /**
+     * Decompression context being used to inflate message contents.
+     * 
+     * @var resource
+     */
     protected $context;
-    
+
+    /**
+     * Zlib flush mode to be used for the final flush opertaion.
+     * 
+     * @var int
+     */
     protected $flushMode;
     
+    /**
+     * Create a new WebSocket decompression stream.
+     * 
+     * @param ReadableStream $stream Underlying stream that provides compressed message data.
+     * @param resource $context Decompression context being used to inflate message contents.
+     * @param int $flushMode Zlib flush mode to be used for the final flush opertaion.
+     */
     public function __construct(ReadableStream $stream, $context, int $flushMode)
     {
         parent::__construct($stream);
@@ -41,6 +63,9 @@ class DecompressionStream extends ReadableStreamDecorator
         return parent::close();
     }
 
+    /**
+     * Decompress the given chunk of data.
+     */
     protected function processChunk(string $chunk): string
     {
         if ($chunk === '') {

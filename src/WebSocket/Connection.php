@@ -151,35 +151,21 @@ class Connection
         return $this->protocol;
     }
     
-    public function enablePerMessageDeflate(array $settings)
+    /**
+     * Enable permessage-deflate WebSocket protocol extension.
+     * 
+     * @param PerMessageDeflate $deflate
+     */
+    public function enablePerMessageDeflate(PerMessageDeflate $deflate)
     {
-        $compressionTakeover = empty($settings['client_no_context_takeover']);
-        $decompressionTakeover = empty($settings['sever_no_context_takeover']);
-        $compressionWindow = $settings['client_max_window_bits'];
-        
-        $this->deflate = new PerMessageDeflate($compressionTakeover, $decompressionTakeover, $compressionWindow);
-        $this->writer = new CompressedMessageWriter($this->socket, $this->client, $this->deflate);
+        $this->deflate = $deflate;
+        $this->writer = new CompressedMessageWriter($this->socket, $this->client, $deflate);
         
         if ($this->logger) {
-            $this->logger->debug('Enabled permessage-deflate extension: {settings}', [
-                'settings' => \json_encode($settings, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+            $this->logger->debug('Enabled extension: {extension}', [
+                'extension' => $deflate->getExtensionHeader()
             ]);
         }
-    }
-
-    protected function getDecompressionContext()
-    {
-        if ($this->decompression) {
-            return $this->decompression;
-        }
-        
-        $context = \inflate_init(\ZLIB_ENCODING_RAW);
-        
-        if ($this->flushMode === \ZLIB_SYNC_FLUSH) {
-            return $this->decompression = $context;
-        }
-        
-        return $context;
     }
 
     /**

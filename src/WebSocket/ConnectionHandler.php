@@ -37,6 +37,13 @@ class ConnectionHandler implements UpgradeResultHandler
     const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
     /**
+     * Enable usage of permessage-deflate WebSocket extension?
+     * 
+     * @var bool
+     */
+    protected $deflateSupported = false;
+    
+    /**
      * PSR logger instance.
      * 
      * @var LoggerInterface
@@ -53,6 +60,14 @@ class ConnectionHandler implements UpgradeResultHandler
         $this->logger = $logger;
     }
 
+    /**
+     * Enable / disable usage of permessage-deflate WebSocket extension.
+     */
+    public function setDeflateSupported(bool $deflate)
+    {
+        $this->deflateSupported = $deflate;
+    }
+    
     /**
      * {@inheritdoc}
      */
@@ -93,80 +108,45 @@ class ConnectionHandler implements UpgradeResultHandler
             $response = $response->withHeader('Sec-WebSocket-Protocol', $protocol);
         }
         
-        $compression = $this->getCompressionSettings($request);
-        
-        if (!empty($compression)) {
-            $ext = 'permessage-deflate';
-            
-            foreach ($compression as $k => $v) {
-                if ($v === true) {
-                    $ext .= '; ' . $k;
-                } elseif ($v !== false) {
-                    $ext .= '; ' . $k . '=' . $v;
-                }
-            }
-            
-            $response = $response->withAddedHeader('Sec-WebSocket-Extensions', $ext);
+        if ($this->deflateSupported && $deflate = $this->negotiatePerMessageDeflate($request)) {
+            $response = $response->withAddedHeader('Sec-WebSocket-Extensions', $deflate->getExtensionHeader());
+            $response = $response->withAttribute(PerMessageDeflate::class, $deflate);
         }
         
         return $endpoint->onHandshake($request, $response);
     }
-    
-    protected function getCompressionSettings(HttpRequest $request): array
+
+    /**
+     * Negotiate permessage-deflate WebSocket extensio if supported by the clientn.
+     * 
+     * @param HttpRequest $request
+     * @return PerMessageDeflate Or null when not supported by client / server or invalid window sizes are specified.
+     */
+    protected function negotiatePerMessageDeflate(HttpRequest $request)
     {
         static $zlib;
-        static $defaults = [
-            'client_no_context_takeover' => false,
-            'server_no_context_takeover' => false,
-            'client_max_window_bits' => 14,
-            'server_max_window_bits' => 14
-        ];
         
-        $settings = null;
+        $extension = null;
         
         if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
-            foreach ($request->getHeaderTokenValues('Sec-WebSocket-Extensions') as $ext) {
-                $tokens = \array_map('trim', \explode(';', $ext));
-                $ext = \array_shift($tokens);
-                
-                if ($ext === 'permessage-deflate') {
-                    $settings = $tokens;
+            foreach ($request->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
+                if (\strtolower($ext->getValue()) === 'permessage-deflate') {
+                    $extension = $ext;
                     
                     break;
                 }
             }
         }
         
-        if ($settings === null) {
-            return [];
+        if ($extension === null) {
+            return;
         }
         
-        $parsed = $defaults;
-        
-        foreach ($settings as $val) {
-            $parts = \array_map('trim', \explode('=', $val, 2));
-            
-            switch ($parts[0]) {
-                case 'client_no_context_takeover':
-                case 'server_no_context_takeover':
-                    $parsed[$parts[0]] = true;
-                    break;
-                case 'client_max_window_bits':
-                case 'server_max_window_bits':
-                    $bits = (int) $parts[0];
-                    
-                    if ($bits < 8 || $bits > 15) {
-                        return;
-                    }
-                    
-                    $settings[$parts[0]] = \min(14, $bits);
-                    break;
-                default:
-                    return;
-            }
+        try {
+            return PerMessageDeflate::fromHeaderToken($extension);
+        } catch (\OutOfRangeException $e) {
+            return;
         }
-        
-        return $parsed;
     }
 
     /**
@@ -189,10 +169,8 @@ class ConnectionHandler implements UpgradeResultHandler
         
         $conn = new Connection($socket, false, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
         
-        $compression = $this->getCompressionSettings($request);
-        
-        if (!empty($compression)) {
-            $conn->enablePerMessageDeflate($compression);
+        if ($deflate = $response->getAttribute(PerMessageDeflate::class)) {
+            $conn->enablePerMessageDeflate($deflate);
         }
         
         yield from $this->delegateToEndpoint($conn, $endpoint);

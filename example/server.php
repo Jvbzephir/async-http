@@ -32,7 +32,11 @@ Loop::execute(function () {
     $endpoint->setCertificate(__DIR__ . '/localhost.pem');
     
     $endpoint->addDriver(new Http2Driver(null, $logger));
-    $endpoint->addUpgradeResultHandler(new ConnectionHandler($logger));
+    
+    $ws = new ConnectionHandler($logger);
+    $ws->setDeflateSupported(true);
+    
+    $endpoint->addUpgradeResultHandler($ws);
     
     $endpoint->listen(function (HttpRequest $request) use ($websocket) {
         switch (trim($request->getRequestTarget(), '/')) {
