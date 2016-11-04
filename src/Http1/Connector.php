@@ -205,7 +205,7 @@ class Connector implements HttpConnector
             return true;
         }
         
-        if ($response->getProtocolVersion() === '1.0' && !\in_array('keep-alive', $response->getHeaderTokens('Connection'), true)) {
+        if ($response->getProtocolVersion() === '1.0' && !\in_array('keep-alive', $response->getHeaderTokenValues('Connection'), true)) {
             return true;
         }
         
@@ -330,7 +330,7 @@ class Connector implements HttpConnector
         
         $tokens = [];
         
-        foreach ($request->getHeaderTokens('Connection') as $token) {
+        foreach ($request->getHeaderTokenValues('Connection') as $token) {
             if ($token !== 'close' && $token !== 'keep-alive') {
                 $tokens[] = $token;
             }
@@ -354,7 +354,7 @@ class Connector implements HttpConnector
         if ($request->hasHeader('Connection')) {
             $request = $request->withAddedHeader('Connection', \implode(', ', \array_merge([
                 $this->keepAlive ? 'keep-alive' : 'close'
-            ], $request->getHeaderTokens('Connection'))));
+            ], $request->getHeaderTokenValues('Connection'))));
         } else {
             $request = $request->withHeader('Connection', $this->keepAlive ? 'keep-alive' : 'close');
         }

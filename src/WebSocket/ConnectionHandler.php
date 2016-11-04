@@ -87,7 +87,7 @@ class ConnectionHandler implements UpgradeResultHandler
         $response = $response->withReason('WebSocket Handshake');
         $response = $response->withAttribute(Endpoint::class, $endpoint);
         
-        $protocol = $endpoint->negotiateProtocol($request->getHeaderTokens('Sec-WebSocket-Protocol'));
+        $protocol = $endpoint->negotiateProtocol($request->getHeaderTokenValues('Sec-WebSocket-Protocol'));
         
         if ($protocol !== '') {
             $response = $response->withHeader('Sec-WebSocket-Protocol', $protocol);
@@ -125,7 +125,7 @@ class ConnectionHandler implements UpgradeResultHandler
         $settings = null;
         
         if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
-            foreach ($request->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
+            foreach ($request->getHeaderTokenValues('Sec-WebSocket-Extensions') as $ext) {
                 $tokens = \array_map('trim', \explode(';', $ext));
                 $ext = \array_shift($tokens);
                 
@@ -258,7 +258,7 @@ class ConnectionHandler implements UpgradeResultHandler
             ]);
         }
         
-        $versions = $request->getHeaderTokens('Sec-Websocket-Version');
+        $versions = $request->getHeaderTokenValues('Sec-Websocket-Version');
         
         if (!\in_array('13', $versions, true)) {
             throw new StatusException(Http::BAD_REQUEST, 'Secure websocket version 13 required', [

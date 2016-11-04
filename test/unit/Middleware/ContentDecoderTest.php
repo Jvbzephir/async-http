@@ -51,7 +51,7 @@ class ContentDecoderTest extends AsyncTestCase
             $this->assertEquals([
                 'gzip',
                 'deflate'
-            ], $request->getHeaderTokens('Accept-Encoding'));
+            ], $request->getHeaderTokenValues('Accept-Encoding'));
             
             $response = new HttpResponse();
             

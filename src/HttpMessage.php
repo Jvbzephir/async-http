@@ -98,22 +98,21 @@ abstract class HttpMessage
         }, $this->headers[$n]);
     }
 
-    public function getHeaderLine(string $name): string
+    public function getHeaderLine(string $name, string $glue = ','): string
     {
-        return \implode(',', $this->getHeader($name));
+        return \implode($glue, $this->getHeader($name));
     }
-    
+
     public function getHeaderTokens(string $name, string $separator = ','): array
     {
-        $tokens = [];
-        
-        foreach ($this->getHeader($name) as $v) {
-            foreach (\explode($separator, \strtolower($v)) as $t) {
-                $tokens[] = \trim($t);
-            }
-        }
-        
-        return $tokens;
+        return HeaderToken::parseList($this->getHeaderLine($name, $separator), $separator);
+    }
+
+    public function getHeaderTokenValues(string $name, bool $lowercase = true, string $separator = ','): array
+    {
+        return \array_map(function (HeaderToken $token) use ($lowercase) {
+            return $lowercase ? \strtolower($token->getValue()) : $token->getValue();
+        }, HeaderToken::parseList($this->getHeaderLine($name, $separator), $separator));
     }
 
     public function withHeader(string $name, string ...$values): HttpMessage

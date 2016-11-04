@@ -106,7 +106,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
             'foo',
             'bar',
             'baz'
-        ], $message->getHeaderTokens('Tokens'));
+        ], $message->getHeaderTokenValues('Tokens'));
     }
     
     public function testCanTokenizeHeaderUsingSeparator()
@@ -118,7 +118,7 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
             'foo',
             'bar',
             'baz'
-        ], $message->getHeaderTokens('Tokens', ';'));
+        ], $message->getHeaderTokenValues('Tokens', true, ';'));
     }
 
     public function testCanUseBody()

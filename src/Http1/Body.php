@@ -123,7 +123,7 @@ class Body implements HttpBody
     {
         $close = false;
         
-        if ($message instanceof HttpResponse && \in_array('close', $message->getHeaderTokens('Connection'))) {
+        if ($message instanceof HttpResponse && \in_array('close', $message->getHeaderTokenValues('Connection'))) {
             $close = true;
         }
         

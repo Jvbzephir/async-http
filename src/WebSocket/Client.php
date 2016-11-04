@@ -147,7 +147,7 @@ class Client
             throw new \RuntimeException(\sprintf('Unexpected HTTP response code: %s', $response->getStatusCode()));
         }
         
-        if (!\in_array('upgrade', $response->getHeaderTokens('Connection'))) {
+        if (!\in_array('upgrade', $response->getHeaderTokenValues('Connection'))) {
             throw new \RuntimeException(\sprintf('HTTP connection header did not contain upgrade: "%s"', $response->getHeaderLine('Connection')));
         }
         

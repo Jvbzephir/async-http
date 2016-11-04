@@ -129,7 +129,7 @@ class ContentEncoder
         if (($zlib ?? ($zlib = \function_exists('deflate_init'))) && $this->isCompressable($request, $response)) {
             $compress = null;
             
-            foreach ($request->getHeaderTokens('Accept-Encoding') as $encoding) {
+            foreach ($request->getHeaderTokenValues('Accept-Encoding') as $encoding) {
                 switch ($encoding) {
                     case 'gzip':
                         $compress = \ZLIB_ENCODING_GZIP;

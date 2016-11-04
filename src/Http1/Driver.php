@@ -169,7 +169,7 @@ class Driver implements HttpDriver
                     }
                 }
                 
-                $tokens = $request->getHeaderTokens('Connection');
+                $tokens = $request->getHeaderTokenValues('Connection');
                 
                 if (\in_array('upgrade', $tokens, true)) {
                     foreach ($tokens as $i => $token) {
@@ -227,8 +227,8 @@ class Driver implements HttpDriver
             ''
         ];
         
-        if (\in_array('upgrade', $request->getHeaderTokens('Connection'), true)) {
-            $protocols = \array_merge($request->getHeaderTokens('Upgrade'), $protocols);
+        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'), true)) {
+            $protocols = \array_merge($request->getHeaderTokenValues('Upgrade'), $protocols);
         }
         
         foreach ($protocols as $protocol) {
@@ -284,7 +284,7 @@ class Driver implements HttpDriver
         $request->getBody()->setCascadeClose(false);
         
         if ($request->getProtocolVersion() == '1.1') {
-            if (\in_array('100-continue', $request->getHeaderTokens('Expect'), true)) {
+            if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {
                 $request->getBody()->setExpectContinue($socket);
             }
         }
@@ -321,7 +321,7 @@ class Driver implements HttpDriver
             return true;
         }
         
-        $conn = $request->getHeaderTokens('Connection');
+        $conn = $request->getHeaderTokenValues('Connection');
         
         // HTTP/1.0 must explicitly specify keep-alive to use persistent connections.
         if ($request->getProtocolVersion() == '1.0' && !\in_array('keep-alive', $conn, true)) {
@@ -422,8 +422,8 @@ class Driver implements HttpDriver
             ''
         ];
         
-        if (\in_array('upgrade', $request->getHeaderTokens('Connection'), true)) {
-            $protocols = \array_merge($request->getHeaderTokens('Upgrade'), $protocols);
+        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'), true)) {
+            $protocols = \array_merge($request->getHeaderTokenValues('Upgrade'), $protocols);
         }
         
         foreach ($protocols as $protocol) {
