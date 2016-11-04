@@ -20,36 +20,13 @@ use KoolKode\Async\Stream\ReadableStream;
 
 class CompressedMessageWriter extends MessageWriter
 {
-    protected $context;
+    protected $deflate;
     
-    protected $window;
-    
-    protected $flushMode;
-    
-    public function __construct(SocketStream $socket, bool $client, bool $takeover = true, int $window = 14)
+    public function __construct(SocketStream $socket, bool $client, PerMessageDeflate $deflate)
     {
         parent::__construct($socket, $client);
         
-        $this->flushMode = $takeover ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
-        $this->window = $window;
-    }
-
-    protected function getCompressionContext()
-    {
-        if ($this->context) {
-            return $this->context;
-        }
-        
-        $context = \deflate_init(\ZLIB_ENCODING_RAW, [
-            'level' => 1,
-            'window' => $this->window
-        ]);
-        
-        if ($this->flushMode === \ZLIB_SYNC_FLUSH) {
-            return $this->context = $context;
-        }
-        
-        return $context;
+        $this->deflate = $deflate;
     }
 
     public function sendText(string $text, int $priority = 0): Awaitable
@@ -61,7 +38,7 @@ class CompressedMessageWriter extends MessageWriter
         return $this->writer->execute(function () use ($text) {
             $type = Frame::TEXT;
             $reserved = Frame::RESERVED1;
-            $context = $this->getCompressionContext();
+            $context = $this->deflate->getCompressionContext();
             $chunks = \str_split($text, 4092);
             
             for ($size = \count($chunks) - 1, $i = 0; $i < $size; $i++) {
@@ -73,7 +50,7 @@ class CompressedMessageWriter extends MessageWriter
                 $reserved = 0;
             }
             
-            $chunk = \substr(\deflate_add($context, $chunks[$i], $this->flushMode), 0, -4);
+            $chunk = \substr(\deflate_add($context, $chunks[$i], $this->deflate->getCompressionFlushMode()), 0, -4);
             
             yield $this->writeFrame(new Frame($type, $chunk, true, $reserved));
         }, $priority);
@@ -84,7 +61,7 @@ class CompressedMessageWriter extends MessageWriter
         return $this->writer->execute(function () use ($stream) {
             $type = Frame::BINARY;
             $reserved = Frame::RESERVED1;
-            $context = $this->getCompressionContext();
+            $context = $this->deflate->getCompressionContext();
             $len = 0;
             
             try {
@@ -101,7 +78,7 @@ class CompressedMessageWriter extends MessageWriter
                 }
                 
                 if ($chunk !== null) {
-                    $chunk = \substr(\deflate_add($context, $chunk, $this->flushMode), 0, -4);
+                    $chunk = \substr(\deflate_add($context, $chunk, $this->deflate->getCompressionFlushMode()), 0, -4);
                     
                     $len += yield $this->writeFrame(new Frame($type, $chunk, true, $reserved));
                 }

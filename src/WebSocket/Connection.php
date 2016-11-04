@@ -18,8 +18,6 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Stream\ReadableChannelStream;
-use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
@@ -80,17 +78,16 @@ class Connection
     /**
      * Message buffer that is being used to reassemble fragmented messages.
      * 
-     * @var string|Channel
+     * @var TextMessageReader|BinaryMessageReader
      */
     protected $buffer;
     
-    protected $compressed = false;
-    
-    protected $bufferCompressed = false;
-    
-    protected $decompression;
-    
-    protected $flushMode;
+    /**
+     * Extension that provides deflate compression of messages.
+     * 
+     * @var PerMessageDeflate
+     */
+    protected $deflate;
     
     /**
      * Maximum frame size (in bytes).
@@ -156,12 +153,12 @@ class Connection
     
     public function enablePerMessageDeflate(array $settings)
     {
-        $takeover = empty($settings['client_no_context_takeover']);
-        $window = $settings['client_max_window_bits'];
+        $compressionTakeover = empty($settings['client_no_context_takeover']);
+        $decompressionTakeover = empty($settings['sever_no_context_takeover']);
+        $compressionWindow = $settings['client_max_window_bits'];
         
-        $this->compressed = true;
-        $this->writer = new CompressedMessageWriter($this->socket, $this->client, $takeover, $window);
-        $this->flushMode = empty($settings['sever_no_context_takeover']) ? \ZLIB_SYNC_FLUSH : \ZLIB_FINISH;
+        $this->deflate = new PerMessageDeflate($compressionTakeover, $decompressionTakeover, $compressionWindow);
+        $this->writer = new CompressedMessageWriter($this->socket, $this->client, $this->deflate);
         
         if ($this->logger) {
             $this->logger->debug('Enabled permessage-deflate extension: {settings}', [
@@ -361,24 +358,10 @@ class Connection
             throw new ConnectionException('Cannot receive new message while reading continuation frames', Frame::PROTOCOL_ERROR);
         }
         
-        if (\strlen($frame->data) > $this->maxTextMessageSize) {
-            throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxTextMessageSize), Frame::MESSAGE_TOO_BIG);
-        }
+        $this->buffer = new TextMessageReader($this->messages, $this->maxTextMessageSize, $this->deflate);
         
-        if ($frame->finished) {
-            if ($this->compressed && $frame->reserved & Frame::RESERVED1) {
-                $frame->data = \inflate_add($this->getDecompressionContext(), $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
-                $frame->reserved &= ~Frame::RESERVED1;
-            }
-            
-            if (!\preg_match('//u', $frame->data)) {
-                throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
-            }
-            
-            yield $this->messages->send($frame->data);
-        } else {
-            $this->buffer = $frame->data;
-            $this->bufferCompressed = $this->compressed && (($frame->reserved & Frame::RESERVED1) ? true : false);
+        if (yield from $this->buffer->appendTextFrame($frame)) {
+            $this->buffer = null;
         }
     }
 
@@ -391,16 +374,10 @@ class Connection
             throw new ConnectionException('Cannot receive new message while reading continuation frames', Frame::PROTOCOL_ERROR);
         }
         
-        if ($frame->finished) {
-            yield $this->messages->send(new ReadableMemoryStream($frame->data));
-        } else {
-            $this->buffer = new Channel(16);
-            
-            yield $this->messages->send(new ReadableChannelStream($this->buffer));
-            
-            foreach (\str_split($frame->data, 4096) as $chunk) {
-                yield $this->buffer->send($chunk);
-            }
+        $this->buffer = new BinaryMessageReader($this->messages, $this->deflate);
+        
+        if (yield from $this->buffer->appendBinaryFrame($frame)) {
+            $this->buffer = null;
         }
     }
 
@@ -414,41 +391,13 @@ class Connection
         }
         
         try {
-            if ($this->buffer instanceof Channel) {
-                foreach (\str_split($frame->data, 4096) as $chunk) {
-                    yield $this->buffer->send($chunk);
-                }
-                
-                if ($frame->finished) {
-                    $this->buffer->close();
-                }
-            } else {
-                if ((\strlen($this->buffer) + \strlen($frame->data)) > $this->maxTextMessageSize) {
-                    throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxTextMessageSize), Frame::MESSAGE_TOO_BIG);
-                }
-                
-                $this->buffer .= $frame->data;
-                
-                if ($frame->finished) {
-                    if ($this->bufferCompressed) {
-                        $this->buffer = \inflate_add($this->getDecompressionContext(), $this->buffer . "\x00\x00\xFF\xFF", $this->flushMode);
-                    }
-                    
-                    if (!\preg_match('//u', $this->buffer)) {
-                        throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
-                    }
-                    
-                    yield $this->messages->send($this->buffer);
-                }
+            if (yield from $this->buffer->appendContinuationFrame($frame)) {
+                $this->buffer = null;
             }
         } catch (\Throwable $e) {
-            if ($this->buffer instanceof Channel) {
-                $this->buffer->close($e);
-            }
-            
-            $this->buffer = null;
-        } finally {
-            if ($frame->finished) {
+            try {
+                $this->buffer->dispose($e);
+            } finally {
                 $this->buffer = null;
             }
         }
