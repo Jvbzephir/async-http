@@ -191,7 +191,7 @@ class ConnectionHandler implements UpgradeResultHandler
                     } finally {
                         $message->close();
                     }
-                } elseif (\is_string($message)) {
+                } else {
                     yield from $this->invokeAsync($endpoint->onTextMessage($conn, $message));
                 }
             }
@@ -236,9 +236,7 @@ class ConnectionHandler implements UpgradeResultHandler
             ]);
         }
         
-        $versions = $request->getHeaderTokenValues('Sec-Websocket-Version');
-        
-        if (!\in_array('13', $versions, true)) {
+        if (!\in_array('13', $request->getHeaderTokenValues('Sec-Websocket-Version'), true)) {
             throw new StatusException(Http::BAD_REQUEST, 'Secure websocket version 13 required', [
                 'Sec-Websocket-Version' => '13'
             ]);

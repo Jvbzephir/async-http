@@ -44,9 +44,7 @@ abstract class HttpMessage
                     $k,
                     \trim($v)
                 ];
-            }, [
-                (string) $v
-            ]));
+            }, (array) $v));
             
             if (!empty($filtered)) {
                 $this->headers[\strtolower($k)] = $filtered;

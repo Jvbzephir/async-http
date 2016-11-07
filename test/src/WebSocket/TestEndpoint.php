@@ -13,12 +13,22 @@ namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Stream\ReadableStream;
 
+/**
+ * WebSocket endpoint that allows using callbacks as message handlers.
+ * 
+ * Using callbacks allows for convenient assertions within a message handler.
+ * 
+ * @author Martin Schröder
+ */
 class TestEndpoint extends Endpoint
 {
     protected $handshake;
 
     protected $textHandler;
+    
+    protected $binaryHandler;
 
     public function validateHandshake(callable $handshake)
     {
@@ -43,6 +53,18 @@ class TestEndpoint extends Endpoint
     {
         if ($this->textHandler) {
             return ($this->textHandler)($conn, $message);
+        }
+    }
+
+    public function handleBinaryMessage(callable $handler)
+    {
+        $this->binaryHandler = $handler;
+    }
+
+    public function onBinaryMessage(Connection $conn, ReadableStream $message)
+    {
+        if ($this->binaryHandler) {
+            return ($this->binaryHandler)($conn, $message);
         }
     }
 }
