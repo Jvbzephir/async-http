@@ -37,6 +37,13 @@ class Client
     const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     
     /**
+     * Enable permessage-deflate WebSocket extension?
+     * 
+     * @var string
+     */
+    protected $deflateSupported = false;
+    
+    /**
      * HTTP client being used to perform the initial handshake.
      * 
      * @var HttpClient
@@ -60,6 +67,14 @@ class Client
     {
         $this->httpClient = $httpClient ?? new HttpClient();
         $this->logger = $logger;
+    }
+
+    /**
+     * Enable / disable permessage-deflate WebSocket extension.
+     */
+    public function setDeflateSupported(bool $deflate)
+    {
+        $this->deflateSupported = $deflate;
     }
 
     /**
@@ -98,20 +113,48 @@ class Client
         
         while (null !== yield $stream->read());
         
+        return $this->establishConnection($location, $response);
+    }
+
+    /**
+     * Establish a WebSocket connection using the given handshake HTTP response.
+     * 
+     * @param string $location
+     * @param HttpResponse $response
+     * @return Connection
+     */
+    protected function establishConnection(string $location, HttpResponse $response): Connection
+    {
         $socket = $response->getAttribute(SocketStream::class);
         
         if (!$socket instanceof SocketStream) {
             throw new \RuntimeException('Failed to access HTTP socket stream via response attribute');
         }
         
-        if ($this->logger) {
-            $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
-                'peer' => $socket->getRemoteAddress(),
-                'uri' => $location
-            ]);
+        try {
+            $conn = new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
+            
+            if ($this->logger) {
+                $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
+                    'peer' => $socket->getRemoteAddress(),
+                    'uri' => $location
+                ]);
+            }
+            
+            if ($deflate = $this->negotiatePerMessageDeflate($response)) {
+                if (!$this->deflateSupported) {
+                    throw new \RuntimeException('Server enabled permessage-deflate but client does not support the extension');
+                }
+                
+                $conn->enablePerMessageDeflate($deflate);
+            }
+            
+            return $conn;
+        } catch (\Throwable $e) {
+            $socket->close();
+            
+            throw $e;
         }
-        
-        return new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
     }
 
     /**
@@ -124,6 +167,8 @@ class Client
      */
     protected function createHandshakeRequest(string $uri, string $nonce, array $protocols): HttpRequest
     {
+        static $zlib;
+        
         $request = new HttpRequest($uri, Http::GET, [
             'Connection' => 'upgrade',
             'Upgrade' => 'websocket',
@@ -135,9 +180,13 @@ class Client
             $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));
         }
         
+        if ($this->deflateSupported && $zlib ?? ($zlib = \function_exists('inflate_init'))) {
+            $request = $request->withAddedHeader('Sec-WebSocket-Extensions', 'permessage-deflate');
+        }
+        
         return $request;
     }
-    
+
     /**
      * Assert that the given response indicates a succeeded WebSocket handshake.
      */
@@ -161,6 +210,39 @@ class Client
         
         if (\base64_encode(\sha1($nonce . self::GUID, true)) !== $response->getHeaderLine('Sec-WebSocket-Accept')) {
             throw new \RuntimeException('Failed to verify Sec-WebSocket-Accept HTTP header');
+        }
+    }
+
+    /**
+     * Negotiate permessage-deflate settings with the server using the given handshake HTTP response.
+     * 
+     * @param HttpResponse $response
+     * @return PerMessageDeflate Or null when the server did not enable the extension.
+     */
+    protected function negotiatePerMessageDeflate(HttpResponse $response)
+    {
+        static $zlib;
+        
+        $extension = null;
+        
+        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+            foreach ($response->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
+                if (\strtolower($ext->getValue()) === 'permessage-deflate') {
+                    $extension = $ext;
+                    
+                    break;
+                }
+            }
+        }
+        
+        if ($extension === null) {
+            return;
+        }
+        
+        try {
+            return PerMessageDeflate::fromHeaderToken($extension);
+        } catch (\OutOfRangeException $e) {
+            return;
         }
     }
 }
