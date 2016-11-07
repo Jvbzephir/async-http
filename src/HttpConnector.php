@@ -23,6 +23,13 @@ use KoolKode\Async\Awaitable;
 interface HttpConnector
 {
     /**
+     * Get priority of the connector (connectors with hihgher priority are preferred over connectors with lower priority).
+     * 
+     * @return int
+     */
+    public function getPriority(): int;
+    
+    /**
      * Get ALPN protocols supported by the connector.
      * 
      * @return array

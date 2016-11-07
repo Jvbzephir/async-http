@@ -49,6 +49,14 @@ class Connector implements HttpConnector
     /**
      * {@inheritdoc}
      */
+    public function getPriority(): int
+    {
+        return 20;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function getProtocols(): array
     {
         return [

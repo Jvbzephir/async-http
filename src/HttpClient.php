@@ -70,6 +70,10 @@ class HttpClient
             new Connector()
         ];
         
+        \usort($this->connectors, function (HttpConnector $a, HttpConnector $b) {
+            return $b->getPriority() <=> $a->getPriority();
+        });
+        
         $this->protocols = \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
             return $connector->getProtocols();
         }, $this->connectors)));
@@ -88,6 +92,15 @@ class HttpClient
         }
         
         return new AwaitPending($close);
+    }
+
+    public function addConnector(HttpConnector $connector)
+    {
+        $this->connectors[] = $connector;
+        
+        \usort($this->connectors, function (HttpConnector $a, HttpConnector $b) {
+            return $b->getPriority() <=> $a->getPriority();
+        });
     }
 
     public function addMiddleware(callable $middleware, int $priority = 0)
