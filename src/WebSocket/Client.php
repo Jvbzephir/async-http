@@ -106,7 +106,7 @@ class Client
         
         $response = yield $this->httpClient->send($request);
         
-        $this->assertHandshakeSucceeded($response, $nonce);
+        $this->assertHandshakeSucceeded($response, $nonce, $protocols);
         
         // Discard HTTP body contents but do not close the underlying socket stream.
         $stream = yield $response->getBody()->getReadableStream();
@@ -180,7 +180,7 @@ class Client
             $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));
         }
         
-        if ($this->deflateSupported && $zlib ?? ($zlib = \function_exists('inflate_init'))) {
+        if ($this->deflateSupported && ($zlib ?? ($zlib = \function_exists('inflate_init')))) {
             $request = $request->withAddedHeader('Sec-WebSocket-Extensions', 'permessage-deflate');
         }
         
@@ -190,13 +190,13 @@ class Client
     /**
      * Assert that the given response indicates a succeeded WebSocket handshake.
      */
-    protected function assertHandshakeSucceeded(HttpResponse $response, string $nonce)
+    protected function assertHandshakeSucceeded(HttpResponse $response, string $nonce, array $protocols)
     {
         if ($response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
             throw new \RuntimeException(\sprintf('Unexpected HTTP response code: %s', $response->getStatusCode()));
         }
         
-        if (!\in_array('upgrade', $response->getHeaderTokenValues('Connection'))) {
+        if (!\in_array('upgrade', $response->getHeaderTokenValues('Connection'), true)) {
             throw new \RuntimeException(\sprintf('HTTP connection header did not contain upgrade: "%s"', $response->getHeaderLine('Connection')));
         }
         
@@ -204,12 +204,14 @@ class Client
             throw new \RuntimeException(\sprintf('HTTP upgrade header did not specify websocket: "%s"', $response->getHeaderLine('Upgrade')));
         }
         
-        if (!$response->hasHeader('Sec-Websocket-Accept')) {
-            throw new \RuntimeException('Missing Sec-WebSocket-Accept HTTP header');
-        }
-        
         if (\base64_encode(\sha1($nonce . self::GUID, true)) !== $response->getHeaderLine('Sec-WebSocket-Accept')) {
             throw new \RuntimeException('Failed to verify Sec-WebSocket-Accept HTTP header');
+        }
+        
+        if ($response->hasHeader('Sec-WebSocket-Protocol')) {
+            if (!\in_array($response->getHeaderLine('Sec-WebSocket-Protocol'), $protocols, true)) {
+                throw new \OutOfRangeException(\sprintf('Unsupported protocol: "%s"', $response->getHeaderLine('Sec-WebSocket-Protocol')));
+            }
         }
     }
 

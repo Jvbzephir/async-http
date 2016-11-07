@@ -217,7 +217,7 @@ class Connection
      * 
      * @return string|ReadableStream
      */
-    public function readNextMessage(): Awaitable
+    public function receive(): Awaitable
     {
         return $this->messages->receive();
     }
