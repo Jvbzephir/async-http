@@ -28,7 +28,7 @@ class TestLogger implements LoggerInterface, \Countable, \IteratorAggregate
         $this->messages[] = [
             'level' => $level,
             'message' => $message,
-            'contexr' => $context
+            'context' => $context
         ];
     }
 

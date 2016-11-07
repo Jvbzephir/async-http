@@ -152,6 +152,16 @@ class Connection
     }
     
     /**
+     * check if permessage-deflate extension is enabled.
+     * 
+     * @return bool
+     */
+    public function isCompressionEnabled(): bool
+    {
+        return $this->deflate !== null;
+    }
+    
+    /**
      * Enable permessage-deflate WebSocket protocol extension.
      * 
      * @param PerMessageDeflate $deflate
