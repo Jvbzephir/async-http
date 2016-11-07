@@ -76,7 +76,7 @@ class HttpTestClient extends HttpClient
     {
         if ($this->server->isEncrypted()) {
             foreach ($this->connectors as $connector) {
-                if ($connector->isRequestSupported($request)) {
+                if (!$connector->isRequestSupported($request)) {
                     continue;
                 }
                 
@@ -94,11 +94,7 @@ class HttpTestClient extends HttpClient
             }
         } else {
             foreach ($this->connectors as $connector) {
-                if ($connector->isRequestSupported($request)) {
-                    continue;
-                }
-                
-                if (\in_array('http/1.1', $connector->getProtocols(), true)) {
+                if ($connector->isRequestSupported($request) && \in_array('http/1.1', $connector->getProtocols(), true)) {
                     $this->spawnWorker();
                     
                     return $connector;

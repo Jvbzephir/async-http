@@ -11,7 +11,6 @@
 
 namespace KoolKode\Async\Http\WebSocket;
 
-use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http;
@@ -24,13 +23,6 @@ use KoolKode\Async\Http\Test\HttpMockClient;
  */
 class ClientTest extends EndToEndTest
 {
-    public function getConnectors(): array
-    {
-        return [
-            new Connector()
-        ];
-    }
-    
     public function testBasicEcho()
     {
         $this->httpServer->setAction(function (HttpRequest $request) {

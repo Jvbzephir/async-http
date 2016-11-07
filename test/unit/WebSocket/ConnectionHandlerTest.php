@@ -15,27 +15,19 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\Http1\Connector;
+use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Http\Test\EndToEndTest;
+use KoolKode\Async\ReadContents;
+use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\ReadContents;
-use KoolKode\Async\Socket\Socket;
-use KoolKode\Async\Http\TestLogger;
 
 /**
  * @covers \KoolKode\Async\Http\WebSocket\ConnectionHandler
  */
 class ConnectionHandlerTest extends EndToEndTest
 {
-    public function getConnectors(): array
-    {
-        return [
-            new Connector()
-        ];
-    }
-    
     public function testDetectsUpgradeAvailability()
     {
         $conn = new ConnectionHandler();
