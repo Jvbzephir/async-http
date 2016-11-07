@@ -184,7 +184,7 @@ class ConnectionHandler implements UpgradeResultHandler
         try {
             yield from $this->invokeAsync($endpoint->onOpen($conn));
             
-            while (null !== ($message = yield $conn->readNextMessage())) {
+            while (null !== ($message = yield $conn->receive())) {
                 if ($message instanceof ReadableStream) {
                     try {
                         yield from $this->invokeAsync($endpoint->onBinaryMessage($conn, $message));
