@@ -20,16 +20,46 @@ namespace KoolKode\Async\Http\WebSocket;
  */
 class Frame
 {
+    /**
+     * Frame that carries fragmented data belonging to the most-recent text or binary frame.
+     * 
+     * @var int
+     */
     const CONTINUATION = 0x00;
 
+    /**
+     * Data frame that transfers a UTF-8 encoded text payload.
+     * 
+     * @var int
+     */
     const TEXT = 0x01;
 
+    /**
+     * Data frame that transfers arbitrary binary data.
+     * 
+     * @var int
+     */
     const BINARY = 0x02;
 
+    /**
+     * Control frame indicating that a connection is about to be closed.
+     * 
+     * @var int
+     */
     const CONNECTION_CLOSE = 0x08;
 
+    /**
+     * Control frame that instructs a peer to replay with a pong frame.
+     * 
+     * @var int
+     */
     const PING = 0x09;
 
+    /**
+     * Control frame that is received in response to a ping frame.
+     * 
+     * @var int
+     */
     const PONG = 0x0A;
 
     /**
@@ -46,10 +76,25 @@ class Frame
      */
     const RESERVED = 0b01110000;
 
+    /**
+     * Mask being used to access reserved bit 1.
+     * 
+     * @var int
+     */
     const RESERVED1 = 0b01000000;
     
+    /**
+     * Mask being used to access reserved bit 2.
+     *
+     * @var int
+     */
     const RESERVED2 = 0b00100000;
     
+    /**
+     * Mask being used to access reserved bit 3.
+     *
+     * @var int
+     */
     const RESERVED3 = 0b00010000;
     
     /**
