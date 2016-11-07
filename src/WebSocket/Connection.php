@@ -255,7 +255,7 @@ class Connection
      */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
-        return $this->sendBinary($stream, $priority);
+        return $this->writer->sendBinary($stream, $priority);
     }
 
     /**
