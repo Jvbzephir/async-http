@@ -591,7 +591,6 @@ class Driver implements HttpDriver
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse
     {
         static $remove = [
-            'Connection',
             'Content-Length',
             'Keep-Alive',
             'Trailer',
@@ -602,6 +601,25 @@ class Driver implements HttpDriver
         
         foreach ($remove as $name) {
             $response = $response->withoutHeader($name);
+        }
+        
+        $conn = [];
+        
+        foreach ($response->getHeaderTokenValues('Connection') as $token) {
+            switch ($token) {
+                case 'close':
+                case 'keep-alive':
+                    // Ignore these...
+                    break;
+                default:
+                    $conn[] = $token;
+            }
+        }
+        
+        if (empty($conn)) {
+            $response = $response->withoutHeader('Connection');
+        } else {
+            $response = $response->withHeader('Connection', \implode(', ', $conn));
         }
         
         return $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
@@ -626,6 +644,10 @@ class Driver implements HttpDriver
             ]);
         }
         
+        if (!$close) {
+            $response = $response->withHeader('Keep-Alive', '30');
+        }
+        
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
         if ((float) $response->getProtocolVersion() > 1) {
@@ -640,16 +662,9 @@ class Driver implements HttpDriver
             $close = true;
         }
         
-        if ($close) {
-            $buffer .= "Connection: close\r\n";
-        } else {
-            $buffer .= "Connection: keep-alive\r\n";
-            $buffer .= "Keep-Alive: timeout=30\r\n";
-        }
-        
         foreach ($response->getHeaders() as $name => $header) {
             $name = Http::normalizeHeaderName($name);
-        
+            
             foreach ($header as $value) {
                 $buffer .= $name . ': ' . $value . "\r\n";
             }

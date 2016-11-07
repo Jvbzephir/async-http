@@ -351,10 +351,8 @@ class Connector implements HttpConnector
 
     protected function serializeHeaders(HttpRequest $request, int $size = null)
     {
-        if ($request->hasHeader('Connection')) {
-            $request = $request->withAddedHeader('Connection', \implode(', ', \array_merge([
-                $this->keepAlive ? 'keep-alive' : 'close'
-            ], $request->getHeaderTokenValues('Connection'))));
+        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'))) {
+            $request = $request->withHeader('Connection', 'upgrade');
         } else {
             $request = $request->withHeader('Connection', $this->keepAlive ? 'keep-alive' : 'close');
         }
