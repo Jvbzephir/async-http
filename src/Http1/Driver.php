@@ -644,6 +644,10 @@ class Driver implements HttpDriver
             ]);
         }
         
+        if (!$response->hasHeader('Connection')) {
+            $response = $response->withHeader('Connection', $close ? 'close' : 'keep-alive');
+        }
+        
         if (!$close) {
             $response = $response->withHeader('Keep-Alive', '30');
         }

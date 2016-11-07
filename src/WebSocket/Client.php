@@ -104,7 +104,7 @@ class Client
         $nonce = \base64_encode(\random_bytes(16));
         $request = $this->createHandshakeRequest($uri, $nonce, $protocols);
         
-        $response = yield $this->httpClient->send($request);
+        $response = yield $this->sendHandshake($request);
         
         $this->assertHandshakeSucceeded($response, $nonce, $protocols);
         
@@ -114,6 +114,17 @@ class Client
         while (null !== yield $stream->read());
         
         return $this->establishConnection($location, $response);
+    }
+
+    /**
+     * Send WebSocket handshake HTTP request and get the response.
+     * 
+     * @param HttpRequest $request
+     * @return HttpResponse
+     */
+    protected function sendHandshake(HttpRequest $request): Awaitable
+    {
+        return $this->httpClient->send($request);
     }
 
     /**
