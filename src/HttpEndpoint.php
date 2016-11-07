@@ -98,7 +98,7 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            $context = new HttpDriverContext($factory->getPeerName(), $this->middleware);
+            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middleware);
             
             return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });

@@ -57,7 +57,7 @@ abstract class EndToEndTest extends AsyncTestCase
                 
                 $context->socket = new SocketStream($a);
                 
-                $serverContext = new HttpDriverContext('localhost', $this->serverMiddleware);
+                $serverContext = new HttpDriverContext('localhost', false, $this->serverMiddleware);
                 
                 $this->serverTasks[] = $this->driver->handleConnection($serverContext, new SocketStream($b), $action);
             }

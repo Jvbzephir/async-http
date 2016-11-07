@@ -299,7 +299,7 @@ class Driver implements HttpDriver
         }
         
         if ($process) {
-            $protocol = $socket->isEncrypted() ? 'https' : 'http';
+            $protocol = $context->encrypted ? 'https' : 'http';
             $target = $request->getRequestTarget();
             
             if (\substr($target, 0, 1) === '/') {

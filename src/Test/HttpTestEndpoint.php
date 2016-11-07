@@ -61,7 +61,7 @@ class HttpTestEndpoint
 
     public function accept(SocketStream $socket, callable $action, string $alpn = ''): Awaitable
     {
-        $context = new HttpDriverContext($this->peerName, $this->middleware);
+        $context = new HttpDriverContext($this->peerName, false, $this->middleware);
         
         foreach ($this->drivers as $driver) {
             if (\in_array($alpn, $driver->getProtocols(), true)) {

@@ -28,6 +28,13 @@ class HttpDriverContext
     public $peerName;
     
     /**
+     * Is the HTTP endpoint encrypted using SSL / TSL.
+     * 
+     * @var bool
+     */
+    public $encrypted;
+    
+    /**
      * Registered prioritized HTTP middleware.
      * 
      * @var \SplPriorityQueue
@@ -38,11 +45,13 @@ class HttpDriverContext
      * Create a new HTTP server / driver context.
      * 
      * @param string $peerName
+     * @param bool $encrypted
      * @param \SplPriorityQueue $middleware
      */
-    public function __construct(string $peerName, \SplPriorityQueue $middleware = null)
+    public function __construct(string $peerName, bool $encrypted = false, \SplPriorityQueue $middleware = null)
     {
         $this->peerName = $peerName;
+        $this->encrypted = $encrypted;
         $this->middleware = $middleware ?? new \SplPriorityQueue();
     }
 }
