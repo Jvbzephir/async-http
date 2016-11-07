@@ -11,15 +11,16 @@
 
 namespace KoolKode\Async\Http\WebSocket;
 
-use KoolKode\Async\Http\Test\HttpTestClient;
-use KoolKode\Async\Http\Test\HttpTestEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\TestLogger;
+use KoolKode\Async\Http\Test\HttpMockClient;
+use KoolKode\Async\Http\Test\HttpTestClient;
+use KoolKode\Async\Http\Test\HttpTestEndpoint;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Test\SocketStreamTester;
-use KoolKode\Async\Http\TestLogger;
 
 /**
  * @covers \KoolKode\Async\Http\WebSocket\Client
@@ -163,76 +164,52 @@ class ClientTest extends AsyncTestCase
 
     public function testUnexpectedResponseStatusCode()
     {
-        yield new SocketStreamTester(function (SocketStream $socket) {
-            $client = new Client(new HttpTestClient($socket));
-            
-            $this->expectException(\RuntimeException::class);
-            
-            yield $client->connect('ws://localhost/');
-        }, function (SocketStream $socket) {
-            $server = new HttpTestEndpoint();
-            
-            yield $server->accept($socket, function (HttpRequest $request) {
-                return new HttpResponse();
-            });
-        });
+        $client = new Client(new HttpMockClient([
+            new HttpResponse()
+        ]));
+        
+        $this->expectException(\RuntimeException::class);
+        
+        yield $client->connect('ws://localhost/');
     }
 
     public function testMissingConnectionUpgrade()
     {
-        yield new SocketStreamTester(function (SocketStream $socket) {
-            $client = new Client(new HttpTestClient($socket));
-            
-            $this->expectException(\RuntimeException::class);
-            
-            yield $client->connect('ws://localhost/');
-        }, function (SocketStream $socket) {
-            $server = new HttpTestEndpoint();
-            
-            yield $server->accept($socket, function (HttpRequest $request) {
-                return new HttpResponse(Http::SWITCHING_PROTOCOLS);
-            });
-        });
+        $client = new Client(new HttpMockClient([
+            new HttpResponse(Http::SWITCHING_PROTOCOLS)
+        ]));
+        
+        $this->expectException(\RuntimeException::class);
+        
+        yield $client->connect('ws://localhost/');
     }
 
-    public function testMissingUpgradeHeader()
+    public function testInvalidUpgradeHeader()
     {
-        yield new SocketStreamTester(function (SocketStream $socket) {
-            $client = new Client(new HttpTestClient($socket));
-            
-            $this->expectException(\RuntimeException::class);
-            
-            yield $client->connect('ws://localhost/');
-        }, function (SocketStream $socket) {
-            $server = new HttpTestEndpoint();
-            
-            yield $server->accept($socket, function (HttpRequest $request) {
-                return new HttpResponse(Http::SWITCHING_PROTOCOLS, [
-                    'Connection' => 'upgrade',
-                    'Upgrade' => 'foo'
-                ]);
-            });
-        });
+        $client = new Client(new HttpMockClient([
+            new HttpResponse(Http::SWITCHING_PROTOCOLS, [
+                'Connection' => 'upgrade',
+                'Upgrade' => 'foo'
+            ])
+        ]));
+        
+        $this->expectException(\RuntimeException::class);
+        
+        yield $client->connect('ws://localhost/');
     }
 
     public function testFailedAccept()
     {
-        yield new SocketStreamTester(function (SocketStream $socket) {
-            $client = new Client(new HttpTestClient($socket));
-            
-            $this->expectException(\RuntimeException::class);
-            
-            yield $client->connect('ws://localhost/');
-        }, function (SocketStream $socket) {
-            $server = new HttpTestEndpoint();
-            
-            yield $server->accept($socket, function (HttpRequest $request) {
-                return new HttpResponse(Http::SWITCHING_PROTOCOLS, [
-                    'Connection' => 'upgrade',
-                    'Upgrade' => 'websocket'
-                ]);
-            });
-        });
+        $client = new Client(new HttpMockClient([
+            new HttpResponse(Http::SWITCHING_PROTOCOLS, [
+                'Connection' => 'upgrade',
+                'Upgrade' => 'websocket'
+            ])
+        ]));
+        
+        $this->expectException(\RuntimeException::class);
+        
+        yield $client->connect('ws://localhost/');
     }
     
     public function testInvalidCompressionSettingsDisableCompression()
