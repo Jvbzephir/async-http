@@ -132,6 +132,14 @@ class Driver implements HttpDriver
     /**
      * {@inheritdoc}
      */
+    public function getPriority(): int
+    {
+        return 11;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function getProtocols(): array
     {
         return [

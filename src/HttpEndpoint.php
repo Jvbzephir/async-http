@@ -67,6 +67,10 @@ class HttpEndpoint
         if ($driver instanceof UpgradeHandler) {
             $this->http1->addUpgradeHandler($driver);
         }
+        
+        \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
+            return $b->getPriority() <=> $a->getPriority();
+        });
     }
 
     public function addUpgradeHandler(UpgradeHandler $handler)

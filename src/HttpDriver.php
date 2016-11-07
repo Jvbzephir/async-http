@@ -24,6 +24,13 @@ use KoolKode\Async\Socket\SocketStream;
 interface HttpDriver
 {
     /**
+     * Get priority of the HTTP driver (drivers with higher priority are preferred over drivers with lower priority).
+     * 
+     * @return int
+     */
+    public function getPriority(): int;
+    
+    /**
      * Get ALPN protocols supported by the driver.
      * 
      * @return array

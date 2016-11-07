@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Test;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Failure;
+use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Socket\SocketStream;
 
@@ -37,13 +38,14 @@ class HttpTestEndpoint
 
     public function __construct(array $drivers, string $peerName = 'localhost', bool $encrypted = false)
     {
+        $this->drivers = $drivers;
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
         $this->middleware = new \SplPriorityQueue();
         
-        foreach ($drivers as $driver) {
-            $this->drivers[] = $driver;
-        }
+        \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
+            return $b->getPriority() <=> $a->getPriority();
+        });
     }
 
     public function isEncrypted(): bool
