@@ -20,6 +20,11 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Success;
 
+/**
+ * HTTP client mock that returns queued HTTP responses.
+ * 
+ * @author Martin Schröder
+ */
 class HttpMockClient extends HttpClient
 {
     protected $responses;

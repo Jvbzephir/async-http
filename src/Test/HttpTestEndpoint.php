@@ -14,61 +14,71 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Test;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Http\HttpDriver;
+use KoolKode\Async\Failure;
 use KoolKode\Async\Http\HttpDriverContext;
-use KoolKode\Async\Http\Http1\Driver;
-use KoolKode\Async\Http\Http1\UpgradeHandler;
-use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Socket\SocketStream;
 
+/**
+ * Specialized HTTP endpoint being used by end-to-end testing.
+ * 
+ * @author Martin Schröder
+ */
 class HttpTestEndpoint
 {
     protected $peerName;
     
-    protected $http1;
-
+    protected $encrypted;
+    
     protected $drivers = [];
     
     protected $middleware;
+    
+    protected $action;
 
-    public function __construct(string $peerName = 'localhost')
+    public function __construct(array $drivers, string $peerName = 'localhost', bool $encrypted = false)
     {
         $this->peerName = $peerName;
+        $this->encrypted = $encrypted;
         $this->middleware = new \SplPriorityQueue();
         
-        $this->http1 = new Driver();
-        $this->http1->setDebug(true);
-    }
-
-    public function addDriver(HttpDriver $driver)
-    {
-        $this->drivers[] = $driver;
-        
-        if ($driver instanceof UpgradeHandler) {
-            $this->http1->addUpgradeHandler($driver);
+        foreach ($drivers as $driver) {
+            $this->drivers[] = $driver;
         }
     }
 
-    public function addUpgradeHandler(UpgradeHandler $handler)
+    public function isEncrypted(): bool
     {
-        $this->http1->addUpgradeHandler($handler);
+        return $this->encrypted;
     }
 
-    public function addUpgradeResultHandler(UpgradeResultHandler $handler)
+    public function getDrivers(): array
     {
-        $this->http1->addUpgradeResultHandler($handler);
+        return $this->drivers;
+    }
+    
+    public function setAction(callable $action)
+    {
+        $this->action = $action;
     }
 
-    public function accept(SocketStream $socket, callable $action, string $alpn = ''): Awaitable
+    public function accept(SocketStream $socket, string $alpn = ''): Awaitable
     {
-        $context = new HttpDriverContext($this->peerName, false, $this->middleware);
+        $context = new HttpDriverContext($this->peerName, $this->encrypted, $this->middleware);
         
-        foreach ($this->drivers as $driver) {
-            if (\in_array($alpn, $driver->getProtocols(), true)) {
-                return $driver->handleConnection($context, $socket, $action);
+        if ($this->encrypted) {
+            foreach ($this->drivers as $driver) {
+                if (\in_array($alpn, $driver->getProtocols(), true)) {
+                    return $driver->handleConnection($context, $socket, $this->action ?? function () {});
+                }
             }
         }
         
-        return $this->http1->handleConnection($context, $socket, $action);
+        foreach ($this->drivers as $driver) {
+            if (\in_array('http/1.1', $driver->getProtocols(), true)) {
+                return $driver->handleConnection($context, $socket, $this->action ?? function () {});
+            }
+        }
+        
+        return new Failure(new \RuntimeException('No HTTP driver found'));
     }
 }

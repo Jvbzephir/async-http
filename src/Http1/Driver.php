@@ -201,7 +201,7 @@ class Driver implements HttpDriver
                 }
             } finally {
                 try {
-                    yield $socket->close();
+                    $socket->close();
                 } finally {
                     if ($this->logger && !$upgraded) {
                         $this->logger->debug('Closed HTTP/1 connection to {peer}', [

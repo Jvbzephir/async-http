@@ -227,7 +227,10 @@ class Stream
 
     protected function resolveResponse(array $headers): HttpResponse
     {
-        $response = new HttpResponse((int) $this->getFirstHeader(':status', $headers));
+        $status = (int) $this->getFirstHeader(':status', $headers);
+        
+        $response = new HttpResponse();
+        $response = $response->withStatus($status, Http::getReason($status));
         $response = $response->withProtocolVersion('2.0');
         
         foreach ($headers as $header) {

@@ -77,7 +77,7 @@ class Driver implements HttpDriver, UpgradeHandler
                 }
             } finally {
                 try {
-                    yield $conn->shutdown();
+                    $conn->shutdown();
                 } finally {
                     if ($this->logger) {
                         $this->logger->debug('Closed HTTP/2 connection to {peer}', [
@@ -160,7 +160,7 @@ class Driver implements HttpDriver, UpgradeHandler
             }
         } finally {
             try {
-                yield $conn->shutdown();
+                $conn->shutdown();
             } finally {
                 if ($this->logger) {
                     $this->logger->debug('Closed HTTP/2 connection to {peer}', [
@@ -213,7 +213,7 @@ class Driver implements HttpDriver, UpgradeHandler
             }
         } finally {
             try {
-                yield $conn->shutdown();
+                $conn->shutdown();
             } finally {
                 if ($this->logger) {
                     $this->logger->debug('Closed HTTP/2 connection to {peer}', [
