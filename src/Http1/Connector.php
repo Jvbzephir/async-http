@@ -79,6 +79,14 @@ class Connector implements HttpConnector
     /**
      * {@inheritdoc}
      */
+    public function isRequestSupported(HttpRequest $request): bool
+    {
+        return true;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     public function isSupported(string $protocol, array $meta = []): bool
     {
         return \in_array($protocol, [

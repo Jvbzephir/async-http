@@ -24,7 +24,7 @@ class HttpResponse extends HttpMessage
 
     protected $reason = '';
 
-    public function __construct(int $status = Http::OK, array $headers = [], string $protocolVersion = '1.1')
+    public function __construct(int $status = Http::OK, array $headers = [], string $protocolVersion = '2.0')
     {
         parent::__construct($headers, $protocolVersion);
         

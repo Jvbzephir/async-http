@@ -117,6 +117,10 @@ class HttpClient
             $uri = $request->getUri();
             
             foreach ($this->connectors as $connector) {
+                if (!$connector->isRequestSupported($request)) {
+                    continue;
+                }
+                
                 $context = yield $connector->getConnectorContext($uri);
                 
                 if ($context->connected) {
@@ -135,7 +139,7 @@ class HttpClient
                 $meta = $socket->getMetadata();
                 
                 try {
-                    $connector = $this->chooseConnector(\trim($meta['crypto']['alpn_protocol'] ?? ''), $meta);
+                    $connector = $this->chooseConnector($request, \trim($meta['crypto']['alpn_protocol'] ?? ''), $meta);
                 } catch (\Throwable $e) {
                     $socket->close();
                     
@@ -177,10 +181,10 @@ class HttpClient
         return $factory->createSocketStream(5, $uri->getScheme() === 'https');
     }
     
-    protected function chooseConnector(string $alpn, array $meta): HttpConnector
+    protected function chooseConnector(HttpRequest $request, string $alpn, array $meta): HttpConnector
     {
         foreach ($this->connectors as $connector) {
-            if ($connector->isSupported($alpn, $meta)) {
+            if ($connector->isRequestSupported($request) && $connector->isSupported($alpn, $meta)) {
                 return $connector;
             }
         }

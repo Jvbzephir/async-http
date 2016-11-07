@@ -26,11 +26,24 @@ use KoolKode\Async\Test\AsyncTestCase;
  * @author Martin Schröder
  */
 abstract class EndToEndTest extends AsyncTestCase
-{    
+{
+    /**
+     * HTTP test client.
+     * 
+     * @var HttpTestClient
+     */
     protected $httpClient;
 
+    /**
+     * HTTP test server.
+     * 
+     * @var HttpTestEndpoint
+     */
     protected $httpServer;
 
+    /**
+     * Setup HTTP client / server.
+     */
     protected function setUp()
     {
         parent::setUp();
@@ -39,21 +52,33 @@ abstract class EndToEndTest extends AsyncTestCase
         $this->httpClient = new HttpTestClient($this->getConnectors(), $this->httpServer);
     }
     
+    /**
+     * Dispose client / server tasks after test coroutine has finished.
+     */
     protected function disposeTest()
     {
         $this->httpClient->shutdown();
     }
 
+    /**
+     * Get base URI of the HTTP test server.
+     */
     protected function getBaseUri(): string
     {
         return \sprintf('%s://localhost:1337/', $this->isEncrypted() ? 'https' : 'http');
     }
 
+    /**
+     * Determine if a TLS-encrypted socket should be simulated.
+     */
     protected function isEncrypted(): bool
     {
         return true;
     }
 
+    /**
+     * Get all HTTP connectors to be used by the test.
+     */
     protected function getConnectors(): array
     {
         $http1 = new Http1Connector();
@@ -66,6 +91,9 @@ abstract class EndToEndTest extends AsyncTestCase
         ];
     }
 
+    /**
+     * Get all HTTP drivers to be used by the test.
+     */
     protected function getDrivers(): array
     {
         $http2 = new Http2Driver();

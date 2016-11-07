@@ -55,6 +55,14 @@ class Connector implements HttpConnector
             'h2'
         ];
     }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function isRequestSupported(HttpRequest $request): bool
+    {
+        return (float) $request->getProtocolVersion() >= 2.0;
+    }
 
     /**
      * {@inheritdoc}

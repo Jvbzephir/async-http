@@ -26,7 +26,7 @@ class HttpRequest extends HttpMessage
 
     protected $uri;
 
-    public function __construct($uri, string $method = Http::GET, array $headers = [], string $protocolVersion = '1.1')
+    public function __construct($uri, string $method = Http::GET, array $headers = [], string $protocolVersion = '2.0')
     {
         parent::__construct($headers, $protocolVersion);
         

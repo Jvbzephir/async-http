@@ -30,6 +30,14 @@ interface HttpConnector
     public function getProtocols(): array;
     
     /**
+     * Check if the connector can handle the HTTP request.
+     * 
+     * @param HttpRequest $request
+     * @return bool
+     */
+    public function isRequestSupported(HttpRequest $request): bool;
+    
+    /**
      * Check if the negotiated ALPN protocol is supported by the connector.
      * 
      * @param string $protocol Negotiated ALPN protocol name.

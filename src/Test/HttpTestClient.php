@@ -18,6 +18,7 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpConnector;
+use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
@@ -71,10 +72,14 @@ class HttpTestClient extends HttpClient
         });
     }
 
-    protected function chooseConnector(string $alpn, array $meta): HttpConnector
+    protected function chooseConnector(HttpRequest $request, string $alpn, array $meta): HttpConnector
     {
         if ($this->server->isEncrypted()) {
             foreach ($this->connectors as $connector) {
+                if ($connector->isRequestSupported($request)) {
+                    continue;
+                }
+                
                 foreach ($connector->getProtocols() as $protocol) {
                     foreach ($this->server->getDrivers() as $driver) {
                         foreach ($driver->getProtocols() as $alpn) {
@@ -89,6 +94,10 @@ class HttpTestClient extends HttpClient
             }
         } else {
             foreach ($this->connectors as $connector) {
+                if ($connector->isRequestSupported($request)) {
+                    continue;
+                }
+                
                 if (\in_array('http/1.1', $connector->getProtocols(), true)) {
                     $this->spawnWorker();
                     

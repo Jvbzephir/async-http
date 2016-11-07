@@ -30,7 +30,7 @@ abstract class HttpMessage
 
     protected $attributes = [];
 
-    public function __construct(array $headers = [], string $protocolVersion = '1.1')
+    public function __construct(array $headers = [], string $protocolVersion = '2.0')
     {
         $this->protocolVersion = (string) $protocolVersion;
         $this->body = new StringBody();
