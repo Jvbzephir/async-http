@@ -15,6 +15,7 @@ use Interop\Async\Loop;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
+use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Response\FileResponse;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Test\TestLogger;
@@ -34,6 +35,8 @@ Loop::execute(function () {
     $ws->setDeflateSupported(true);
     
     $endpoint->addUpgradeResultHandler($ws);
+    
+    $endpoint->addMiddleware(new ContentEncoder());
     
     $endpoint->listen(function (HttpRequest $request) use ($websocket) {
         switch (trim($request->getRequestTarget(), '/')) {

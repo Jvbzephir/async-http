@@ -282,13 +282,17 @@ class Stream
             
             $bodyStream = yield $request->getBody()->getReadableStream();
             
-            yield from $this->sendHeaders($request, $headers);
+            yield from $this->sendHeaders($request, $headers, [
+                'content-encoding',
+                'host'
+            ]);
+            
             yield from $this->sendBody($bodyStream);
             
             return (yield $this->defer)[1];
         });
     }
-    
+
     public function sendResponse(HttpRequest $request, HttpResponse $response): Awaitable
     {
         return new Coroutine(function () use ($request, $response) {
@@ -308,17 +312,14 @@ class Stream
             }
         });
     }
-    
-    protected function sendHeaders(HttpMessage $message, array $headers): \Generator
+
+    protected function sendHeaders(HttpMessage $message, array $headers, array $remove = []): \Generator
     {
-        static $remove = [
+        static $removeDefault = [
             'connection',
-            'content-encoding',
             'content-length',
-            'host',
             'keep-alive',
             'transfer-encoding',
-            'upgrade',
             'te'
         ];
         
@@ -326,6 +327,10 @@ class Stream
             if (!isset($headers[$k])) {
                 $headers[$k] = $v;
             }
+        }
+        
+        foreach ($removeDefault as $name) {
+            unset($headers[$name]);
         }
         
         foreach ($remove as $name) {
