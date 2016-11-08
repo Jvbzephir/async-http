@@ -19,7 +19,7 @@
 	"require" : {
 		"php" : "~7.0",
 		"koolkode/async" : "dev-master",
-		"koolkode/util" : "^0.2.5",
+		"koolkode/util" : "^0.2.6",
 		"psr/log" : "~1.0"
 	},
 	"require-dev" : {

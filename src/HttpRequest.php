@@ -13,6 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Header\Accept;
+
 /**
  * Models an HTTP request.
  * 
@@ -114,6 +116,11 @@ class HttpRequest extends HttpMessage
         }
         
         return $request;
+    }
+    
+    public function getAccept(): Accept
+    {
+        return Accept::fromMessage($this);
     }
     
     public function hasHeader(string $name): bool

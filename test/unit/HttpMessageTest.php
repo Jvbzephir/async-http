@@ -120,6 +120,22 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
             'baz'
         ], $message->getHeaderTokenValues('Tokens', true, ';'));
     }
+   
+    public function testCanAccessContentType()
+    {
+        $message = new HttpResponse(Http::OK, [
+            'Content-Type' => 'text/html; charset="utf-8"'
+        ]);
+        
+        $this->assertEquals('text/html;charset="utf-8"', (string) $message->getContentType());
+    }
+    
+    public function testCanAccessDefaultContentType()
+    {
+        $message = new HttpResponse(Http::OK);
+        
+        $this->assertEquals('application/octet-stream', (string) $message->getContentType());
+    }
 
     public function testCanUseBody()
     {

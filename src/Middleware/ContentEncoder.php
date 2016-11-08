@@ -176,16 +176,14 @@ class ContentEncoder
             return false;
         }
         
-        $type = \preg_replace("';.*$'", '', $response->getHeaderLine('Content-Type'));
-        
-        if (isset($this->types[$type])) {
-            return true;
-        }
-        
         try {
-            $media = new MediaType($type);
+            $media = $response->getContentType()->getMediaType();
         } catch (InvalidMediaTypeException $e) {
             return false;
+        }
+        
+        if (isset($this->types[(string) $media])) {
+            return true;
         }
         
         foreach ($media->getSubTypes() as $sub) {

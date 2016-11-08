@@ -35,6 +35,7 @@ class ConnectorTest extends AsyncTestCase
     {
         $connector = new Connector();
         
+        $this->assertEquals(11, $connector->getPriority());
         $this->assertEquals([
             'http/1.1'
         ], $connector->getProtocols());
@@ -42,6 +43,8 @@ class ConnectorTest extends AsyncTestCase
         $this->assertTrue($connector->isSupported('http/1.1'));
         $this->assertTrue($connector->isSupported(''));
         $this->assertFalse($connector->isSupported('h2'));
+        
+        $this->assertTrue($connector->isRequestSupported(new HttpRequest('/')));
     }
 
     public function testDetectsInvalidConnectorContext()

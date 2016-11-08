@@ -92,5 +92,9 @@ class HttpResponseTest extends \PHPUnit_Framework_TestCase
         $this->assertNotSame($response, $response = $response->withStatus(Http::BAD_REQUEST, 'Error'));
         $this->assertEquals(Http::BAD_REQUEST, $response->getStatusCode());
         $this->assertEquals('Error', $response->getReasonPhrase());
+        
+        $this->assertNotSame($response, $response = $response->withReason('Foo'));
+        $this->assertEquals(Http::BAD_REQUEST, $response->getStatusCode());
+        $this->assertEquals('Foo', $response->getReasonPhrase());
     }
 }

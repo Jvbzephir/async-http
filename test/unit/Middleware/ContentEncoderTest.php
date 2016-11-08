@@ -34,6 +34,7 @@ class ContentEncoderTest extends AsyncTestCase
     public function provideEncodingSettings()
     {
         yield ['', 'trim'];
+        yield ['foo', 'trim'];
         yield ['gzip', 'gzdecode'];
         yield ['deflate', 'gzuncompress'];
     }
@@ -64,7 +65,7 @@ class ContentEncoderTest extends AsyncTestCase
         
         $this->assertTrue($response instanceof HttpResponse);
         
-        if ($name !== '') {
+        if ($name !== '' && $name !== 'foo') {
             $this->assertTrue($response->hasHeader('Content-Encoding'));
         }
         

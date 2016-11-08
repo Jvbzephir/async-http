@@ -14,6 +14,8 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Body\StringBody;
+use KoolKode\Async\Http\Header\ContentType;
+use KoolKode\Async\Http\Header\HeaderToken;
 
 /**
  * Base class for HTTP messages.
@@ -64,6 +66,11 @@ abstract class HttpMessage
         
         return $message;
     }
+    
+    public function getContentType(string $default = 'application/octet-stream'): ContentType
+    {
+        return ContentType::parse($this->hasHeader('Content-Type') ? $this->getHeaderLine('Content-Type') : $default);
+    }
 
     public function getHeaders(): array
     {
@@ -110,7 +117,7 @@ abstract class HttpMessage
     {
         return \array_map(function (HeaderToken $token) use ($lowercase) {
             return $lowercase ? \strtolower($token->getValue()) : $token->getValue();
-        }, HeaderToken::parseList($this->getHeaderLine($name, $separator), $separator));
+        }, $this->getHeaderTokens($name, $separator));
     }
 
     public function withHeader(string $name, string ...$values): HttpMessage

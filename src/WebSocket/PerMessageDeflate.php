@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
-use KoolKode\Async\Http\HeaderToken;
+use KoolKode\Async\Http\Header\HeaderToken;
 
 /**
  * Implements settings and shared context for the RFC 7692 permessage-deflate extension.

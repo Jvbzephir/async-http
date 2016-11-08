@@ -11,7 +11,7 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http;
+namespace KoolKode\Async\Http\Header;
 
 class HeaderToken implements \Countable
 {
@@ -21,7 +21,7 @@ class HeaderToken implements \Countable
     
     public function __construct(string $value, array $params = [])
     {
-        $this->value = \trim($value);
+        $this->value = $value;
         
         foreach ($params as $k => $v) {
             $this->setParam($k, $v);
@@ -50,10 +50,10 @@ class HeaderToken implements \Countable
         $value = \array_shift($parts);
         
         if ($value === '') {
-            throw new \InvalidArgumentException();
+            throw new \InvalidArgumentException('Cannot parse token without value');
         }
         
-        return new HeaderToken($value, $parts ? self::parseParams($parts, $lookup) : []);
+        return new static(\trim($value), $parts ? self::parseParams($parts, $lookup) : []);
     }
 
     public static function parseList(string $input, string $separator = ','): array
@@ -76,7 +76,7 @@ class HeaderToken implements \Countable
             $value = \array_shift($parts);
             
             if ($value !== '') {
-                $tokens[] = new HeaderToken($value, $parts ? self::parseParams($parts, $lookup) : []);
+                $tokens[] = new static(\trim($value), $parts ? self::parseParams($parts, $lookup) : []);
             }
         }
         
@@ -110,7 +110,7 @@ class HeaderToken implements \Countable
 
     public function __toString(): string
     {
-        $buffer = $this->value;
+        $buffer = (string) $this->value;
         
         foreach ($this->params as $k => $v) {
             if ($v === false) {
@@ -131,9 +131,14 @@ class HeaderToken implements \Countable
 
     public function getValue(): string
     {
-        return $this->value;
+        return (string) $this->value;
     }
 
+    public function getParams(): array
+    {
+        return $this->params;
+    }
+    
     public function hasParam(string $name): bool
     {
         return isset($this->params[$name]);

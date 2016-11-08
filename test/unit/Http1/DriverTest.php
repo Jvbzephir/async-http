@@ -34,6 +34,7 @@ class DriverTest extends AsyncTestCase
     {
         $driver = new Driver();
         
+        $this->assertEquals(11, $driver->getPriority());
         $this->assertEquals([
             'http/1.1'
         ], $driver->getProtocols());
