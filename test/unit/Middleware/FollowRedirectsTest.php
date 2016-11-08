@@ -33,7 +33,7 @@ class FollowRedirectsTest extends AsyncTestCase
             $this->assertEquals(Http::POST, $request->getMethod());
             
             if ($request->getRequestTarget() === '/test') {
-                $response = new HttpResponse(Http::REDIRECT_IDENTICAL);
+                $response = new HttpResponse(Http::TEMPORARY_REDIRECT);
                 $response = $response->withHeader('Location', 'http://localhost/redirected');
                 
                 return $response;
@@ -71,7 +71,7 @@ class FollowRedirectsTest extends AsyncTestCase
                 $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
                 $this->assertEquals('Test Body', yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse(Http::REDIRECT_TEMPORARY);
+                $response = new HttpResponse(Http::SEE_OTHER);
                 $response = $response->withHeader('Location', 'http://localhost/redirected?foo=bar');
                 
                 return $response;
@@ -106,7 +106,7 @@ class FollowRedirectsTest extends AsyncTestCase
         $middlewares->insert(new FollowRedirects(3), 0);
         
         $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
-            $response = new HttpResponse(Http::REDIRECT_IDENTICAL);
+            $response = new HttpResponse(Http::TEMPORARY_REDIRECT);
             $response = $response->withHeader('Location', 'http://localhost/redirected');
             
             return $response;

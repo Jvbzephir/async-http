@@ -674,31 +674,6 @@ abstract class Http
     const NETWORK_AUTHENTICATION_REQUIRED = 511;
 
     /**
-     * Perform a permanent redirect to the new location (a GET request will be used to aquire)
-     * the new resource and search engine inedexes and caches will be updated to use the new
-     * resource location.
-     * 
-     * @var int
-     */
-    const REDIRECT_PERMANENT = 301;
-
-    /**
-     * Perform a GET request to the resource location (discard any POST data and headers
-     * in the process).
-     * 
-     * @var int
-     */
-    const REDIRECT_TEMPORARY = 303;
-
-    /**
-     * Perform a temporary redirect to the new resource location preserving the request
-     * method, headers and body.
-     * 
-     * @var int
-     */
-    const REDIRECT_IDENTICAL = 307;
-
-    /**
      * Array of response codes and their status messages.
      * 
      * @var array
