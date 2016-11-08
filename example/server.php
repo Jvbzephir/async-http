@@ -12,8 +12,10 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Response\FileResponse;
@@ -48,8 +50,11 @@ Loop::execute(function () {
             case 'bigbang.jpg':
                 $file = 'big-bang-theory.jpg';
                 break;
-            default:
+            case '':
                 $file = 'index.html';
+                break;
+            default:
+                return new HttpResponse(Http::NOT_FOUND);
         }
         
         return new FileResponse(__DIR__ . '/public/' . $file);
