@@ -29,7 +29,7 @@ class ContentType extends HeaderToken
      */
     public function __construct($type, array $params = [])
     {
-        parent::__construct($type, $params);
+        parent::__construct((string) $type, $params);
         
         $this->value = new MediaType($type);
     }
