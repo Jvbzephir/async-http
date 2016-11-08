@@ -45,4 +45,14 @@ class JsonResponseTest extends AsyncTestCase
             'bar'
         ], json_decode(yield $response->getBody()->getContents(), true));
     }
+    
+    public function testCanChangeEncoderOptions()
+    {
+        $response = new JsonResponse([], true, JSON_FORCE_OBJECT);
+        
+        $this->assertEquals(Http::OK, $response->getStatusCode());
+        $this->assertEquals('application/json', (string) $response->getContentType()->getMediaType());
+        $this->assertEquals('utf-8', $response->getContentType()->getParam('charset'));
+        $this->assertEquals('{}', yield $response->getBody()->getContents());
+    }
 }
