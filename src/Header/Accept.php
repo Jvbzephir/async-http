@@ -11,33 +11,57 @@
 
 namespace KoolKode\Async\Http\Header;
 
-use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Util\MediaType;
 
+/**
+ * The Accept request-header field can be used to specify certain media types which are acceptable for the response.
+ * 
+ * Accept headers can be used to indicate that the request is specifically limited to a small set of desired types, as in
+ * the case of a request for an in-line image. 
+ * 
+ * @author Martin Schröder
+ */
 class Accept implements \Countable, \IteratorAggregate
 {
+    /**
+     * Acceptable media types.
+     * 
+     * @var array
+     */
     protected $types = [];
     
+    /**
+     * Create an Accept header accepting the given media types.
+     * 
+     * @param HeaderToken ...$types
+     */
     public function __construct(HeaderToken ...$types)
     {
         $this->types = $this->sortByQuality($types);
     }
     
-    public static function fromMessage(HttpMessage $message): Accept
-    {
-        return new static(...ContentType::parseList($message->getHeaderLine('Accept')));
-    }
-    
+    /**
+     * Count the number of accepted media types.
+     */
     public function count()
     {
         return \count($this->types);
     }
 
+    /**
+     * Iteratoe over the accepted content types.
+     */
     public function getIterator()
     {
         return new \ArrayIterator($this->types);
     }
     
+    /**
+     * Check if the given media type is accepted.
+     * 
+     * @param string $type
+     * @return bool
+     */
     public function accepts($type): bool
     {
         if (!$type instanceof MediaType) {
@@ -53,6 +77,11 @@ class Accept implements \Countable, \IteratorAggregate
         return false;
     }
     
+    /**
+     * Get all accepted media types.
+     * 
+     * @return array
+     */
     public function getMediaTypes(): array
     {
         return \array_map(function (ContentType $type) {
@@ -60,6 +89,12 @@ class Accept implements \Countable, \IteratorAggregate
         }, $this->types);
     }
 
+    /**
+     * Stable sort implementation that order by relative quality and media type score.
+     * 
+     * @param array $types
+     * @return array
+     */
     protected function sortByQuality(array $types): array
     {
         $result = [];

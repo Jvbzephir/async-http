@@ -32,7 +32,7 @@ class AcceptTest extends \PHPUnit_Framework_TestCase
             'text/*'
         ];
         
-        $accept = Accept::fromMessage($message);
+        $accept = new Accept(...$message->getHeaderTokens('Accept'));
         
         $this->assertCount(4, $accept);
         $this->assertEquals($result, array_map('trim', $accept->getMediaTypes()));

@@ -19,7 +19,6 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Util\InvalidMediaTypeException;
-use KoolKode\Util\MediaType;
 
 /**
  * Middleware that compresses HTTP response bodies.

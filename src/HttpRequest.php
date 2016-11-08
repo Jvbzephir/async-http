@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Header\Accept;
+use KoolKode\Async\Http\Header\ContentType;
 
 /**
  * Models an HTTP request.
@@ -120,7 +121,7 @@ class HttpRequest extends HttpMessage
     
     public function getAccept(): Accept
     {
-        return Accept::fromMessage($this);
+        return new Accept(...ContentType::parseList($this->getHeaderLine('Accept')));
     }
     
     public function hasHeader(string $name): bool
