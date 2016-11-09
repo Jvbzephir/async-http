@@ -18,6 +18,39 @@ use KoolKode\Async\Http\HttpResponse;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 class RouteCollector
+{    
+    protected $routes = [];
+
+    public function route(string $name, string $pattern, array $methods = null): RouteHandler
+    {
+        return $this->routes[$name] = new RouteHandler($pattern, $methods);
+    }
+    
+    public function compile(): array
+    {
+        $parsed = new \SplPriorityQueue();
+        
+        foreach ($this->routes as $handler) {
+            list ($priority, $depth, $regex, $mapping) = $handler->compileRoute();
+            
+            $parsed->insert(\array_merge([
+                $regex,
+                $depth,
+                $handler
+            ], $mapping), $priority);
+        }
+        
+        $result = [];
+        
+        while (!$parsed->isEmpty()) {
+            $result[] = $parsed->extract();
+        }
+        
+        return $result;
+    }
+}
+
+class RouteHandler
 {
     const BOOST_DYNAMIC = -10000;
     
@@ -35,118 +68,13 @@ class RouteCollector
     
     const TYPE_PERIOD_MULTI = 'E';
     
-    protected $routes = [];
-
-    public function route(string $name, string $pattern, RouteHandler $handler)
-    {
-        $this->routes[$name] = [
-            '/' . \ltrim($pattern, '/'),
-            $handler
-        ];
-    }
-    
-    public function compile(): array
-    {
-        $parsed = new \SplPriorityQueue();
-        
-        foreach ($this->routes as list ($pattern, $handler)) {
-            list ($priority, $depth, $regex, $mapping) = $this->parseRoute($pattern, $handler->getConstraintBoost());
-            
-            $parsed->insert(\array_merge([
-                $regex,
-                $depth,
-                $handler
-            ], $mapping), $priority);
-        }
-        
-        $result = [];
-        
-        while (!$parsed->isEmpty()) {
-            $result[] = $parsed->extract();
-        }
-        
-        return $result;
-    }
-
-    protected function parseRoute(string $pattern, int $boost): array
-    {
-        $regex = '';
-        $params = [];
-        
-        $boost += 1000000;
-        $lastDepth = 0;
-        $depth = 1;
-        
-        foreach (\preg_split("'(\\{[^\\}]+\\})'", $pattern, -1, \PREG_SPLIT_DELIM_CAPTURE | \PREG_SPLIT_NO_EMPTY) as $part) {
-            if ($part[0] !== '{') {
-                $regex .= \preg_quote($part, "'");
-                $depth += \substr_count($part, '/');
-                
-                continue;
-            }
-            
-            $name = \substr($part, 1, -1);
-            $type = self::TYPE_LITERAL;
-            $catch = '[^/]+';
-            
-            switch ($name[0]) {
-                case '/':
-                    $depth++;
-                    $name = \substr($name, 1);
-                    $catch = '/[^/]+';
-                    
-                    if (\substr($name, -1) === '*') {
-                        $name = \substr($name, 0, -1);
-                        $type = self::TYPE_PATH_MULTI;
-                        $catch .= '(?:/[^/]+)*';
-                    } else {
-                        $type = self::TYPE_PATH;
-                    }
-                    break;
-                case '.':
-                    $name = \substr($name, 1);
-                    $catch = '\.[^/\.]+?';
-                    
-                    if (\substr($name, -1) === '*') {
-                        $name = \substr($name, 0, -1);
-                        $type = self::TYPE_PERIOD_MULTI;
-                        $catch .= '(?:\.[^/\.]+)*?';
-                    } else {
-                        $type = self::TYPE_PERIOD;
-                    }
-                    break;
-            }
-            
-            $regex .= '(' . $catch . ')';
-            $params[] = $type . $name;
-            
-            if ($lastDepth === $depth) {
-                $boost += $depth * self::BOOST_MULTI;
-            } else {
-                $boost += self::BOOST_DYNAMIC;
-            }
-            
-            $lastDepth = $depth;
-        }
-        
-        return [
-            $depth * self::BOOST_DEPTH + $boost,
-            $depth,
-            $regex,
-            $params
-        ];
-    }
-}
-
-class RouteHandler
-{
-    protected $handler;
+    protected $pattern;
     
     protected $methods;
     
-    public function __construct($handler, array $methods = null)
+    public function __construct(string $pattern, array $methods = null)
     {
-        $this->handler = $handler;
+        $this->pattern = '/' . \ltrim($pattern, '/');
         $this->methods = $methods;
     }
     
@@ -160,9 +88,78 @@ class RouteHandler
         return $this->methods ?? [];
     }
     
-    public function getConstraintBoost(): int
+    protected function getConstraintBoost(): int
     {
         return $this->methods ? 1 : 0;
+    }
+    
+    public function compileRoute(): array
+    {
+        $regex = '';
+        $params = [];
+    
+        $boost = $this->getConstraintBoost() + 1000000;
+        $lastDepth = 0;
+        $depth = 1;
+    
+        foreach (\preg_split("'(\\{[^\\}]+\\})'", $this->pattern, -1, \PREG_SPLIT_DELIM_CAPTURE | \PREG_SPLIT_NO_EMPTY) as $part) {
+            if ($part[0] !== '{') {
+                $regex .= \preg_quote($part, "'");
+                $depth += \substr_count($part, '/');
+    
+                continue;
+            }
+    
+            $name = \substr($part, 1, -1);
+            $type = self::TYPE_LITERAL;
+            $catch = '[^/]+';
+    
+            switch ($name[0]) {
+                case '/':
+                    $depth++;
+                    $name = \substr($name, 1);
+                    $catch = '/[^/]+';
+    
+                    if (\substr($name, -1) === '*') {
+                        $name = \substr($name, 0, -1);
+                        $type = self::TYPE_PATH_MULTI;
+                        $catch .= '(?:/[^/]+)*';
+                    } else {
+                        $type = self::TYPE_PATH;
+                    }
+                    break;
+                case '.':
+                    $name = \substr($name, 1);
+                    $catch = '\.[^/\.]+?';
+    
+                    if (\substr($name, -1) === '*') {
+                        $name = \substr($name, 0, -1);
+                        $type = self::TYPE_PERIOD_MULTI;
+                        $catch .= '(?:\.[^/\.]+)*?';
+                    } else {
+                        $type = self::TYPE_PERIOD;
+                    }
+                    break;
+            }
+    
+            $regex .= '(' . $catch . ')';
+            $params[] = $type . $name;
+    
+            if ($lastDepth === $depth) {
+                $boost += $depth * self::BOOST_MULTI;
+            } else {
+                $boost += self::BOOST_DYNAMIC;
+            }
+    
+            $lastDepth = $depth;
+        }
+    
+        return [
+            $depth * self::BOOST_DEPTH + $boost,
+            $depth,
+            $regex,
+            $params
+        ];
     }
 }
 
@@ -270,14 +267,14 @@ class Router
         
         for ($size = \count($route), $i = 3; $i < $size; $i++) {
             switch ($route[$i][0]) {
-                case RouteCollector::TYPE_PATH:
-                case RouteCollector::TYPE_PERIOD:
+                case RouteHandler::TYPE_PATH:
+                case RouteHandler::TYPE_PERIOD:
                     $params[\substr($route[$i], 1)] = \rawurldecode(\substr($match[$i], 1));
                     break;
-                case RouteCollector::TYPE_PATH_MULTI:
+                case RouteHandler::TYPE_PATH_MULTI:
                     $params[\substr($route[$i], 1)] = \array_map('rawurldecode', \explode('/', \substr($match[$i], 1)));
                     break;
-                case RouteCollector::TYPE_PERIOD_MULTI:
+                case RouteHandler::TYPE_PERIOD_MULTI:
                     $params[\substr($route[$i], 1)] = \array_map('rawurldecode', \explode('.', \substr($match[$i], 1)));
                     break;
                 default:
@@ -291,21 +288,21 @@ class Router
 
 $collector = new RouteCollector();
 
-$collector->route('index', '/', new RouteHandler('index'));
+$collector->route('index', '/');
 
-$collector->route('favicon', '/favicon.ico', new RouteHandler('favicon'));
+$collector->route('favicon', '/favicon.ico');
 
-$collector->route('page2', '/page{/page*}', new RouteHandler('handler1', [
+$collector->route('page2', '/page{/page*}', [
     Http::POST
-]));
+]);
 
-$collector->route('page1', '/page{/page}.{format}', new RouteHandler('handler2', [
+$collector->route('page1', '/page/{page}.{format}', [
     Http::PUT
-]));
+]);
 
 $router = new Router($collector->compile());
 
-$request = new HttpRequest('/page/123.html', Http::GET);
+$request = new HttpRequest('/page/sub/123.html', Http::POST);
 
 $match = $router->route($request);
 
