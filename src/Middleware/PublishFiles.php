@@ -57,7 +57,7 @@ class PublishFiles
      */
     public function __construct(string $directory, string $basePath = '/', int $ttl = 86400)
     {
-        $this->directory = \trim(\str_replace('\\', '/', $directory), '/') . '/';
+        $this->directory = \rtrim(\str_replace('\\', '/', $directory), '/') . '/';
         $this->basePath = \rtrim('/' . \trim($basePath, '/'), '/') . '/';
         $this->ttl = $ttl;
     }
