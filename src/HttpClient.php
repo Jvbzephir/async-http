@@ -17,9 +17,9 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\DNS\Address;
-use KoolKode\Async\Http\Http1\Connector;
-use KoolKode\Async\Http\Middleware\HttpMiddleware;
+use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
+use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
 
@@ -30,6 +30,8 @@ use KoolKode\Async\Socket\SocketFactory;
  */
 class HttpClient
 {
+    use MiddlewareSupported;
+    
     /**
      * User agent header to be sent when HTTP requests do not specify this header.
      * 
@@ -52,13 +54,6 @@ class HttpClient
     protected $connectors;
     
     /**
-     * Registered HTTP client middleware.
-     * 
-     * @var \SplPriorityQueue
-     */
-    protected $middleware;
-    
-    /**
      * Create a new HTTP client using the given connectors.
      * 
      * Will auto-create an HTTP/1.x connector if no other connector is given. 
@@ -78,8 +73,6 @@ class HttpClient
         $this->protocols = \array_unique(\array_merge(...\array_map(function (HttpConnector $connector) {
             return $connector->getProtocols();
         }, $this->connectors)));
-        
-        $this->middleware = new \SplPriorityQueue();
         
         $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
     }
@@ -103,15 +96,6 @@ class HttpClient
             return $b->getPriority() <=> $a->getPriority();
         });
     }
-
-    public function addMiddleware(callable $middleware, int $priority = null)
-    {
-        if ($priority === null && $middleware instanceof HttpMiddleware) {
-            $priority = $middleware->getDefaultPriority();
-        }
-        
-        $this->middleware->insert($middleware, $priority ?? 0);
-    }
     
     public function setUserAgent(string $agent)
     {
@@ -130,7 +114,7 @@ class HttpClient
             $request = $request->withHeader('User-Agent', $this->userAgent);
         }
         
-        $next = new NextMiddleware($this->middleware, function (HttpRequest $request) {
+        $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) {
             $connecting = new \SplObjectStorage();
             $uri = $request->getUri();
             

@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Failure;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
+use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Socket\SocketStream;
 
 /**
@@ -26,13 +27,13 @@ use KoolKode\Async\Socket\SocketStream;
  */
 class HttpTestEndpoint
 {
+    use MiddlewareSupported;
+    
     protected $peerName;
     
     protected $encrypted;
     
     protected $drivers = [];
-    
-    protected $middleware;
     
     protected $action;
 
@@ -41,7 +42,6 @@ class HttpTestEndpoint
         $this->drivers = $drivers;
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
-        $this->middleware = new \SplPriorityQueue();
         
         \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
             return $b->getPriority() <=> $a->getPriority();
@@ -65,7 +65,7 @@ class HttpTestEndpoint
 
     public function accept(SocketStream $socket, string $alpn = ''): Awaitable
     {
-        $context = new HttpDriverContext($this->peerName, $this->encrypted, $this->middleware);
+        $context = new HttpDriverContext($this->peerName, $this->encrypted, $this->middlewares);
         
         if ($this->encrypted) {
             foreach ($this->drivers as $driver) {

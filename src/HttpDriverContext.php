@@ -37,21 +37,21 @@ class HttpDriverContext
     /**
      * Registered prioritized HTTP middleware.
      * 
-     * @var \SplPriorityQueue
+     * @var array
      */
-    public $middleware;
+    public $middlewares;
     
     /**
      * Create a new HTTP server / driver context.
      * 
      * @param string $peerName
      * @param bool $encrypted
-     * @param \SplPriorityQueue $middleware
+     * @param array $middlewares
      */
-    public function __construct(string $peerName, bool $encrypted = false, \SplPriorityQueue $middleware = null)
+    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [])
     {
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
-        $this->middleware = $middleware ?? new \SplPriorityQueue();
+        $this->middlewares = $middlewares;
     }
 }

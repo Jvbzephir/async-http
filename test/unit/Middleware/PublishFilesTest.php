@@ -25,10 +25,7 @@ class PublishFilesTest extends AsyncTestCase
     {
         $publish = new PublishFiles(__DIR__, '/', 3600);
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -44,10 +41,7 @@ class PublishFilesTest extends AsyncTestCase
     {
         $publish = new PublishFiles(__DIR__, '/', 3600);
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -58,15 +52,12 @@ class PublishFilesTest extends AsyncTestCase
         $this->assertTrue($response->hasHeader('Expires'));
         $this->assertEquals(file_get_contents(__FILE__), yield $response->getBody()->getContents());
     }
-    
+
     public function testWillUseBasePath()
     {
         $publish = new PublishFiles(__DIR__, '/asset');
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -76,15 +67,12 @@ class PublishFilesTest extends AsyncTestCase
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), yield $response->getBody()->getContents());
     }
-    
+
     public function testExcludeHttpMethodExceptForGetAndHead()
     {
         $publish = new PublishFiles(__DIR__);
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -98,10 +86,7 @@ class PublishFilesTest extends AsyncTestCase
     {
         $publish = new PublishFiles(__DIR__, '/app');
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -110,15 +95,12 @@ class PublishFilesTest extends AsyncTestCase
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals(Http::NOT_FOUND, $response->getStatusCode());
     }
-    
+
     public function testWillEnforceBaseDirectory()
     {
         $publish = new PublishFiles(__DIR__);
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         
@@ -127,15 +109,12 @@ class PublishFilesTest extends AsyncTestCase
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals(Http::NOT_FOUND, $response->getStatusCode());
     }
-    
+
     public function testWillNotServeDirectory()
     {
         $publish = new PublishFiles(__DIR__);
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($publish, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {
+        $next = NextMiddleware::wrap($publish, function () {
             return new HttpResponse(Http::NOT_FOUND);
         });
         

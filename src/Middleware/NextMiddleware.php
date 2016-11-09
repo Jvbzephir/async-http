@@ -17,20 +17,57 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 
 /**
- * Extendable context object that is used to allow for persistent connections etc.
+ * HTTP middleware dispatcher.
  * 
  * @author Martin Schröder
  */
 class NextMiddleware
 {
+    /**
+     * Registered middlewares sorted by priority.
+     * 
+     * @var array
+     */
     protected $middlewares;
 
+    /**
+     * The target to be invoked if all middlewares delegate dispatching of the HTTP request.
+     * 
+     * @var callable
+     */
     protected $target;
+    
+    /**
+     * Current middleware processing index.
+     * 
+     * @var int
+     */
+    protected $index = 0;
 
-    public function __construct(\SplPriorityQueue $middlewares, callable $target)
+    /**
+     * Create a new HTTP middleware dispatcher.
+     * 
+     * @param array $middlewares Registered middlewares sorted by priority.
+     * @param callable $target The target to be invoked if all middlewares delegate dispatching of the HTTP request.
+     */
+    public function __construct(array $middlewares, callable $target)
     {
-        $this->middlewares = clone $middlewares;
+        $this->middlewares = $middlewares;
         $this->target = $target;
+    }
+    
+    /**
+     * Wrap the given middleware and target into a middleware dispatcher.
+     * 
+     * @param callable $middleware
+     * @param callable $target
+     * @return NextMiddleware
+     */
+    public static function wrap(callable $middleware, callable $target): NextMiddleware
+    {
+        return new static([
+            new RegisteredMiddleware($middleware, 0)
+        ], $target);
     }
 
     /**
@@ -43,10 +80,10 @@ class NextMiddleware
      */
     public function __invoke(HttpRequest $request): \Generator
     {
-        if ($this->middlewares->isEmpty()) {
-            $response = ($this->target)($request);
+        if (isset($this->middlewares[$this->index])) {
+            $response = ($this->middlewares[$this->index++]->callback)($request, $this);
         } else {
-            $response = $this->middlewares->extract()($request, $this);
+            $response = ($this->target)($request);
         }
         
         if ($response instanceof \Generator) {

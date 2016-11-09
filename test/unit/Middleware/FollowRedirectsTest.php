@@ -30,13 +30,10 @@ class FollowRedirectsTest extends AsyncTestCase
         
         $this->assertEquals(-100001, $redirects->getDefaultPriority());
     }
-    
+
     public function testFollowsRedirectWithIdenticalRequest()
     {
-        $middleware = new \SplPriorityQueue();
-        $middleware->insert(new FollowRedirects(), 0);
-        
-        $next = new NextMiddleware($middleware, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new FollowRedirects(), function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             if ($request->getRequestTarget() === '/test') {
@@ -69,10 +66,7 @@ class FollowRedirectsTest extends AsyncTestCase
 
     public function testWillSwitchToGet()
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new FollowRedirects(), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new FollowRedirects(), function (HttpRequest $request) {
             if ($request->getRequestTarget() === '/test') {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
@@ -108,11 +102,8 @@ class FollowRedirectsTest extends AsyncTestCase
     }
 
     public function testEnforcesRedirectLimit()
-    {    
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new FollowRedirects(3), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+    {
+        $next = NextMiddleware::wrap(new FollowRedirects(), function (HttpRequest $request) {
             $response = new HttpResponse(Http::TEMPORARY_REDIRECT);
             $response = $response->withHeader('Location', 'http://localhost/redirected');
             

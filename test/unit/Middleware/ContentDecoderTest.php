@@ -51,10 +51,7 @@ class ContentDecoderTest extends AsyncTestCase
     {
         $message = 'Hello decoded world! :)';
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new ContentDecoder(), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) use ($message, $name, $func) {
+        $next = NextMiddleware::wrap(new ContentDecoder(), function (HttpRequest $request) use ($message, $name, $func) {
             $this->assertEquals([
                 'gzip',
                 'deflate'

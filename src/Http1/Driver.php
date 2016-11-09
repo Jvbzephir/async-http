@@ -377,7 +377,7 @@ class Driver implements HttpDriver
                 $request = $request->withoutHeader($name);
             }
             
-            $next = new NextMiddleware($context->middleware, function (HttpRequest $request) use ($action) {
+            $next = new NextMiddleware($context->middlewares, function (HttpRequest $request) use ($action) {
                 $response = $action($request);
                 
                 if ($response instanceof \Generator) {

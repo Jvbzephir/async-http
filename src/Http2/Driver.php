@@ -265,7 +265,7 @@ class Driver implements HttpDriver, UpgradeHandler
             ]);
         }
         
-        $next = new NextMiddleware($context->middleware, $action);
+        $next = new NextMiddleware($context->middlewares, $action);
         
         $response = yield from $next($request);
         

@@ -18,7 +18,7 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
-use KoolKode\Async\Http\Middleware\HttpMiddleware;
+use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -27,6 +27,8 @@ use Psr\Log\LoggerInterface;
 
 class HttpEndpoint
 {
+    use MiddlewareSupported;
+    
     protected $factory;
     
     protected $server;
@@ -34,8 +36,6 @@ class HttpEndpoint
     protected $drivers = [];
     
     protected $http1;
-
-    protected $middleware;
     
     protected $logger;
     
@@ -47,22 +47,11 @@ class HttpEndpoint
         $this->factory->setPeerName($peerName);
         
         $this->http1 = new Driver(null, $logger);
-        
-        $this->middleware = new \SplPriorityQueue();
     }
     
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
     {
         $this->factory->setCertificate($file, $allowSelfSigned, $password);
-    }
-    
-    public function addMiddleware(callable $middleware, int $priority = null)
-    {
-        if ($priority === null && $middleware instanceof HttpMiddleware) {
-            $priority = $middleware->getDefaultPriority();
-        }
-        
-        $this->middleware->insert($middleware, $priority ?? 0);
     }
     
     public function addDriver(HttpDriver $driver)
@@ -107,7 +96,7 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middleware);
+            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middlewares);
             
             return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });

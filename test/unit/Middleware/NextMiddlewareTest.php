@@ -23,7 +23,7 @@ class NextMiddlewareTest extends AsyncTestCase
 {
     public function testCanInvokeSyncAction()
     {
-        $next = new NextMiddleware(new \SplPriorityQueue(), function (HttpRequest $request) {
+        $next = new NextMiddleware([], function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             return new HttpResponse(Http::NO_CONTENT);
@@ -37,7 +37,7 @@ class NextMiddlewareTest extends AsyncTestCase
 
     public function testCanInvokeAsyncAction()
     {
-        $next = new NextMiddleware(new \SplPriorityQueue(), function (HttpRequest $request) {
+        $next = new NextMiddleware([], function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             yield null;
@@ -53,14 +53,11 @@ class NextMiddlewareTest extends AsyncTestCase
 
     public function testCanInvokeSyncMiddleware()
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             return new HttpResponse(Http::NO_CONTENT);
-        }, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {});
+        }, function () {});
         
         $response = yield from $next(new HttpRequest('http://localhost/', Http::POST));
         
@@ -70,16 +67,13 @@ class NextMiddlewareTest extends AsyncTestCase
 
     public function testCanInvokeAsyncMiddleware()
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(function (HttpRequest $request) {
             $this->assertEquals(Http::POST, $request->getMethod());
             
             yield null;
             
             return new HttpResponse(Http::NO_CONTENT);
-        }, 0);
-        
-        $next = new NextMiddleware($middlewares, function () {});
+        }, function () {});
         
         $response = yield from $next(new HttpRequest('http://localhost/', Http::POST));
         
@@ -89,7 +83,7 @@ class NextMiddlewareTest extends AsyncTestCase
 
     public function testDetectsMissingHttpResponse()
     {
-        $next = new NextMiddleware(new \SplPriorityQueue(), function () {});
+        $next = new NextMiddleware([], function () {});
         
         $this->expectException(\RuntimeException::class);
         

@@ -47,7 +47,7 @@ class HttpMockClient extends HttpClient
             $request = $request->withHeader('User-Agent', $this->userAgent);
         }
         
-        $next = new NextMiddleware($this->middleware, function (HttpRequest $request) {
+        $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) {
             return \array_shift($this->responses);
         });
         

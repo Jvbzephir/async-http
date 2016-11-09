@@ -53,12 +53,9 @@ class ContentEncoderTest extends AsyncTestCase
     {
         $message = 'Hello decoded world! :)';
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new ContentEncoder([
+        $next = NextMiddleware::wrap(new ContentEncoder([
             'text/plain'
-        ]), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) use ($message, $name, $func) {
+        ]), function (HttpRequest $request) use ($message, $name, $func) {
             $response = new HttpResponse();
             $response = $response->withHeader('Content-Type', 'text/plain');
             
@@ -81,10 +78,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testWillNotEncodeResponseToHeadRequest()
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new ContentEncoder(), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withBody(new StringBody('Foo'));
             
@@ -121,10 +115,7 @@ class ContentEncoderTest extends AsyncTestCase
      */
     public function testWillNotEncodeUmcompressableResponse(HttpResponse $response)
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new ContentEncoder(), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) use ($response) {
+        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) use ($response) {
             return $response;
         });
         
@@ -139,10 +130,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testWillNotDoubleEncodeResponse()
     {
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert(new ContentEncoder(), 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withHeader('Content-Encoding', 'foo');
             
@@ -163,10 +151,7 @@ class ContentEncoderTest extends AsyncTestCase
         $encoder = new ContentEncoder();
         $encoder->addType('foo/bar');
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($encoder, 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withHeader('Content-Type', 'foo/bar');
             
@@ -189,10 +174,7 @@ class ContentEncoderTest extends AsyncTestCase
         ]);
         $encoder->addSubType('bar');
         
-        $middlewares = new \SplPriorityQueue();
-        $middlewares->insert($encoder, 0);
-        
-        $next = new NextMiddleware($middlewares, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withHeader('Content-Type', 'foo/bar');
             
