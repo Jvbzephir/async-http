@@ -27,8 +27,16 @@ use KoolKode\Async\Stream\ReadableInflateStream;
  * 
  * @author Martin Schröder
  */
-class ContentDecoder
+class ContentDecoder implements HttpMiddleware
 {
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultPriority(): int
+    {
+        return -100000;
+    }
+    
     /**
      * Handles compressed HTTP response bodies using an inflate stream.
      * 

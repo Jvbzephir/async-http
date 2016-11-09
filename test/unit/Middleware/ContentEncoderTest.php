@@ -31,6 +31,13 @@ class ContentEncoderTest extends AsyncTestCase
         }
     }
     
+    public function testDeclaresDefaultPriority()
+    {
+        $encoder = new ContentEncoder();
+    
+        $this->assertEquals(100000, $encoder->getDefaultPriority());
+    }
+    
     public function provideEncodingSettings()
     {
         yield ['', 'trim'];

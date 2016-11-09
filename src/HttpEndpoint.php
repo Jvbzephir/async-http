@@ -18,6 +18,7 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
+use KoolKode\Async\Http\Middleware\HttpMiddleware;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -55,9 +56,13 @@ class HttpEndpoint
         $this->factory->setCertificate($file, $allowSelfSigned, $password);
     }
     
-    public function addMiddleware(callable $middleware, int $priority = 0)
+    public function addMiddleware(callable $middleware, int $priority = null)
     {
-        $this->middleware->insert($middleware, $priority);
+        if ($priority === null && $middleware instanceof HttpMiddleware) {
+            $priority = $middleware->getDefaultPriority();
+        }
+        
+        $this->middleware->insert($middleware, $priority ?? 0);
     }
     
     public function addDriver(HttpDriver $driver)

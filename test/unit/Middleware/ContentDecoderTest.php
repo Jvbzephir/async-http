@@ -30,6 +30,13 @@ class ContentDecoderTest extends AsyncTestCase
         }
     }
     
+    public function testDeclaresDefaultPriority()
+    {
+        $decoder = new ContentDecoder();
+        
+        $this->assertEquals(-100000, $decoder->getDefaultPriority());
+    }
+    
     public function provideEncodingSettings()
     {
         yield ['', 'trim'];

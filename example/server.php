@@ -39,8 +39,8 @@ Loop::execute(function () {
     
     $endpoint->addUpgradeResultHandler($ws);
     
-    $endpoint->addMiddleware(new ContentEncoder(), 10);
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+    $endpoint->addMiddleware(new ContentEncoder());
     
     $endpoint->listen(function (HttpRequest $request) use ($websocket) {
         switch (trim($request->getRequestTarget(), '/')) {

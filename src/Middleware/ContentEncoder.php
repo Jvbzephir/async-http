@@ -31,7 +31,7 @@ use KoolKode\Util\InvalidMediaTypeException;
  * 
  * @author Martin Schröder
  */
-class ContentEncoder
+class ContentEncoder implements HttpMiddleware
 {
     /**
      * Compressable content types.
@@ -110,6 +110,14 @@ class ContentEncoder
     public function addSubType(string $type)
     {
         $this->subTypes[$type] = true;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultPriority(): int
+    {
+        return 100000;
     }
 
     /**

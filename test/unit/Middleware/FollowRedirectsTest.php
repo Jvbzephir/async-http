@@ -24,6 +24,13 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class FollowRedirectsTest extends AsyncTestCase
 {
+    public function testDeclaresDefaultPriority()
+    {
+        $redirects = new FollowRedirects();
+        
+        $this->assertEquals(-100001, $redirects->getDefaultPriority());
+    }
+    
     public function testFollowsRedirectWithIdenticalRequest()
     {
         $middleware = new \SplPriorityQueue();

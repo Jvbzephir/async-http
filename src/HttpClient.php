@@ -18,6 +18,7 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Http1\Connector;
+use KoolKode\Async\Http\Middleware\HttpMiddleware;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
@@ -103,9 +104,13 @@ class HttpClient
         });
     }
 
-    public function addMiddleware(callable $middleware, int $priority = 0)
+    public function addMiddleware(callable $middleware, int $priority = null)
     {
-        $this->middleware->insert($middleware, $priority);
+        if ($priority === null && $middleware instanceof HttpMiddleware) {
+            $priority = $middleware->getDefaultPriority();
+        }
+        
+        $this->middleware->insert($middleware, $priority ?? 0);
     }
     
     public function setUserAgent(string $agent)

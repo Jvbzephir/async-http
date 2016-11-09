@@ -25,7 +25,7 @@ use KoolKode\Async\Http\Uri;
  * 
  * @author Martin Schröder
  */
-class FollowRedirects
+class FollowRedirects implements HttpMiddleware
 {
     /**
      * Max number of redirects that are allowed for a single request.
@@ -42,6 +42,14 @@ class FollowRedirects
     public function __construct(int $maxRedirects = 5)
     {
         $this->maxRedirects = $maxRedirects;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultPriority(): int
+    {
+        return -100001;
     }
     
     /**
