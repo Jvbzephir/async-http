@@ -19,7 +19,9 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableInflateStream;
 
 /**
- * Middeware that decompresses HTTP response bodies.
+ * HTTP client-side middeware that decompresses HTTP response bodies.
+ * 
+ * Give this middleware a very low (maybe even negative) priority to have it decompress responses before other middleware!
  * 
  * Supported content encodings are "gzip" and "deflate".
  * 

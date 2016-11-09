@@ -18,6 +18,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
+use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\Response\FileResponse;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Test\TestLogger;
@@ -38,26 +39,18 @@ Loop::execute(function () {
     
     $endpoint->addUpgradeResultHandler($ws);
     
-    $endpoint->addMiddleware(new ContentEncoder());
+    $endpoint->addMiddleware(new ContentEncoder(), 10);
+    $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
     
     $endpoint->listen(function (HttpRequest $request) use ($websocket) {
         switch (trim($request->getRequestTarget(), '/')) {
             case 'websocket':
                 return $websocket;
-            case 'websocket.js':
-                $file = 'websocket.js';
-                break;
-            case 'bigbang.jpg':
-                $file = 'big-bang-theory.jpg';
-                break;
             case '':
-                $file = 'index.html';
-                break;
-            default:
-                return new HttpResponse(Http::NOT_FOUND);
+                return new FileResponse(__DIR__ . '/public/index.html');
         }
         
-        return new FileResponse(__DIR__ . '/public/' . $file);
+        return new HttpResponse(Http::NOT_FOUND);
     });
     
     echo "HTTPS server listening on port 8888\n\n";
