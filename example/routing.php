@@ -11,9 +11,11 @@
 
 // Prototype of a new regex-based HTTP request router with support for additional constraints.
 
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Util\MediaType;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -72,6 +74,10 @@ class RouteHandler
     
     protected $methods;
     
+    protected $consumes;
+    
+    protected $produces;
+    
     public function __construct(string $pattern, array $methods = null)
     {
         $this->pattern = '/' . \ltrim($pattern, '/');
@@ -86,6 +92,57 @@ class RouteHandler
     public function getSupportedMethods(): array
     {
         return $this->methods ?? [];
+    }
+    
+    public function consumes(string ...$mediaType)
+    {
+        if ($this->consumes === null) {
+            $this->consumes = [];
+        }
+        
+        foreach ($mediaType as $type) {
+            $this->consumes[] = new MediaType($type);
+        }
+        
+        return $this;
+    }
+    
+    public function canConsume(MediaType $type): bool
+    {
+        if ($this->consumes === null) {
+            return true;
+        }
+        
+        foreach ($this->consumes as $acceptable) {
+            if ($type->is($acceptable)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    public function getConsumedMediaTypes(): array
+    {
+        return $this->consumes ?? [];
+    }
+    
+    public function produces(string ...$mediaType): RouteHandler
+    {
+        if ($this->produces === null) {
+            $this->produces = [];
+        }
+        
+        foreach ($mediaType as $type) {
+            $this->produces[] = new MediaType($type);
+        }
+        
+        return $this;
+    }
+    
+    public function getProducedMediaTypes(): array
+    {
+        return $this->produces ?? [];
     }
     
     protected function getConstraintBoost(): int
@@ -124,6 +181,7 @@ class RouteHandler
                         $name = \substr($name, 0, -1);
                         $type = self::TYPE_PATH_MULTI;
                         $catch .= '(?:/[^/]+)*';
+                        $boost--;
                     } else {
                         $type = self::TYPE_PATH;
                     }
@@ -136,6 +194,7 @@ class RouteHandler
                         $name = \substr($name, 0, -1);
                         $type = self::TYPE_PERIOD_MULTI;
                         $catch .= '(?:\.[^/\.]+)*?';
+                        $boost--;
                     } else {
                         $type = self::TYPE_PERIOD;
                     }
@@ -163,6 +222,88 @@ class RouteHandler
     }
 }
 
+class RouteMatch
+{
+    public $handler;
+    
+    public $params;
+    
+    public function __construct(RouteHandler $handler, array $params = [])
+    {
+        $this->handler = $handler;
+        $this->params = $params;
+    }
+}
+
+class RoutingContext
+{
+    public $level;
+    
+    protected $allow = [];
+    
+    protected $matches = [];
+    
+    public function isMatch(): bool
+    {
+        return !empty($this->matches);
+    }
+
+    public function createNoMatchResponse(): HttpResponse
+    {
+        if ($this->allow) {
+            return new HttpResponse(Http::METHOD_NOT_ALLOWED, [
+                'Allow' => \implode(', ', \array_keys($this->allow))
+            ]);
+        }
+        
+        return new HttpResponse(Http::NOT_FOUND);
+    }
+    
+    public function createUnsupportedMediaTypeResponse(): HttpResponse
+    {
+        $response = new HttpResponse(Http::UNSUPPORTED_MEDIA_TYPE);
+        $accepted = [];
+        
+        foreach ($this->matches as $match) {
+            foreach ($match->handler->getConsumedMediaTypes() as $type) {
+                $accepted[(string) $type] = true;
+            }
+        }
+        
+        if ($accepted) {
+            \ksort($accepted);
+            
+            $response = $response->withHeader('Content-Type', 'application/json;charset="utf-8"');
+            $response = $response->withBody(new StringBody(\json_encode([
+                'status' => Http::UNSUPPORTED_MEDIA_TYPE,
+                'reason' => Http::getReason(Http::UNSUPPORTED_MEDIA_TYPE),
+                'acceptable' => \array_keys($accepted)
+            ], \JSON_UNESCAPED_SLASHES | \JSON_HEX_AMP | \JSON_HEX_APOS | \JSON_HEX_QUOT | \JSON_HEX_TAG)));
+        }
+        
+        return $response;
+    }
+
+    public function addAllowedMethods(array $methods)
+    {
+        foreach ($methods as $method) {
+            $this->allow[$method] = true;
+        }
+    }
+    
+    public function addMatch(RouteMatch $match)
+    {
+        $this->matches[] = $match;
+    }
+    
+    public function getMatches(): array
+    {
+        return $this->matches;
+    }
+}
+
+// TODO: Implement hierarchy-based routing by chaining routers...
+
 class Router
 {
     protected $routes;
@@ -178,16 +319,10 @@ class Router
         $this->chunkSize = $chunkSize;
     }
 
-    public function route(HttpRequest $request)
+    public function route(RoutingContext $context, string $path, string $method)
     {
-        $method = $request->getMethod();
-        $path = \str_replace('+', '%20', $request->getRequestTarget());
-        
         $skip = 0;
         $m = null;
-        
-        $level = null;
-        $allow = [];
         
         while (true) {
             list ($regex, $routes) = $this->compileRegex($skip);
@@ -195,44 +330,30 @@ class Router
             if ($regex === null) {
                 break;
             }
-            echo $regex, "\n\n";
-            if (\preg_match($regex, $path, $m)) {
-                $route = $routes[$m['MARK']];
-                $handler = $route[2];
+            
+            if (!\preg_match($regex, $path, $m)) {
+                $skip += $this->chunkSize;
                 
-                if ($level && $level !== $route[1]) {
-                    break;
-                }
-                
-                $level = $route[1];
-                
-                if (!$handler->isMethodSupported($method)) {
-                    foreach ($handler->getSupportedMethods() as $allowed) {
-                        $allow[] = $allowed;
-                    }
-                    
-                    $skip += 1 + (int) $m['MARK'];
-                    
-                    continue;
-                }
-                
-                return [
-                    Http::OK,
-                    $handler,
-                    $this->extractParams($route, $m)
-                ];
+                continue;
             }
             
-            $skip += $this->chunkSize;
+            $route = $routes[$m['MARK']];
+            $handler = $route[2];
+            
+            if ($context->level === null) {
+                $context->level = $route[1];
+            } elseif ($context->level !== $route[1]) {
+                break;
+            }
+            
+            $skip += 1 + (int) $m['MARK'];
+            
+            if ($handler->isMethodSupported($method)) {
+                $context->addMatch(new RouteMatch($handler, $this->extractParams($route, $m)));
+            } else {
+                $context->addAllowedMethods($handler->getSupportedMethods());
+            }
         }
-        
-        if ($allow) {
-            return new HttpResponse(Http::METHOD_NOT_ALLOWED, [
-                'Allow' => implode(', ', \array_unique($allow))
-            ]);
-        }
-        
-        return new HttpResponse(Http::NOT_FOUND);
     }
 
     protected function compileRegex(int $skip): array
@@ -293,18 +414,58 @@ $collector->route('index', '/');
 $collector->route('favicon', '/favicon.ico');
 
 $collector->route('page2', '/page{/page*}', [
-    Http::POST
-]);
+    Http::PUT
+])->consumes('application/json')->produces('application/json');
 
 $collector->route('page1', '/page/{page}.{format}', [
     Http::PUT
-]);
+])->consumes('application/json')->produces('application/xml');
 
 $router = new Router($collector->compile());
 
-$request = new HttpRequest('/page/sub/123.html', Http::POST);
+$request = new HttpRequest('/', Http::POST, [
+    'Content-Type' => 'application/json',
+    'Accept' => 'application/json;q=.5,*/xml'
+]);
 
-$match = $router->route($request);
+$context = new RoutingContext();
 
-print_r($match);
+$router->route($context, \str_replace('+', '%20', $request->getRequestTarget()), $request->getMethod());
 
+if (!$context->isMatch()) {
+    print_r($context->createNoMatchResponse());
+    
+    exit();
+}
+
+$matches = [];
+
+if ($request->hasHeader('Content-Type')) {
+    $type = $request->getContentType()->getMediaType();
+    
+    foreach ($context->getMatches() as $match) {
+        if ($match->handler->canConsume($type)) {
+            $matches[] = $match;
+        }
+    }
+}
+
+if (empty($matches)) {
+    print_r($context->createUnsupportedMediaTypeResponse());
+    
+    exit();
+}
+
+$accept = $request->getAccept();
+
+foreach ($matches as $match) {
+    foreach ($match->handler->getProducedMediaTypes() as $type) {
+        if ($accept->accepts($type)) {
+            print_r($match);
+            
+            exit();
+        }
+    }
+}
+
+print_r($matches[0]);
