@@ -62,7 +62,10 @@ class ResponseParser extends MessageParser
         
         if ($dropBody || Http::isResponseWithoutBody($response->getStatusCode())) {
             $body = new StringBody();
-            $response = $response->withHeader('Content-Length', '0');
+            
+            if (!$dropBody) {
+                $response = $response->withHeader('Content-Length', '0');
+            }
         } else {
             $body = Body::fromMessage($stream, $response);
         }
