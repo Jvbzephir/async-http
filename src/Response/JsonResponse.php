@@ -36,7 +36,7 @@ class JsonResponse extends HttpResponse
         static $defaultOptions = \JSON_UNESCAPED_SLASHES | \JSON_HEX_AMP | \JSON_HEX_APOS | \JSON_HEX_QUOT | \JSON_HEX_TAG;
         
         parent::__construct(Http::OK, [
-            'Content-Type' => 'application/json; charset="utf-8"'
+            'Content-Type' => 'application/json;charset="utf-8"'
         ]);
         
         $this->body = new StringBody($encode ? \json_encode($payload, $options ?? $defaultOptions) : $payload);
