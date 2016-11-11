@@ -533,11 +533,22 @@ class Driver implements HttpDriver
         $response = $this->normalizeResponse($request, $response);
         
         $http11 = ($response->getProtocolVersion() == '1.1');
-        $nobody = ($request->getMethod() === Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode()));
+        $nobody = Http::isResponseWithoutBody($response->getStatusCode());
+        $head = ($request->getMethod() === Http::HEAD);
+        
         $body = $response->getBody();
         $size = yield $body->getSize();
         
-        if (!$body instanceof FileBody || $socket->isEncrypted()) {
+        if ($head) {
+            if ($size === null) {
+                $bodyStream = yield $body->getReadableStream();
+                $size = 0;
+                
+                while (null !== ($chunk = yield $bodyStream->read())) {
+                    $size += \strlen($chunk);
+                }
+            }
+        } elseif (!$nobody && (!$body instanceof FileBody || $socket->isEncrypted())) {
             $bodyStream = yield $body->getReadableStream();
             
             if ($nobody || $size === 0) {
@@ -561,29 +572,31 @@ class Driver implements HttpDriver
         yield $socket->flush();
         
         try {
-            if ($body instanceof FileBody && !$socket->isEncrypted()) {
-                if ($size) {
-                    yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+            if (!$nobody && !$head) {
+                if ($body instanceof FileBody && !$socket->isEncrypted()) {
+                    if ($size) {
+                        yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                    }
+                } elseif ($http11 && $size === null) {
+                    yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+                    
+                    if ($len === $clen) {
+                        yield new CopyBytes($bodyStream, $socket, false, null, 4089, function (string $chunk) {
+                            return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
+                        });
+                    }
+                    
+                    yield $socket->write("0\r\n\r\n");
+                } elseif ($chunk !== null) {
+                    yield $socket->write($chunk);
+                    
+                    if ($len === $clen) {
+                        yield new CopyBytes($bodyStream, $socket, false, ($size === null) ? null : ($size - $len));
+                    }
                 }
-            } elseif ($http11 && $size === null) {
-                yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                 
-                if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $socket, false, null, 4089, function (string $chunk) {
-                        return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
-                    });
-                }
-                
-                yield $socket->write("0\r\n\r\n");
-            } elseif ($chunk !== null) {
-                yield $socket->write($chunk);
-                
-                if ($len === $clen) {
-                    yield new CopyBytes($bodyStream, $socket, false, ($size === null) ? null : ($size - $len));
-                }
+                yield $socket->flush();
             }
-            
-            yield $socket->flush();
         } finally {
             if (isset($bodyStream)) {
                 $bodyStream->close();

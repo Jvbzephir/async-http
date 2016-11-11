@@ -182,6 +182,42 @@ class DriverTest extends AsyncTestCase
         $this->assertCount(4, $logger);
     }
     
+    public function testHeadRequest()
+    {
+        yield new SocketStreamTester(function (DuplexStream $stream) {
+            yield $stream->write(implode("\r\n", [
+                'HEAD /api HTTP/1.0',
+                'Host: localhost',
+                '',
+                ''
+            ]));
+            
+            $response = yield from (new ResponseParser())->parseResponse($stream);
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.0', $response->getProtocolVersion());
+            $this->assertEquals(Http::OK, $response->getStatusCode());
+            $this->assertEquals('close', $response->getHeaderLine('Connection'));
+            $this->assertEquals('9876', $response->getHeaderLine('Content-Length'));
+            $this->assertEquals('', yield $response->getBody()->getContents());
+        }, function (DuplexStream $stream) {
+            $driver = new Driver();
+            
+            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+                $this->assertEquals(Http::HEAD, $request->getMethod());
+                $this->assertEquals('/api', $request->getRequestTarget());
+                $this->assertEquals('1.0', $request->getProtocolVersion());
+                $this->assertEquals('localhost', $request->getHeaderLine('Host'));
+                
+                $response = new HttpResponse();
+                $response = $response->withHeader('Content-Type', 'application/otet-stream');
+                $response = $response->withBody(new StreamBody(new ReadableMemoryStream(\str_repeat('A', 9876))));
+                
+                return $response;
+            });
+        });
+    }
+    
     public function testKeepHttp11Alive()
     {
         $payload = random_bytes(20000);
