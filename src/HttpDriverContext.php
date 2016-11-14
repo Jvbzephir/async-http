@@ -42,16 +42,24 @@ class HttpDriverContext
     public $middlewares;
     
     /**
+     * HTTP proxy mode settings.
+     * 
+     * @var ProxySettings
+     */
+    public $proxy;
+    
+    /**
      * Create a new HTTP server / driver context.
      * 
      * @param string $peerName
      * @param bool $encrypted
      * @param array $middlewares
      */
-    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [])
+    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [], ProxySettings $proxy = null)
     {
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
         $this->middlewares = $middlewares;
+        $this->proxy = $proxy ?? new ProxySettings();
     }
 }

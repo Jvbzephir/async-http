@@ -39,6 +39,8 @@ class HttpEndpoint
     
     protected $logger;
     
+    protected $proxySettings;
+    
     public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', LoggerInterface $logger = null)
     {
         $this->logger = $logger;
@@ -47,6 +49,8 @@ class HttpEndpoint
         $this->factory->setPeerName($peerName);
         
         $this->http1 = new Driver(null, $logger);
+        
+        $this->proxySettings = new ProxySettings();
     }
     
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
@@ -82,6 +86,11 @@ class HttpEndpoint
         $this->http1->addUpgradeResultHandler($handler);
     }
 
+    public function getProxySettings(): ProxySettings
+    {
+        return $this->proxySettings;
+    }
+
     public function listen(callable $action): Awaitable
     {
         return new Coroutine(function () use ($action) {
@@ -101,7 +110,7 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middlewares);
+            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->proxySettings);
             
             return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });

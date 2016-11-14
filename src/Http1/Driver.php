@@ -24,6 +24,7 @@ use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
+use KoolKode\Async\Http\ProxySettings;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
@@ -291,6 +292,8 @@ class Driver implements HttpDriver
         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($socket)));
         $request->getBody()->setCascadeClose(false);
         
+        $request = $request->withAttribute(ProxySettings::class, $context->proxy);
+        
         if ($request->getProtocolVersion() == '1.1') {
             if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {
                 $request->getBody()->setExpectContinue($socket);
@@ -298,23 +301,35 @@ class Driver implements HttpDriver
         }
         
         $peerName = $context->peerName;
-        $process = true;
+        $protocol = $context->encrypted ? 'https' : 'http';
         
-        if ($request->hasHeader('Host')) {
+        $parts = \explode(':', $socket->getRemoteAddress());
+        \array_pop($parts);
+        
+        if ($context->proxy->isTrustedProxy(\implode(':', $parts))) {
+            $host = $context->proxy->getHost($request);
+            
+            if ($host === null) {
+                if (!$request->hasHeader('Host')) {
+                    return $request;
+                }
+                
+                $peerName = $request->getHeaderLine('Host');
+            }
+            
+            $protocol = $context->proxy->getScheme($request) ?? $protocol;
+        } elseif ($request->hasHeader('Host')) {
             $peerName = $request->getHeaderLine('Host');
         } elseif ($request->getProtocolVersion() === '1.1') {
-            $process = false;
+            return $request;
         }
         
-        if ($process) {
-            $protocol = $context->encrypted ? 'https' : 'http';
-            $target = $request->getRequestTarget();
-            
-            if (\substr($target, 0, 1) === '/') {
-                $request = $request->withUri(Uri::parse(\sprintf('%s://%s/%s', $protocol, $peerName, \ltrim($target, '/'))));
-            } else {
-                $request = $request->withUri(Uri::parse(\sprintf('%s://%s/', $protocol, $peerName)));
-            }
+        $target = $request->getRequestTarget();
+        
+        if (\substr($target, 0, 1) === '/') {
+            $request = $request->withUri(Uri::parse(\sprintf('%s://%s/%s', $protocol, $peerName, \ltrim($target, '/'))));
+        } else {
+            $request = $request->withUri(Uri::parse(\sprintf('%s://%s/', $protocol, $peerName)));
         }
         
         return $request;
