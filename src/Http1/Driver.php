@@ -26,6 +26,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\ProxySettings;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Http\RemoteAddress;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
@@ -304,9 +305,12 @@ class Driver implements HttpDriver
         $protocol = $context->encrypted ? 'https' : 'http';
         
         $parts = \explode(':', $socket->getRemoteAddress());
-        \array_pop($parts);
+        $port = (int) \array_pop($parts);
         
-        if ($context->proxy->isTrustedProxy(\implode(':', $parts))) {
+        $address = new RemoteAddress(\implode(':', $parts), $port);
+        $request = $request->withAttribute(RemoteAddress::class, $address);
+        
+        if ($context->proxy->isTrustedProxy($address->ip)) {
             $host = $context->proxy->getHost($request);
             
             if ($host === null) {

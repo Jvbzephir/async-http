@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\RemoteAddress;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
@@ -104,6 +105,11 @@ class Connection
      * @var LoggerInterface
      */
     protected $logger;
+    
+    /**
+     * @var RemoteAddress
+     */
+    protected $remoteAddress;
 
     public function __construct(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null)
     {
@@ -113,6 +119,11 @@ class Connection
         
         $this->writer = new Executor();
         $this->incoming = new Channel();
+        
+        $parts = \explode(':', $socket->getRemoteAddress());
+        $port = (int) \array_pop($parts);
+        
+        $this->remoteAddress = new RemoteAddress(\implode(':', $parts), $port);
     }
     
     public function isAlive(): bool
@@ -139,6 +150,11 @@ class Connection
     public function getHPack(): HPack
     {
         return $this->hpack;
+    }
+    
+    public function getRemoteAddress(): RemoteAddress
+    {
+        return clone $this->remoteAddress;
     }
 
     public function getRemoteSetting(int $setting): int
