@@ -54,6 +54,11 @@ class HttpEndpoint
         $this->factory->setCertificate($file, $allowSelfSigned, $password);
     }
     
+    public function getSocketServerFactory(): SocketServerFactory
+    {
+        return $this->factory;
+    }
+    
     public function addDriver(HttpDriver $driver)
     {
         $this->drivers[] = $driver;
