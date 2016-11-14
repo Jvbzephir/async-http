@@ -15,7 +15,8 @@ window.onload = function() {
 		document.getElementById('websocket-log').appendChild(el);
 	}
 
-	var ws = new WebSocket('wss://localhost:8888/websocket');
+	var body = document.getElementsByTagName('body')[0];
+	var ws = new WebSocket(body.getAttribute('data-websocket-uri'));
 
 	ws.onopen = function() {
 		logMessage('WebSocket connection established');
