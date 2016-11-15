@@ -121,11 +121,7 @@ class HPackCompressor
             $available += 8;
             
             do {
-                if ($entry === null) {
-                    $entry = $table[$buffer >> 8 & 0xFF] ?? null;
-                } else {
-                    $entry = $entry[$buffer >> 8 & 0xFF] ?? null;
-                }
+                $entry = ($entry ?? $table)[$buffer >> 8 & 0xFF] ?? null;
                 
                 if (\is_array($entry)) {
                     $len = 8;
@@ -158,13 +154,7 @@ class HPackCompressor
         $decoded = '';
         
         do {
-            $trailer = ($buffer >> 8 & 0xFF);
-            
-            if ($entry === null) {
-                $entry = $table[$trailer] ?? null;
-            } else {
-                $entry = $entry[$trailer] ?? null;
-            }
+            $entry = ($entry ?? $table)[$buffer >> 8 & 0xFF] ?? null;
             
             if ($entry === null || \is_array($entry) || ($len = $lens[$entry]) > $available) {
                 break;
@@ -178,9 +168,7 @@ class HPackCompressor
         } while ($available > 0);
         
         if ($available > 0) {
-            $trailer = ($buffer >> 8 & 0xFF) >> (8 - $available);
-            
-            switch ($trailer) {
+            switch (($buffer >> 8 & 0xFF) >> (8 - $available)) {
                 case 0b1:
                 case 0b11:
                 case 0b111:
@@ -188,8 +176,11 @@ class HPackCompressor
                 case 0b11111:
                 case 0b111111:
                 case 0b1111111:
+                    // Valid padding detected. :)
                     break;
                 default:
+                    $trailer = ($buffer >> 8 & 0xFF) >> (8 - $available);
+                    
                     throw new \RuntimeException(\sprintf('Invalid HPACK padding in compressed string detected: %08b', $trailer));
             }
         }
