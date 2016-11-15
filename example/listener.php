@@ -17,6 +17,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
+use KoolKode\Async\Http\HttpDriverContext;
 
 require_once __DIR__ . '/websocket.php';
 
@@ -29,11 +30,13 @@ return function (HttpRequest $request) use ($websocket) {
         case '':
             $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/index.html'));
             
+            $peer = $request->getAttribute(HttpDriverContext::class)->getPeer();
             $scheme = ($request->getUri()->getScheme() === 'https') ? 'wss' : 'ws';
-            $uri =  $scheme . '://' . $request->getUri()->getHostWithPort() . '/websocket';
+            $uri = $scheme . '://' . $request->getUri()->getHostWithPort() . '/websocket';
             
             $html = strtr($html, [
-                '###HOST###' => htmlspecialchars($request->getUri()->getHostWithPort(true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                '###URI###' => htmlspecialchars((string) $request->getUri(), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                '###HOST###' => htmlspecialchars($peer, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 '###WEBSOCKET_URI###' => htmlspecialchars($uri, ENT_QUOTES | ENT_HTML5, 'UTF-8')
             ]);
             

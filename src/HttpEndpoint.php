@@ -108,7 +108,10 @@ class HttpEndpoint
             
             $this->server = yield $factory->createSocketServer();
             
-            $context = new HttpDriverContext($factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->proxySettings);
+            $port = $this->server->getPort();
+            $peer = $this->server->getAddress() . ($port ? (':' . $port) : '');
+            
+            $context = new HttpDriverContext($peer, $factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->proxySettings);
             
             return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });

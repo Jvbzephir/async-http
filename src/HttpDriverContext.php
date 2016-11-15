@@ -21,32 +21,39 @@ namespace KoolKode\Async\Http;
 class HttpDriverContext
 {
     /**
+     * Peer used by HTTP endpoint.
+     * 
+     * @var string
+     */
+    protected $peer;
+    
+    /**
      * Server peer name.
      * 
      * @var string
      */
-    public $peerName;
+    protected $peerName;
     
     /**
      * Is the HTTP endpoint encrypted using SSL / TSL.
      * 
      * @var bool
      */
-    public $encrypted;
+    protected $encrypted;
     
     /**
      * Registered prioritized HTTP middleware.
      * 
      * @var array
      */
-    public $middlewares;
+    protected $middlewares;
     
     /**
      * HTTP proxy mode settings.
      * 
      * @var ReverseProxySettings
      */
-    public $proxy;
+    protected $proxy;
     
     /**
      * Create a new HTTP server / driver context.
@@ -55,11 +62,37 @@ class HttpDriverContext
      * @param bool $encrypted
      * @param array $middlewares
      */
-    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [], ReverseProxySettings $proxy = null)
+    public function __construct(string $peer = '127.0.0.1', string $peerName = 'localhost', bool $encrypted = false, array $middlewares = [], ReverseProxySettings $proxy = null)
     {
+        $this->peer = $peer;
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
         $this->middlewares = $middlewares;
         $this->proxy = $proxy ?? new ReverseProxySettings();
+    }
+
+    public function getPeer(): string
+    {
+        return $this->peer;
+    }
+
+    public function getPeerName(): string
+    {
+        return $this->peerName;
+    }
+
+    public function isEncrypted(): bool
+    {
+        return $this->encrypted;
+    }
+
+    public function getMiddlewares(): array
+    {
+        return $this->middlewares;
+    }
+
+    public function getProxySettings(): ReverseProxySettings
+    {
+        return $this->proxy;
     }
 }

@@ -298,8 +298,9 @@ class Driver implements HttpDriver
             }
         }
         
-        $peerName = $context->peerName;
-        $protocol = $context->encrypted ? 'https' : 'http';
+        $peerName = $context->getPeerName();
+        $protocol = $context->isEncrypted() ? 'https' : 'http';
+        $proxy = $context->getProxySettings();
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);
@@ -309,8 +310,8 @@ class Driver implements HttpDriver
             ($ip === '') ? '127.0.0.1' : $ip
         ];
         
-        if ($context->proxy->isTrustedProxy($ip)) {
-            $host = $context->proxy->getHost($request);
+        if ($proxy->isTrustedProxy($ip)) {
+            $host = $proxy->getHost($request);
             
             if ($host === null) {
                 if (!$request->hasHeader('Host')) {
@@ -322,9 +323,9 @@ class Driver implements HttpDriver
                 $peerName = $host;
             }
             
-            $protocol = $context->proxy->getScheme($request) ?? $protocol;
+            $protocol = $proxy->getScheme($request) ?? $protocol;
             
-            $addresses = \array_merge($context->proxy->getAddresses($request), $addresses);
+            $addresses = \array_merge($proxy->getAddresses($request), $addresses);
         } elseif ($request->hasHeader('Host')) {
             $peerName = $request->getHeaderLine('Host');
         } elseif ($request->getProtocolVersion() === '1.1') {
@@ -332,6 +333,7 @@ class Driver implements HttpDriver
         }
         
         $request = $request->withAddress(...$addresses);
+        $request = $request->withAttribute(HttpDriverContext::class, $context);
         
         $target = $request->getRequestTarget();
         
@@ -401,7 +403,7 @@ class Driver implements HttpDriver
                 $request = $request->withoutHeader($name);
             }
             
-            $next = new NextMiddleware($context->middlewares, function (HttpRequest $request) use ($action) {
+            $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($action) {
                 $response = $action($request);
                 
                 if ($response instanceof \Generator) {

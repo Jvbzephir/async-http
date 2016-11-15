@@ -63,7 +63,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::GET, $request->getMethod());
                 $this->assertEquals('/', $request->getRequestTarget());
                 $this->assertEquals('1.0', $request->getProtocolVersion());
@@ -100,7 +100,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setKeepAliveSupported(false);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::OPTIONS, $request->getMethod());
                 $this->assertEquals('*', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -133,7 +133,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 return new HttpResponse(Http::NO_CONTENT);
             });
         });
@@ -164,7 +164,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) use ($payload, $logger) {
             $driver = new Driver(null, $logger);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.0', $request->getProtocolVersion());
@@ -203,7 +203,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::HEAD, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.0', $request->getProtocolVersion());
@@ -245,7 +245,7 @@ class DriverTest extends AsyncTestCase
         }, function (DuplexStream $stream) use ($payload) {
             $driver = new Driver();
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -290,7 +290,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) use ($payload) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -330,7 +330,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::POST, $request->getMethod());
                 $this->assertEquals('/api', $request->getRequestTarget());
                 $this->assertEquals('1.1', $request->getProtocolVersion());
@@ -365,7 +365,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 return new \stdClass();
             });
         });
@@ -392,7 +392,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function (HttpRequest $request) {
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 throw new StatusException(Http::PRECONDITION_FAILED, 'Failed to check condition');
             });
         });
@@ -419,7 +419,7 @@ class DriverTest extends AsyncTestCase
             $driver = new Driver();
             $driver->setDebug(true);
             
-            yield $driver->handleConnection(new HttpDriverContext('localhost'), $stream, function () {});
+            yield $driver->handleConnection(new HttpDriverContext(), $stream, function () {});
         });
     }
 }

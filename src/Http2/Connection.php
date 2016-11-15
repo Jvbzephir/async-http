@@ -278,24 +278,29 @@ class Connection
                 $this->remoteAddress
             ];
             
-            if ($context->proxy->isTrustedProxy($this->remoteAddress)) {
+            $proxy = $context->getProxySettings();
+            
+            if ($proxy->isTrustedProxy($this->remoteAddress)) {
                 $scheme = $request->getUri()->getScheme();
-                $proxied = $context->proxy->getScheme($request) ?? $scheme;
+                $proxied = $proxy->getScheme($request) ?? $scheme;
                 
                 if ($proxied != $scheme) {
                     $request = $request->withUri($request->getUri()->withScheme($proxied));
                 }
                 
-                if (null !== ($host = $context->proxy->getHost($request))) {
+                if (null !== ($host = $proxy->getHost($request))) {
                     $request = $request->withUri($request->getUri()->withPort(null)->withHost($host));
                 }
                 
-                $addresses = \array_merge($context->proxy->getAddresses($request), $addresses);
+                $addresses = \array_merge($proxy->getAddresses($request), $addresses);
             }
+            
+            $request = $request->withAttribute(HttpDriverContext::class, $context);
+            $request = $request->withAddress(...$addresses);
             
             return [
                 $stream,
-                $request->withAddress(...$addresses)
+                $request
             ];
         }, true);
     }

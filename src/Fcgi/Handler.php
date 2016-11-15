@@ -313,7 +313,7 @@ class Handler
         ];
         
         $uri = \strtolower($this->params['REQUEST_SCHEME'] ?? 'http') . '://';
-        $uri .= ($this->params['HTTP_HOST'] ?? $this->context->peerName);
+        $uri .= ($this->params['HTTP_HOST'] ?? $this->context->getPeerName());
         
         if (!empty($this->params['SERVER_PORT'])) {
             $uri .= ':' . (int) $this->params['SERVER_PORT'];
@@ -354,6 +354,7 @@ class Handler
         }
         
         $request = $request->withAddress(...$addresses);
+        $request = $request->withAttribute(HttpDriverContext::class, $this->context);
         
         return $request->withBody(new StreamBody(new ReadableChannelStream($this->body)));
     }

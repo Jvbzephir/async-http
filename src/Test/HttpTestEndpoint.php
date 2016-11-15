@@ -65,7 +65,9 @@ class HttpTestEndpoint
 
     public function accept(SocketStream $socket, string $alpn = ''): Awaitable
     {
-        $context = new HttpDriverContext($this->peerName, $this->encrypted, $this->middlewares);
+        $port = $this->encrypted ? 443 : 80;
+        
+        $context = new HttpDriverContext('127.0.0.1:' . $port, $this->peerName, $this->encrypted, $this->middlewares);
         
         if ($this->encrypted) {
             foreach ($this->drivers as $driver) {
