@@ -44,7 +44,7 @@ class HttpDriverContext
     /**
      * HTTP proxy mode settings.
      * 
-     * @var ProxySettings
+     * @var ReverseProxySettings
      */
     public $proxy;
     
@@ -55,11 +55,11 @@ class HttpDriverContext
      * @param bool $encrypted
      * @param array $middlewares
      */
-    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [], ProxySettings $proxy = null)
+    public function __construct(string $peerName, bool $encrypted = false, array $middlewares = [], ReverseProxySettings $proxy = null)
     {
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
         $this->middlewares = $middlewares;
-        $this->proxy = $proxy ?? new ProxySettings();
+        $this->proxy = $proxy ?? new ReverseProxySettings();
     }
 }

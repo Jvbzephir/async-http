@@ -49,8 +49,6 @@ class HttpEndpoint
         $this->factory->setPeerName($peerName);
         
         $this->http1 = new Driver(null, $logger);
-        
-        $this->proxySettings = new ProxySettings();
     }
     
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
@@ -86,7 +84,7 @@ class HttpEndpoint
         $this->http1->addUpgradeResultHandler($handler);
     }
 
-    public function setProxySettings(ProxySettings $proxy)
+    public function setProxySettings(ReverseProxySettings $proxy)
     {
         $this->proxySettings = $proxy;
     }

@@ -24,7 +24,6 @@ use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
-use KoolKode\Async\Http\ProxySettings;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
@@ -292,8 +291,6 @@ class Driver implements HttpDriver
     {
         $request = yield new Timeout(30, new Coroutine($this->parser->parseRequest($socket)));
         $request->getBody()->setCascadeClose(false);
-        
-        $request = $request->withAttribute(ProxySettings::class, $context->proxy);
         
         if ($request->getProtocolVersion() == '1.1') {
             if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {

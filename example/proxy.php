@@ -14,7 +14,7 @@ declare(strict_types = 1);
 use Interop\Async\Loop;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\PublishFiles;
-use KoolKode\Async\Http\ProxySettings;
+use KoolKode\Async\Http\ReverseProxySettings;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Log\PipeLogHandler;
 use KoolKode\Async\Loop\LoopConfig;
@@ -25,7 +25,7 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
     
-    $proxy = new ProxySettings();
+    $proxy = new ReverseProxySettings();
     $proxy->addTrustedProxy('127.0.0.1', '::1');
     
     $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $logger);
