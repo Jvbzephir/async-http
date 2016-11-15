@@ -246,8 +246,10 @@ class Connector implements HttpConnector
         
         $body = $request->getBody();
         $size = yield $body->getSize();
+        $sendfile = false;
         
-        if ($body instanceof FileBody && !$socket->isEncrypted()) {
+        if ($body instanceof FileBody && $socket->isSendfileSupported()) {
+            $sendfile = true;
             $chunk = $size ? '' : null;
         } else {
             if ($request->getProtocolVersion() == '1.0' && $size === null) {
@@ -296,7 +298,7 @@ class Connector implements HttpConnector
             }
         }
         
-        if ($body instanceof FileBody && !$socket->isEncrypted()) {
+        if ($sendfile) {
             if ($size) {
                 yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
             }

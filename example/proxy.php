@@ -26,7 +26,7 @@ Loop::execute(function () {
     $logger->addHandler(new PipeLogHandler());
     
     $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $logger);
-    $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1'));
+    $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1', '10.0.2.2'));
     $endpoint->addUpgradeResultHandler(new ConnectionHandler($logger));
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));

@@ -561,6 +561,7 @@ class Driver implements HttpDriver
         $http11 = ($response->getProtocolVersion() == '1.1');
         $nobody = Http::isResponseWithoutBody($response->getStatusCode());
         $head = ($request->getMethod() === Http::HEAD);
+        $sendfile = false;
         
         $body = $response->getBody();
         $size = yield $body->getSize();
@@ -574,23 +575,27 @@ class Driver implements HttpDriver
                     $size += \strlen($chunk);
                 }
             }
-        } elseif (!$nobody && (!$body instanceof FileBody || $socket->isEncrypted())) {
-            $bodyStream = yield $body->getReadableStream();
-            
-            if ($nobody || $size === 0) {
-                $chunk = null;
-                $size = 0;
-                $len = 0;
+        } elseif (!$nobody) {
+            if ($body instanceof FileBody && $socket->isSendfileSupported()) {
+                $sendfile = true;
             } else {
-                $clen = ($size === null) ? 4089 : 4096;
-                $chunk = yield $bodyStream->readBuffer($clen);
-                $len = \strlen($chunk ?? '');
-            }
-            
-            if ($chunk === null) {
-                $size = 0;
-            } elseif ($len < $clen) {
-                $size = $len;
+                $bodyStream = yield $body->getReadableStream();
+                
+                if ($nobody || $size === 0) {
+                    $chunk = null;
+                    $size = 0;
+                    $len = 0;
+                } else {
+                    $clen = ($size === null) ? 4089 : 4096;
+                    $chunk = yield $bodyStream->readBuffer($clen);
+                    $len = \strlen($chunk ?? '');
+                }
+                
+                if ($chunk === null) {
+                    $size = 0;
+                } elseif ($len < $clen) {
+                    $size = $len;
+                }
             }
         }
         
@@ -599,7 +604,7 @@ class Driver implements HttpDriver
         
         try {
             if (!$nobody && !$head) {
-                if ($body instanceof FileBody && !$socket->isEncrypted()) {
+                if ($sendfile) {
                     if ($size) {
                         yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
                     }
