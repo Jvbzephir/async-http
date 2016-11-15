@@ -29,7 +29,9 @@ return function (HttpRequest $request) use ($websocket) {
         case '':
             $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/public/index.html'));
             
-            $uri = 'wss://' . $request->getUri()->getHostWithPort() . '/websocket';
+            $scheme = ($request->getUri()->getScheme() === 'https') ? 'wss' : 'ws';
+            $uri =  $scheme . '://' . $request->getUri()->getHostWithPort() . '/websocket';
+            
             $html = strtr($html, [
                 '###WEBSOCKET_URI###' => htmlspecialchars($uri, ENT_QUOTES | ENT_HTML5, 'UTF-8')
             ]);
