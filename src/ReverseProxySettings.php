@@ -65,6 +65,18 @@ class ReverseProxySettings
     ];
 
     /**
+     * Create a new HTTP reverse proxy configuration
+     * 
+     * @param string ...$proxies Set of trusted proxy IP addresses.
+     */
+    public function __construct(string ...$proxies)
+    {
+        foreach ($proxies as $proxy) {
+            $this->trustedProxies[(string) new Address($proxy)] = true;
+        }
+    }
+
+    /**
      * Check if the given IP address is a trusted HTTP proxy address.
      * 
      * @param string $address
@@ -90,9 +102,12 @@ class ReverseProxySettings
      * 
      * @param bool $trust
      */
-    public function setTrustAllProxies(bool $trust)
+    public function withTrustAllProxies(bool $trust): ReverseProxySettings
     {
-        $this->trustAllProxies = $trust;
+        $settings = clone $this;
+        $settings->trustAllProxies = $trust;
+        
+        return $settings;
     }
     
     /**
@@ -100,11 +115,15 @@ class ReverseProxySettings
      * 
      * @param string ...$proxies
      */
-    public function addTrustedProxy(string ...$proxies)
+    public function withTrustedProxy(string ...$proxies): ReverseProxySettings
     {
+        $settings = clone $this;
+        
         foreach ($proxies as $proxy) {
-            $this->trustedProxies[(string) new Address($proxy)] = true;
+            $settings->trustedProxies[(string) new Address($proxy)] = true;
         }
+        
+        return $settings;
     }
 
     /**
@@ -112,9 +131,12 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function addSchemeHeader(string $name)
+    public function withSchemeHeader(string $name): ReverseProxySettings
     {
-        $this->schemeHeaders[] = $name;
+        $settings = clone $this;
+        $settings->schemeHeaders[] = $name;
+        
+        return $settings;
     }
 
     /**
@@ -137,9 +159,12 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function addHostHeader(string $name)
+    public function withHostHeader(string $name): ReverseProxySettings
     {
-        $this->hostHeaders[] = $name;
+        $settings = clone $this;
+        $settings->hostHeaders[] = $name;
+        
+        return $settings;
     }
     
     /**
@@ -162,9 +187,12 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function addAddressHeader(string $name)
+    public function withAddressHeader(string $name): ReverseProxySettings
     {
-        $this->addressHeaders = $name;
+        $settings = clone $this;
+        $settings->addressHeaders = $name;
+        
+        return $settings;
     }
 
     /**

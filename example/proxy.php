@@ -25,11 +25,8 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
     
-    $proxy = new ReverseProxySettings();
-    $proxy->addTrustedProxy('127.0.0.1', '::1');
-    
     $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $logger);
-    $endpoint->setProxySettings($proxy);
+    $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1'));
     $endpoint->addUpgradeResultHandler(new ConnectionHandler($logger));
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
