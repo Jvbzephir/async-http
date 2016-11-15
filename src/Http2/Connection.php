@@ -126,6 +126,10 @@ class Connection
         \array_pop($parts);
         
         $this->remoteAddress = \implode(':', $parts);
+        
+        if ($this->remoteAddress === '') {
+            $this->remoteAddress = '127.0.0.1';
+        }
     }
     
     public function isAlive(): bool

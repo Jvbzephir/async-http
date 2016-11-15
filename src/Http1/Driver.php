@@ -303,10 +303,10 @@ class Driver implements HttpDriver
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);
-        
         $ip = \implode(':', $parts);
+        
         $addresses = [
-            $ip
+            ($ip === '') ? '127.0.0.1' : $ip
         ];
         
         if ($context->proxy->isTrustedProxy($ip)) {
