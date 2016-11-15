@@ -171,6 +171,8 @@ class HPackCompressor
             }
             
             $decoded .= $entry;
+            $entry = null;
+            
             $available -= $len;
             $buffer <<= $len;
         } while ($available > 0);
