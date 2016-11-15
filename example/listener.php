@@ -27,12 +27,13 @@ return function (HttpRequest $request) use ($websocket) {
         case 'websocket':
             return $websocket;
         case '':
-            $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/public/index.html'));
+            $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/index.html'));
             
             $scheme = ($request->getUri()->getScheme() === 'https') ? 'wss' : 'ws';
             $uri =  $scheme . '://' . $request->getUri()->getHostWithPort() . '/websocket';
             
             $html = strtr($html, [
+                '###HOST###' => htmlspecialchars($request->getUri()->getHostWithPort(true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 '###WEBSOCKET_URI###' => htmlspecialchars($uri, ENT_QUOTES | ENT_HTML5, 'UTF-8')
             ]);
             
