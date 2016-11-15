@@ -37,6 +37,7 @@ class HttpRequestTest extends \PHPUnit_Framework_TestCase
                 'Foo: bar',
                 'Host: localhost'
             ],
+            'addresses' => [],
             'body' => $body,
             'attributes' => [
                 'foo'

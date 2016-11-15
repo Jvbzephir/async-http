@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Header\Accept;
 use KoolKode\Async\Http\Header\ContentType;
 
@@ -28,6 +29,8 @@ class HttpRequest extends HttpMessage
     protected $target;
 
     protected $uri;
+    
+    protected $addresses = [];
 
     public function __construct($uri, string $method = Http::GET, array $headers = [], string $protocolVersion = '2.0')
     {
@@ -54,6 +57,7 @@ class HttpRequest extends HttpMessage
             'uri' => (string) $this->uri,
             'target' => $this->getRequestTarget(),
             'headers' => $headers,
+            'addresses' => $this->addresses,
             'body' => $this->body,
             'attributes' => \array_keys($this->attributes)
         ];
@@ -180,6 +184,27 @@ class HttpRequest extends HttpMessage
     public function getQueryParams(): array
     {
         return $this->uri->getQueryParams();
+    }
+
+    public function getClientAddress(): string
+    {
+        return isset($this->addresses[0]) ? $this->addresses[0] : '';
+    }
+
+    public function getProxyAddresses(): array
+    {
+        return \array_slice($this->addresses, 1);
+    }
+
+    public function withAddress(string ...$address): HttpRequest
+    {
+        $request = clone $this;
+        
+        foreach ($address as $ip) {
+            $request->addresses[] = (string) new Address($ip);
+        }
+        
+        return $request;
     }
 
     protected function filterMethod(string $method): string

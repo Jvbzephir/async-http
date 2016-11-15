@@ -13,14 +13,14 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\DNS\Address;
+use KoolKode\Async\DNS\MalformedAddressException;
+
 class ProxySettings
 {
     protected $trustAllProxies = false;
     
-    protected $trustedProxies = [
-        '127.0.0.1' => true,
-        '::1' => true
-    ];
+    protected $trustedProxies = [];
     
     protected $schemeHeaders = [
         'X-Forwarded-Proto'
@@ -29,6 +29,10 @@ class ProxySettings
     protected $hostHeaders = [
         'X-Forwarded-Host'
     ];
+    
+    protected $addressHeaders = [
+        'X-Forwarded-For'
+    ];
 
     public function isTrustedProxy(string $address): bool
     {
@@ -36,12 +40,18 @@ class ProxySettings
             return true;
         }
         
-        return isset($this->trustedProxies[$address]);
+        try {
+            return isset($this->trustedProxies[(string) new Address($address)]);
+        } catch (MalformedAddressException $e) {
+            return false;
+        }
     }
     
-    public function addTrustedProxy(string $proxy)
+    public function addTrustedProxy(string ...$proxies)
     {
-        $this->trustedProxies[\trim($proxy, '[]')] = true;
+        foreach ($proxies as $proxy) {
+            $this->trustedProxies[(string) new Address($proxy)] = true;
+        }
     }
 
     public function addSchemeHeader(string $name)
@@ -53,7 +63,7 @@ class ProxySettings
     {
         foreach ($this->schemeHeaders as $name) {
             if ($request->hasHeader($name)) {
-                return $request->getHeaderTokens($name)[0]->getValue();
+                return \strtolower($request->getHeaderTokens($name)[0]->getValue());
             }
         }
     }
@@ -70,5 +80,25 @@ class ProxySettings
                 return $request->getHeaderTokens($name)[0]->getValue();
             }
         }
+    }
+    
+    public function addAddressHeader(string $name)
+    {
+        $this->addressHeaders = $name;
+    }
+
+    public function getAddresses(HttpRequest $request): array
+    {
+        $addresses = [];
+        
+        foreach ($this->addressHeaders as $name) {
+            if ($request->hasHeader($name)) {
+                foreach ($request->getHeaderTokenValues($name, false) as $ip) {
+                    $addresses[] = $ip;
+                }
+            }
+        }
+        
+        return $addresses;
     }
 }

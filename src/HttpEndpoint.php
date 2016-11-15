@@ -86,9 +86,9 @@ class HttpEndpoint
         $this->http1->addUpgradeResultHandler($handler);
     }
 
-    public function getProxySettings(): ProxySettings
+    public function setProxySettings(ProxySettings $proxy)
     {
-        return $this->proxySettings;
+        $this->proxySettings = $proxy;
     }
 
     public function listen(callable $action): Awaitable

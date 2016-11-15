@@ -22,7 +22,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\RemoteAddress;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
@@ -216,7 +215,6 @@ class Stream
         $request = new HttpRequest($uri, $method);
         $request = $request->withRequestTarget($path);
         $request = $request->withProtocolVersion('2.0');
-        $request = $request->withAttribute(RemoteAddress::class, $this->conn->getRemoteAddress());
         
         foreach ($headers as $header) {
             if (\substr($header[0], 0, 1) !== ':') {

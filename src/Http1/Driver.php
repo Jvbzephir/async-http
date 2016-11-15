@@ -26,7 +26,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\ProxySettings;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\RemoteAddress;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
@@ -154,7 +153,7 @@ class Driver implements HttpDriver
      */
     public function handleConnection(HttpDriverContext $context, SocketStream $socket, callable $action): Awaitable
     {
-        return new Coroutine(function () use ($socket, $action, $context) {
+        return new Coroutine(function () use ($context, $socket, $action) {
             $remotePeer = $socket->getRemoteAddress();
             $upgraded = false;
             
@@ -169,7 +168,7 @@ class Driver implements HttpDriver
                 
                 if ($request->getProtocolVersion() !== '1.0' && $request->hasHeader('Host')) {
                     try {
-                        yield from $this->upgradeConnection($socket, $request, $action, $upgraded);
+                        yield from $this->upgradeConnection($context, $socket, $request, $action, $upgraded);
                         
                         if ($upgraded) {
                             return;
@@ -226,12 +225,13 @@ class Driver implements HttpDriver
     /**
      * Consult all registered upgrade handlers in order to upgrade the connection as needed.
      * 
+     * @param HttpDriverContext $context
      * @param SocketStream $socket
      * @param HttpRequest $request
      * @param callable $action
      * @param bool $upgraded Will be set to true when the connection has been upgraded.
      */
-    protected function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action, bool & $upgraded): \Generator
+    protected function upgradeConnection(HttpDriverContext $context, SocketStream $socket, HttpRequest $request, callable $action, bool & $upgraded): \Generator
     {
         $protocols = [
             ''
@@ -246,7 +246,7 @@ class Driver implements HttpDriver
                 if ($handler->isUpgradeSupported($protocol, $request)) {
                     $upgraded = true;
                     
-                    return yield from $handler->upgradeConnection($socket, $request, $action);
+                    return yield from $handler->upgradeConnection($context, $socket, $request, $action);
                 }
             }
         }
@@ -305,12 +305,14 @@ class Driver implements HttpDriver
         $protocol = $context->encrypted ? 'https' : 'http';
         
         $parts = \explode(':', $socket->getRemoteAddress());
-        $port = (int) \array_pop($parts);
+        \array_pop($parts);
         
-        $address = new RemoteAddress(\implode(':', $parts), $port);
-        $request = $request->withAttribute(RemoteAddress::class, $address);
+        $ip = \implode(':', $parts);
+        $addresses = [
+            $ip
+        ];
         
-        if ($context->proxy->isTrustedProxy($address->ip)) {
+        if ($context->proxy->isTrustedProxy($ip)) {
             $host = $context->proxy->getHost($request);
             
             if ($host === null) {
@@ -319,14 +321,20 @@ class Driver implements HttpDriver
                 }
                 
                 $peerName = $request->getHeaderLine('Host');
+            } else {
+                $peerName = $host;
             }
             
             $protocol = $context->proxy->getScheme($request) ?? $protocol;
+            
+            $addresses = \array_merge($context->proxy->getAddresses($request), $addresses);
         } elseif ($request->hasHeader('Host')) {
             $peerName = $request->getHeaderLine('Host');
         } elseif ($request->getProtocolVersion() === '1.1') {
             return $request;
         }
+        
+        $request = $request->withAddress(...$addresses);
         
         $target = $request->getRequestTarget();
         

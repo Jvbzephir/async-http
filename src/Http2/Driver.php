@@ -80,7 +80,7 @@ class Driver implements HttpDriver, UpgradeHandler
             yield $conn->performServerHandshake();
             
             try {
-                while (null !== ($received = yield $conn->nextRequest())) {
+                while (null !== ($received = yield $conn->nextRequest($context))) {
                     new Coroutine($this->processRequest($context, $conn, $action, ...$received), true);
                 }
             } finally {
@@ -120,10 +120,10 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * {@inheritdoc}
      */
-    public function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    public function upgradeConnection(HttpDriverContext $context, SocketStream $socket, HttpRequest $request, callable $action): \Generator
     {
         if ($this->isPrefaceRequest($request)) {
-            return yield from $this->upgradeConnectionDirect($socket, $request, $action);
+            return yield from $this->upgradeConnectionDirect($context, $socket, $request, $action);
         }
         
         $settings = @\base64_decode($request->getHeaderLine('HTTP2-Settings'));
@@ -163,7 +163,7 @@ class Driver implements HttpDriver, UpgradeHandler
         $remotePeer = $socket->getRemoteAddress();
         
         try {
-            while (null !== ($received = yield $conn->nextRequest())) {
+            while (null !== ($received = yield $conn->nextRequest($context))) {
                 new Coroutine($this->processRequest($conn, $action, ...$received), true);
             }
         } finally {
@@ -182,11 +182,12 @@ class Driver implements HttpDriver, UpgradeHandler
     /**
      * Perform a direct upgrade of the connection to HTTP/2.
      * 
+     * @param HttpDriverContext $context HTTP context related to the HTTP endpoint.
      * @param SocketStream $socket The underlying socket transport.
      * @param HttpRequest $request The HTTP request that caused the connection upgrade.
      * @param callable $action Server action to be performed for each incoming HTTP request.
      */
-    protected function upgradeConnectionDirect(SocketStream $socket, HttpRequest $request, callable $action): \Generator
+    protected function upgradeConnectionDirect(HttpDriverContext $context, SocketStream $socket, HttpRequest $request, callable $action): \Generator
     {
         $preface = yield $socket->readBuffer(\strlen(Connection::PREFACE_BODY), true);
         
@@ -216,7 +217,7 @@ class Driver implements HttpDriver, UpgradeHandler
         $remotePeer = $socket->getRemoteAddress();
         
         try {
-            while (null !== ($received = yield $conn->nextRequest())) {
+            while (null !== ($received = yield $conn->nextRequest($context))) {
                 new Coroutine($this->processRequest($conn, $action, ...$received), true);
             }
         } finally {

@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Socket\SocketStream;
 
@@ -35,9 +36,10 @@ interface UpgradeHandler
     /**
      * Take control of the given connection.
      *
+     * @param HttpDriverContext $context HTTP driver context.
      * @param SocketStream $socket The underlying socket connection to be used.
      * @param HttpRequest $request HTTP request that triggered the connection upgrade.
      * @param callable $action Server action handler.
      */
-    public function upgradeConnection(SocketStream $socket, HttpRequest $request, callable $action): \Generator;
+    public function upgradeConnection(HttpDriverContext $context, SocketStream $socket, HttpRequest $request, callable $action): \Generator;
 }

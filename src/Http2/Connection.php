@@ -16,9 +16,11 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Http\RemoteAddress;
+use KoolKode\Async\Http\HttpDriverContext;
+use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Success;
+use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerInterface;
@@ -107,7 +109,7 @@ class Connection
     protected $logger;
     
     /**
-     * @var RemoteAddress
+     * @var string
      */
     protected $remoteAddress;
 
@@ -121,9 +123,9 @@ class Connection
         $this->incoming = new Channel();
         
         $parts = \explode(':', $socket->getRemoteAddress());
-        $port = (int) \array_pop($parts);
+        \array_pop($parts);
         
-        $this->remoteAddress = new RemoteAddress(\implode(':', $parts), $port);
+        $this->remoteAddress = \implode(':', $parts);
     }
     
     public function isAlive(): bool
@@ -150,11 +152,6 @@ class Connection
     public function getHPack(): HPack
     {
         return $this->hpack;
-    }
-    
-    public function getRemoteAddress(): RemoteAddress
-    {
-        return clone $this->remoteAddress;
     }
 
     public function getRemoteSetting(int $setting): int
@@ -270,9 +267,33 @@ class Connection
         return $this->streams[$stream->getId()] = $stream;
     }
     
-    public function nextRequest(): Awaitable
+    public function nextRequest(HttpDriverContext $context): Awaitable
     {
-        return $this->incoming->receive();
+        return new Transform($this->incoming->receive(), function (Stream $stream, HttpRequest $request) use ($context) {
+            $addresses = [
+                $this->remoteAddress
+            ];
+            
+            if ($context->proxy->isTrustedProxy($this->remoteAddress)) {
+                $scheme = $request->getUri()->getScheme();
+                $proxied = $context->proxy->getScheme($request) ?? $scheme;
+                
+                if ($proxied != $scheme) {
+                    $request = $request->withUri($request->getUri()->withScheme($proxied));
+                }
+                
+                if (null !== ($host = $context->proxy->getHost($request))) {
+                    $request = $request->withUri($request->getUri()->withPort(null)->withHost($host));
+                }
+                
+                $addresses = \array_merge($context->proxy->getAddresses($request), $addresses);
+            }
+            
+            return [
+                $stream,
+                $request->withAddress(...$addresses)
+            ];
+        }, true);
     }
     
     protected function openServerStream(int $streamId): Stream
