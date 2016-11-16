@@ -283,17 +283,6 @@ class Driver implements HttpDriver, UpgradeHandler
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         
-        $sent = yield $stream->sendResponse($request, $response);
-        
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'size' => $sent
-            ]);
-        }
+        yield $stream->sendResponse($request, $response);
     }
 }

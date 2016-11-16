@@ -27,6 +27,23 @@ return function (HttpRequest $request) use ($websocket) {
     switch (trim($request->getRequestTarget(), '/')) {
         case 'websocket':
             return $websocket;
+        case 'events':
+            $source = new \KoolKode\Async\Http\Events\EventSource();
+            
+            new \KoolKode\Async\Coroutine(function () use ($source) {
+                while (true) {
+                    yield $source->send('Hello Client :)');
+                    
+                    yield new \KoolKode\Async\Pause(1);
+                }
+            });
+            
+            $response = new HttpResponse(Http::OK, [
+                'Content-Type' => 'text/event-stream'
+            ]);
+            $response = $response->withBody(new \KoolKode\Async\Http\Events\EventBody($source));
+            
+            return $response;
         case '':
             $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/index.html'));
             

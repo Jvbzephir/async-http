@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
@@ -31,6 +32,7 @@ use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
+use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * Implements the HTTP/1.x protocol on the server side.
@@ -419,14 +421,12 @@ class Driver implements HttpDriver
             
             $response = yield from $next($request);
             
-            if ($response->getStatusCode() === Http::SWITCHING_PROTOCOLS) {
-                $handler = $response->getAttribute(UpgradeResultHandler::class);
+            $handler = $response->getAttribute(UpgradeResultHandler::class);
+            
+            if ($handler instanceof UpgradeResultHandler) {
+                $upgraded = true;
                 
-                if ($handler instanceof UpgradeResultHandler) {
-                    $upgraded = true;
-                    
-                    return yield from $this->upgradeResultConnection($handler, $socket, $request, $response);
-                }
+                return yield from $this->upgradeResultConnection($handler, $socket, $request, $response);
             }
             
             return yield from $this->sendResponse($socket, $request, $response, $close);
@@ -485,7 +485,10 @@ class Driver implements HttpDriver
         }
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
-        $buffer .= "Connection: upgrade\r\n";
+        
+        if ($response->getStatusCode() === Http::SWITCHING_PROTOCOLS) {
+            $buffer .= "Connection: upgrade\r\n";
+        }
         
         foreach ($response->getHeaders() as $name => $header) {
             $name = Http::normalizeHeaderName($name);
@@ -560,6 +563,11 @@ class Driver implements HttpDriver
         $sendfile = false;
         
         $body = $response->getBody();
+        
+        if ($body instanceof DeferredBody) {
+            return yield from $this->sendDeferredResponse($socket, $request, $response, $close);
+        }
+        
         $size = yield $body->getSize();
         
         if ($head) {
@@ -646,6 +654,43 @@ class Driver implements HttpDriver
         return !$close;
     }
 
+    protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    {
+        if ($this->logger) {
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => '-'
+            ]);
+        }
+        
+        yield $socket->write($this->serializeHeaders($response, $close, null, true) . "\r\n");
+        yield $socket->flush();
+        
+        $body = $response->getBody();
+        $body->start($request, $this->logger);
+        
+        $bodyStream = yield $body->getReadableStream();
+        $e = null;
+        
+        try {
+            while (null !== ($chunk = yield $bodyStream->read())) {
+                yield $socket->write($chunk);
+            }
+        } catch (StreamClosedException $e) {
+            // Client disconnected from server.
+        } finally {
+            try {
+                $bodyStream->close();
+            } finally {
+                $body->close($e ? true : false);
+            }
+        }
+    }
+    
     /**
      * Normalize HTTP response object prior to being sent to the client.
      */
@@ -689,7 +734,7 @@ class Driver implements HttpDriver
     /**
      * Serialize HTTP response headers into a string.
      */
-    protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null): string
+    protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null, bool $deferred = false): string
     {
         $reason = \trim($response->getReasonPhrase());
         
@@ -707,16 +752,20 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        if ((float) $response->getProtocolVersion() > 1) {
-            if ($size === null) {
-                $buffer .= "Transfer-Encoding: chunked\r\n";
-            } else {
-                $buffer .= "Content-Length: $size\r\n";
-            }
-        } elseif ($size !== null) {
-            $buffer .= "Content-Length: $size\r\n";
-        } else {
+        if ($deferred) {
             $close = true;
+        } else {
+            if ((float) $response->getProtocolVersion() > 1) {
+                if ($size === null) {
+                    $buffer .= "Transfer-Encoding: chunked\r\n";
+                } else {
+                    $buffer .= "Content-Length: $size\r\n";
+                }
+            } elseif ($size !== null) {
+                $buffer .= "Content-Length: $size\r\n";
+            } else {
+                $close = true;
+            }
         }
         
         foreach ($response->getHeaders() as $name => $header) {

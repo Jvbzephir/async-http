@@ -16,6 +16,18 @@ window.onload = function() {
 	}
 
 	var body = document.getElementsByTagName('body')[0];
+
+	var source = new EventSource('events');
+	var i = 1;
+
+	source.addEventListener('message', function(event) {
+		console.info(event);
+
+		if (i++ > 2) {
+			source.close();
+		}
+	});
+
 	var ws = new WebSocket(body.getAttribute('data-websocket-uri'));
 
 	ws.onopen = function() {

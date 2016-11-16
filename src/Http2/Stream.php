@@ -17,6 +17,7 @@ use Interop\Async\Loop;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
@@ -303,11 +304,37 @@ class Stream
                     ]
                 ];
                 
-                $bodyStream = yield $response->getBody()->getReadableStream();
-                
                 yield from $this->sendHeaders($response, $headers);
                 
-                return yield from $this->sendBody($bodyStream);
+                $body = $response->getBody();
+                
+                if ($body instanceof DeferredBody) {
+                    if ($this->logger) {
+                        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                            'ip' => $request->getClientAddress(),
+                            'method' => $request->getMethod(),
+                            'target' => $request->getRequestTarget(),
+                            'protocol' => $request->getProtocolVersion(),
+                            'status' => $response->getStatusCode(),
+                            'size' => '-'
+                        ]);
+                    }
+                    
+                    return yield from $this->sendDeferredBody($request, $body);
+                }
+                
+                $sent = yield from $this->sendBody(yield $body->getReadableStream());
+                
+                if ($this->logger) {
+                    $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                        'ip' => $request->getClientAddress(),
+                        'method' => $request->getMethod(),
+                        'target' => $request->getRequestTarget(),
+                        'protocol' => $request->getProtocolVersion(),
+                        'status' => $response->getStatusCode(),
+                        'size' => $sent
+                    ]);
+                }
             } finally {
                 $this->conn->closeStream($this->id);
             }
@@ -406,7 +433,7 @@ class Stream
                     $done = true;
                     $frame = new Frame(Frame::DATA, $chunk, Frame::END_STREAM);
                 } else {
-                    $frame = new Frame(Frame::DATA, $chunk, Frame::NOFLAG);
+                    $frame = new Frame(Frame::DATA, $chunk);
                 }
                 
                 $written = yield $this->conn->writeStreamFrame($this->id, $frame);
@@ -423,5 +450,54 @@ class Stream
         }
         
         return $sent;
+    }
+    
+    protected function sendDeferredBody(HttpRequest $request, DeferredBody $body): \Generator
+    {
+        $body->start($request, $this->logger);
+        
+        $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
+        $stream = yield $body->getReadableStream();
+        $e = null;
+        
+        try {
+            while (null !== ($chunk = yield $stream->read($chunkSize))) {
+                $len = \strlen($chunk);
+                
+                while (true) {
+                    if ($this->outputWindow < $len) {
+                        try {
+                            yield $this->outputDefer = new Deferred();
+                        } finally {
+                            $this->outputDefer = null;
+                        }
+                        
+                        continue;
+                    }
+                    
+                    if ($this->conn->getOutputWindow() < $len) {
+                        yield $this->conn->awaitWindowUpdate();
+                        
+                        continue;
+                    }
+                    
+                    break;
+                }
+                
+                $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, $chunk));
+            }
+            
+            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
+        } catch (StreamClosedException $e) {
+            // Client disconnected from server.
+            
+            // TODO: Need to terminate when the client send RST_STREAM as well!
+        } finally {
+            try {
+                $stream->close();
+            } finally {
+                $body->close($e ? true : false);
+            }
+        }
     }
 }
