@@ -264,23 +264,40 @@ class Driver implements HttpDriver, UpgradeHandler
      */
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
-        $next = new NextMiddleware($context->getMiddlewares(), $action);
+        // TODO: Implement error handling!
+        
+        $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
+            $response = $action($request);
+            
+            if ($response instanceof \Generator) {
+                $response = yield from $response;
+            }
+            
+            if (!$response instanceof HttpResponse) {
+                $converted = null;
+                
+                foreach ($context->getResponders() as $responder) {
+                    $converted = ($responder->callback)($request, $response);
+                    
+                    if ($converted instanceof HttpResponse) {
+                        break;
+                    }
+                }
+                
+                if (!$converted instanceof HttpResponse) {
+                    $type = \is_object($response) ? \get_class($response) : \gettype($response);
+                    
+                    throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                }
+                
+                $response = $converted;
+            }
+            
+            return $response->withProtocolVersion($request->getProtocolVersion());
+        });
         
         $response = yield from $next($request);
         
-        if (!$response instanceof HttpResponse) {
-            if ($this->logger) {
-                $type = \is_object($response) ? \get_class($response) : \gettype($response);
-                
-                $this->logger->error('Expecting HTTP response, server action returned {type}', [
-                    'type' => $type
-                ]);
-            }
-            
-            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-        }
-        
-        $response = $response->withProtocolVersion($request->getProtocolVersion());
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         
         yield $stream->sendResponse($request, $response);

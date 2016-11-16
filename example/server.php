@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
@@ -38,6 +39,8 @@ Loop::execute(function () {
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
     $endpoint->addMiddleware(new ContentEncoder());
+    
+    $endpoint->addResponder(new EventResponder());
     
     $endpoint->listen(require __DIR__ . '/listener.php');
     

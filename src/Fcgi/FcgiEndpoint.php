@@ -21,6 +21,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
+use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\SocketServer;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -34,6 +35,7 @@ use Psr\Log\LoggerInterface;
 class FcgiEndpoint
 {
     use MiddlewareSupported;
+    use ResponderSupported;
     
     /**
      * @var SocketServerFactory
@@ -74,7 +76,7 @@ class FcgiEndpoint
             $port = $this->server->getPort();
             $peer = $this->server->getAddress() . ($port ? (':' . $port) : '');
             
-            $context = new HttpDriverContext($peer, $factory->getPeerName(), $factory->isEncrypted(), $this->middlewares);
+            $context = new HttpDriverContext($peer, $factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->responders);
             $pending = new \SplObjectStorage();
             
             try {

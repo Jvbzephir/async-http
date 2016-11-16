@@ -19,6 +19,7 @@ use KoolKode\Async\Http\Http1\Driver;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
+use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -28,6 +29,7 @@ use Psr\Log\LoggerInterface;
 class HttpEndpoint
 {
     use MiddlewareSupported;
+    use ResponderSupported;
     
     protected $factory;
     
@@ -111,7 +113,7 @@ class HttpEndpoint
             $port = $this->server->getPort();
             $peer = $this->server->getAddress() . ($port ? (':' . $port) : '');
             
-            $context = new HttpDriverContext($peer, $factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->proxySettings);
+            $context = new HttpDriverContext($peer, $factory->getPeerName(), $factory->isEncrypted(), $this->middlewares, $this->responders, $this->proxySettings);
             
             return new HttpServer($this, $this->server, new Coroutine($this->runServer($context, $action)));
         });

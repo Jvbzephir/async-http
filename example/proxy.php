@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\ReverseProxySettings;
@@ -31,6 +32,8 @@ Loop::execute(function () {
     $endpoint->addUpgradeResultHandler(new ConnectionHandler($logger));
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+    
+    $endpoint->addResponder(new EventResponder());
     
     $endpoint->listen(require __DIR__ . '/listener.php');
     

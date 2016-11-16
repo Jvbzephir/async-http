@@ -11,17 +11,17 @@
 
 declare(strict_types = 1);
 
-namespace KoolKode\Async\Http\Middleware;
+namespace KoolKode\Async\Http\Responder;
 
 /**
- * Holds a registered middleware.
+ * Holds a registered responder.
  * 
  * @author Martin Schröder
  */
-class RegisteredMiddleware
+class RegisteredResponder
 {
     /**
-     * The callback provided as middleware.
+     * The callback provided as responder.
      * 
      * @var callable
      */
@@ -35,9 +35,9 @@ class RegisteredMiddleware
     public $priority;
 
     /**
-     * Create a new middleware registration.
+     * Create a new responder registration.
      * 
-     * @param callable $callback The callback provided as middleware.
+     * @param callable $callback The callback provided as responder.
      * @param int $priority Registered priority of the middleware.
      */
     public function __construct(callable $callback, int $priority)

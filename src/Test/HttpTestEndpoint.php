@@ -18,6 +18,7 @@ use KoolKode\Async\Failure;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
+use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\SocketStream;
 
 /**
@@ -28,6 +29,7 @@ use KoolKode\Async\Socket\SocketStream;
 class HttpTestEndpoint
 {
     use MiddlewareSupported;
+    use ResponderSupported;
     
     protected $peerName;
     
@@ -67,7 +69,7 @@ class HttpTestEndpoint
     {
         $port = $this->encrypted ? 443 : 80;
         
-        $context = new HttpDriverContext('127.0.0.1:' . $port, $this->peerName, $this->encrypted, $this->middlewares);
+        $context = new HttpDriverContext('127.0.0.1:' . $port, $this->peerName, $this->encrypted, $this->middlewares, $this->responders);
         
         if ($this->encrypted) {
             foreach ($this->drivers as $driver) {

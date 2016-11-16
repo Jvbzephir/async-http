@@ -36,7 +36,7 @@ trait MiddlewareSupported
     public function addMiddleware(callable $middleware, int $priority = null)
     {
         if ($priority === null) {
-            if ($middleware instanceof HttpMiddleware) {
+            if ($middleware instanceof Middleware) {
                 $priority = $middleware->getDefaultPriority();
             } else {
                 $priority = 0;

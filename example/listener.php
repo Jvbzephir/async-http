@@ -11,13 +11,16 @@
 
 declare(strict_types = 1);
 
+use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Body\StringBody;
+use KoolKode\Async\Http\Events\EventSource;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Loop\LoopConfig;
+use KoolKode\Async\Pause;
 use KoolKode\Async\ReadContents;
-use KoolKode\Async\Http\HttpDriverContext;
 
 require_once __DIR__ . '/websocket.php';
 
@@ -28,22 +31,17 @@ return function (HttpRequest $request) use ($websocket) {
         case 'websocket':
             return $websocket;
         case 'events':
-            $source = new \KoolKode\Async\Http\Events\EventSource();
+            $source = new EventSource();
             
-            new \KoolKode\Async\Coroutine(function () use ($source) {
+            new Coroutine(function () use ($source) {
                 while (true) {
                     yield $source->send('Hello Client :)');
                     
-                    yield new \KoolKode\Async\Pause(1);
+                    yield new Pause(1);
                 }
             });
             
-            $response = new HttpResponse(Http::OK, [
-                'Content-Type' => 'text/event-stream'
-            ]);
-            $response = $response->withBody(new \KoolKode\Async\Http\Events\EventBody($source));
-            
-            return $response;
+            return $source;
         case '':
             $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/index.html'));
             

@@ -397,7 +397,7 @@ class Driver implements HttpDriver
                 $request = $request->withoutHeader($name);
             }
             
-            $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($action) {
+            $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
                 $response = $action($request);
                 
                 if ($response instanceof \Generator) {
@@ -408,15 +408,27 @@ class Driver implements HttpDriver
                     $response = $this->upgradeResult($request, $response);
                     
                     if (!$response instanceof HttpResponse) {
-                        $type = \is_object($response) ? \get_class($response) : \gettype($response);
+                        $converted = null;
                         
-                        throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                        foreach ($context->getResponders() as $responder) {
+                            $converted = ($responder->callback)($request, $response);
+                            
+                            if ($converted instanceof HttpResponse) {
+                                break;
+                            }
+                        }
+                        
+                        if (!$converted instanceof HttpResponse) {
+                            $type = \is_object($response) ? \get_class($response) : \gettype($response);
+                            
+                            throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
+                        }
+                        
+                        $response = $converted;
                     }
                 }
                 
-                $response = $response->withProtocolVersion($request->getProtocolVersion());
-                
-                return $response;
+                return $response->withProtocolVersion($request->getProtocolVersion());
             });
             
             $response = yield from $next($request);

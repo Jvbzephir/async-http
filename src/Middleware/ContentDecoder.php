@@ -27,7 +27,7 @@ use KoolKode\Async\Stream\ReadableInflateStream;
  * 
  * @author Martin Schröder
  */
-class ContentDecoder implements HttpMiddleware
+class ContentDecoder implements Middleware
 {
     /**
      * {@inheritdoc}

@@ -25,7 +25,7 @@ use KoolKode\Async\Http\Uri;
  * 
  * @author Martin Schröder
  */
-class FollowRedirects implements HttpMiddleware
+class FollowRedirects implements Middleware
 {
     /**
      * Max number of redirects that are allowed for a single request.

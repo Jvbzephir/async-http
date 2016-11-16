@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpEndpoint;
@@ -33,6 +34,8 @@ Loop::execute(function () {
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
     $endpoint->addMiddleware(new ContentEncoder());
+    
+    $endpoint->addResponder(new EventResponder());
     
     $endpoint->listen(require __DIR__ . '/listener.php');
     

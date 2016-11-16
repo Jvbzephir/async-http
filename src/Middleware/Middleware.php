@@ -23,7 +23,7 @@ use KoolKode\Async\Http\HttpResponse;
  * 
  * @author Martin Schröder
  */
-interface HttpMiddleware
+interface Middleware
 {
     /**
      * Get the default priority of this middleware.

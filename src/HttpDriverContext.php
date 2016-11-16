@@ -49,6 +49,13 @@ class HttpDriverContext
     protected $middlewares;
     
     /**
+     * Registered prioritized HTTP responders.
+     * 
+     * @var array
+     */
+    protected $responders;
+    
+    /**
      * HTTP proxy mode settings.
      * 
      * @var ReverseProxySettings
@@ -62,12 +69,13 @@ class HttpDriverContext
      * @param bool $encrypted
      * @param array $middlewares
      */
-    public function __construct(string $peer = '127.0.0.1', string $peerName = 'localhost', bool $encrypted = false, array $middlewares = [], ReverseProxySettings $proxy = null)
+    public function __construct(string $peer = '127.0.0.1', string $peerName = 'localhost', bool $encrypted = false, array $middlewares = [], array $responders = [], ReverseProxySettings $proxy = null)
     {
         $this->peer = $peer;
         $this->peerName = $peerName;
         $this->encrypted = $encrypted;
         $this->middlewares = $middlewares;
+        $this->responders = $responders;
         $this->proxy = $proxy ?? new ReverseProxySettings();
     }
 
@@ -89,6 +97,11 @@ class HttpDriverContext
     public function getMiddlewares(): array
     {
         return $this->middlewares;
+    }
+    
+    public function getResponders(): array
+    {
+        return $this->responders;
     }
 
     public function getProxySettings(): ReverseProxySettings
