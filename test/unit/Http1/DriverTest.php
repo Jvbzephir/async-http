@@ -179,7 +179,7 @@ class DriverTest extends AsyncTestCase
             });
         });
         
-        $this->assertCount(4, $logger);
+        $this->assertCount(3, $logger);
     }
     
     public function testHeadRequest()
