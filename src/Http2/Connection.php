@@ -204,7 +204,9 @@ class Connection
             $this->processor = new Coroutine($this->processIncomingFrames($frames), true);
             
             if ($this->logger) {
-                $this->logger->debug('Performed HTTP/2 client handshake');
+                $this->logger->debug('Performed HTTP/2 client handshake with {peer}', [
+                    'peer' => $this->socket->getRemoteAddress()
+                ]);
             }
         });
     }
@@ -251,7 +253,9 @@ class Connection
             $this->processor = new Coroutine($this->processIncomingFrames(), true);
             
             if ($this->logger) {
-                $this->logger->debug('Performed HTTP/2 server handshake');
+                $this->logger->debug('Performed HTTP/2 server handshake with {peer}', [
+                    'peer' => $this->socket->getRemoteAddress()
+                ]);
             }
         });
     }
@@ -321,12 +325,6 @@ class Connection
             $this->incoming->send($e ?? $val);
         });
         
-        if ($this->logger) {
-            $this->logger->debug('Accepted stream initiated by client: {id}', [
-                'id' => $streamId
-            ]);
-        }
-        
         return $this->streams[$streamId] = $stream;
     }
     
@@ -336,12 +334,6 @@ class Connection
             $this->streams[$streamId]->close();
             
             unset($this->streams[$streamId]);
-            
-            if ($this->logger) {
-                $this->logger->debug('Closed stream: {id}', [
-                    'id' => $streamId
-                ]);
-            }
         }
     }
     

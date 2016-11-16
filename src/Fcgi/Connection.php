@@ -227,7 +227,7 @@ class Connection
      * @param Record $record
      * @return int Number of bytes being written.
      */
-    public function sendRecord(Record $record)
+    public function sendRecord(Record $record): Awaitable
     {
         return $this->socket->write(\pack('CCnnxx', $record->version, $record->type, $record->requestId, \strlen($record->data)) . $record->data);
     }

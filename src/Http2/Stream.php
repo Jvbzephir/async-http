@@ -306,7 +306,8 @@ class Stream
                 $bodyStream = yield $response->getBody()->getReadableStream();
                 
                 yield from $this->sendHeaders($response, $headers);
-                yield from $this->sendBody($bodyStream);
+                
+                return yield from $this->sendBody($bodyStream);
             } finally {
                 $this->conn->closeStream($this->id);
             }
@@ -375,6 +376,7 @@ class Stream
         $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
         $channel = $body->channel($chunkSize);
         $done = false;
+        $sent = 0;
         
         try {
             while (null !== ($chunk = yield $channel->receive())) {
@@ -407,7 +409,10 @@ class Stream
                     $frame = new Frame(Frame::DATA, $chunk, Frame::NOFLAG);
                 }
                 
-                $this->outputWindow -= yield $this->conn->writeStreamFrame($this->id, $frame);
+                $written = yield $this->conn->writeStreamFrame($this->id, $frame);
+                
+                $sent += $written;
+                $this->outputWindow -= $written;
             }
             
             if (!$done) {
@@ -416,5 +421,7 @@ class Stream
         } finally {
             $body->close();
         }
+        
+        return $sent;
     }
 }

@@ -381,14 +381,6 @@ class Driver implements HttpDriver
             'Transfer-Encoding'
         ];
         
-        if ($this->logger) {
-            $this->logger->info('{method} {target} HTTP/{protocol}', [
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion()
-            ]);
-        }
-        
         // No need for TCP_NODELAY as the connection will be closed anyways flushing the last chunk without delay.
         if ($close) {
             $socket->setTcpNoDelay(false);
@@ -482,6 +474,7 @@ class Driver implements HttpDriver
     protected function upgradeResultConnection(UpgradeResultHandler $handler, SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator
     {
         yield $request->getBody()->discard();
+        yield $response->getBody()->discard();
         
         $response = $this->normalizeResponse($request, $response);
         
@@ -489,14 +482,6 @@ class Driver implements HttpDriver
         
         if ($reason === '') {
             $reason = \trim(Http::getReason($response->getStatusCode()));
-        }
-        
-        if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} {status} {reason}', [
-                'protocol' => $response->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'reason' => $reason
-            ]);
         }
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
@@ -512,6 +497,17 @@ class Driver implements HttpDriver
         
         yield $socket->write($buffer . "\r\n");
         yield $socket->flush();
+        
+        if ($this->logger) {
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => '-'
+            ]);
+        }
         
         return yield from $handler->upgradeConnection($socket, $request, $response);
     }
@@ -602,27 +598,29 @@ class Driver implements HttpDriver
         yield $socket->write($this->serializeHeaders($response, $close, $size) . "\r\n");
         yield $socket->flush();
         
+        $sent = 0;
+        
         try {
             if (!$nobody && !$head) {
                 if ($sendfile) {
                     if ($size) {
-                        yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                        $sent += yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
                     }
                 } elseif ($http11 && $size === null) {
-                    yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+                    $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
                     
                     if ($len === $clen) {
-                        yield new CopyBytes($bodyStream, $socket, false, null, 4089, function (string $chunk) {
+                        $sent += yield new CopyBytes($bodyStream, $socket, false, null, 4089, function (string $chunk) {
                             return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
                         });
                     }
                     
-                    yield $socket->write("0\r\n\r\n");
+                    $sent += yield $socket->write("0\r\n\r\n");
                 } elseif ($chunk !== null) {
-                    yield $socket->write($chunk);
+                    $sent += yield $socket->write($chunk);
                     
                     if ($len === $clen) {
-                        yield new CopyBytes($bodyStream, $socket, false, ($size === null) ? null : ($size - $len));
+                        $sent += yield new CopyBytes($bodyStream, $socket, false, ($size === null) ? null : ($size - $len));
                     }
                 }
                 
@@ -632,6 +630,17 @@ class Driver implements HttpDriver
             if (isset($bodyStream)) {
                 $bodyStream->close();
             }
+        }
+        
+        if ($this->logger) {
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => $sent ?: '-'
+            ]);
         }
         
         return !$close;
@@ -686,14 +695,6 @@ class Driver implements HttpDriver
         
         if ($reason === '') {
             $reason = \trim(Http::getReason($response->getStatusCode()));
-        }
-        
-        if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} {status} {reason}', [
-                'protocol' => $response->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'reason' => $reason
-            ]);
         }
         
         if (!$response->hasHeader('Connection')) {

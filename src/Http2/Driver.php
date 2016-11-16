@@ -136,10 +136,13 @@ class Driver implements HttpDriver, UpgradeHandler
         yield $request->getBody()->discard();
         
         if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
                 'protocol' => $request->getProtocolVersion(),
                 'status' => Http::SWITCHING_PROTOCOLS,
-                'reason' => \trim(Http::getReason(Http::SWITCHING_PROTOCOLS))
+                'size' => '-'
             ]);
         }
         
@@ -196,10 +199,13 @@ class Driver implements HttpDriver, UpgradeHandler
         }
         
         if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} {status} {reason}', [
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
                 'protocol' => $request->getProtocolVersion(),
                 'status' => Http::SWITCHING_PROTOCOLS,
-                'reason' => \trim(Http::getReason(Http::SWITCHING_PROTOCOLS))
+                'size' => '-'
             ]);
         }
         
@@ -258,14 +264,6 @@ class Driver implements HttpDriver, UpgradeHandler
      */
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
-        if ($this->logger) {
-            $this->logger->info('{method} {target} HTTP/{protocol}', [
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion()
-            ]);
-        }
-        
         $next = new NextMiddleware($context->getMiddlewares(), $action);
         
         $response = yield from $next($request);
@@ -285,20 +283,17 @@ class Driver implements HttpDriver, UpgradeHandler
         $response = $response->withProtocolVersion($request->getProtocolVersion());
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         
+        $sent = yield $stream->sendResponse($request, $response);
+        
         if ($this->logger) {
-            $reason = \trim($response->getReasonPhrase());
-            
-            if ($reason === '') {
-                $reason = \trim(Http::getReason($response->getStatusCode()));
-            }
-            
-            $this->logger->info('HTTP/{protocol} {status} {reason}', [
-                'protocol' => $response->getProtocolVersion(),
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
                 'status' => $response->getStatusCode(),
-                'reason' => $reason
+                'size' => $sent
             ]);
         }
-        
-        yield $stream->sendResponse($request, $response);
     }
 }

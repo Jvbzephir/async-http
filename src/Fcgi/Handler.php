@@ -133,13 +133,6 @@ class Handler
             
             $request = $this->buildRequest();
             
-            if ($this->logger) {
-                $this->logger->info('{method} {target} FCGI/1', [
-                    'method' => $request->getMethod(),
-                    'target' => $request->getRequestTarget()
-                ]);
-            }
-            
             $incoming->send([
                 $this,
                 $request
@@ -171,15 +164,27 @@ class Handler
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $buffer . "\r\n"));
         
         $bodyStream = yield $body->getReadableStream();
+        $sent = 0;
         
         try {
             $channel = $bodyStream->channel(4096, $size);
             
             while (null !== ($chunk = yield $channel->receive())) {
-                yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+                $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
             }
         } finally {
             $bodyStream->close();
+        }
+        
+        if ($this->logger) {
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => $sent ?: '-'
+            ]);
         }
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, ''));
@@ -236,13 +241,6 @@ class Handler
         
         if ('' === $reason) {
             $reason = Http::getReason($response->getStatusCode());
-        }
-        
-        if ($this->logger) {
-            $this->logger->info('FCGI/1 {status} {reason}', [
-                'status' => $response->getStatusCode(),
-                'reason' => $reason
-            ]);
         }
         
         $buffer = \sprintf("Status: %03u%s\r\n", $response->getStatusCode(), \rtrim(' ' . $reason));
