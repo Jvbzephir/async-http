@@ -521,8 +521,6 @@ class Stream
             yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
         } catch (StreamClosedException $e) {
             // Client disconnected from server.
-            
-            // TODO: Need to terminate when the client send RST_STREAM as well!
         } finally {
             try {
                 $stream->close();

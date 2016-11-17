@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\AwaitRead;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Body\DeferredBody;
@@ -29,10 +30,10 @@ use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
+use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
-use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * Implements the HTTP/1.x protocol on the server side.
@@ -577,7 +578,7 @@ class Driver implements HttpDriver
         $body = $response->getBody();
         
         if ($body instanceof DeferredBody) {
-            return yield from $this->sendDeferredResponse($socket, $request, $response, $close);
+            return yield from $this->sendDeferredResponse($socket, $request, $response);
         }
         
         $size = yield $body->getSize();
@@ -666,7 +667,7 @@ class Driver implements HttpDriver
         return !$close;
     }
 
-    protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response, bool $close): \Generator
+    protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator
     {
         if ($this->logger) {
             $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
@@ -679,28 +680,49 @@ class Driver implements HttpDriver
             ]);
         }
         
+        $close = true;
+        
         yield $socket->write($this->serializeHeaders($response, $close, null, true) . "\r\n");
         yield $socket->flush();
         
-        $body = $response->getBody();
-        $body->start($request, $this->logger);
+        // Ensure socket will only be reported as readable if the client disconnects.
+        $socket->closeReader();
         
-        $bodyStream = yield $body->getReadableStream();
-        $e = null;
-        
-        try {
-            while (null !== ($chunk = yield $bodyStream->read())) {
-                yield $socket->write($chunk);
-            }
-        } catch (StreamClosedException $e) {
-            // Client disconnected from server.
-        } finally {
+        $task = new Coroutine(function () use ($socket, $request, $response) {
+            $body = $response->getBody();
+            $body->start($request, $this->logger);
+            
+            $bodyStream = yield $body->getReadableStream();
+            $e = null;
+            
             try {
-                $bodyStream->close();
+                while (null !== ($chunk = yield $bodyStream->read())) {
+                    yield $socket->write($chunk);
+                }
+            } catch (StreamClosedException $e) {
+                // Client disconnected from server.
             } finally {
-                $body->close($e ? true : false);
+                try {
+                    $bodyStream->close();
+                } finally {
+                    $body->close($e ? true : false);
+                }
             }
-        }
+            
+            return false;
+        }, true);
+        
+        new Coroutine(function () use ($socket, $task) {
+            $socket = $socket->getSocket();
+            
+            while (\is_resource($socket) && !\feof($socket)) {
+                yield new AwaitRead($socket);
+            }
+            
+            $task->cancel(new StreamClosedException('Client disconnected'));
+        });
+        
+        return yield $task;
     }
     
     /**
