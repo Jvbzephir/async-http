@@ -18,6 +18,7 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Socket\SocketStream;
+use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
 
@@ -236,9 +237,17 @@ class Connection
     /**
      * Close the given request handler.
      */
-    public function closeHandler(int $id)
+    public function closeHandler(int $id, int $reason = self::FCGI_REQUEST_COMPLETE): Awaitable
     {
-        unset($this->handlers[$id]);
+        if (!isset($this->handlers[$id])) {
+            return new Success(false);
+        }
+        
+        try {
+            return $this->handlers[$id]->close($reason);
+        } finally {
+            unset($this->handlers[$id]);
+        }
     }
 
     /**
@@ -280,6 +289,9 @@ class Connection
                         
                         break;
                     case Record::FCGI_ABORT_REQUEST:
+                        if (!yield $this->closeHandler($id)) {
+                            return;
+                        }
                         break;
                     case Record::FCGI_PARAMS:
                         $this->handlers[$id]->handleParams($record);

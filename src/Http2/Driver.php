@@ -19,7 +19,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
@@ -273,27 +272,7 @@ class Driver implements HttpDriver, UpgradeHandler
                 $response = yield from $response;
             }
             
-            if (!$response instanceof HttpResponse) {
-                $converted = null;
-                
-                foreach ($context->getResponders() as $responder) {
-                    $converted = ($responder->callback)($request, $response);
-                    
-                    if ($converted instanceof HttpResponse) {
-                        break;
-                    }
-                }
-                
-                if (!$converted instanceof HttpResponse) {
-                    $type = \is_object($response) ? \get_class($response) : \gettype($response);
-                    
-                    throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
-                }
-                
-                $response = $converted;
-            }
-            
-            return $response->withProtocolVersion($request->getProtocolVersion());
+            return $context->respond($request, $response);
         });
         
         $response = yield from $next($request);

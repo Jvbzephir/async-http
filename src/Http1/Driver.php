@@ -407,29 +407,9 @@ class Driver implements HttpDriver
                 
                 if (!$response instanceof HttpResponse) {
                     $response = $this->upgradeResult($request, $response);
-                    
-                    if (!$response instanceof HttpResponse) {
-                        $converted = null;
-                        
-                        foreach ($context->getResponders() as $responder) {
-                            $converted = ($responder->callback)($request, $response);
-                            
-                            if ($converted instanceof HttpResponse) {
-                                break;
-                            }
-                        }
-                        
-                        if (!$converted instanceof HttpResponse) {
-                            $type = \is_object($response) ? \get_class($response) : \gettype($response);
-                            
-                            throw new \RuntimeException(\sprintf('Expecting HTTP response, server action returned %s', $type));
-                        }
-                        
-                        $response = $converted;
-                    }
                 }
                 
-                return $response->withProtocolVersion($request->getProtocolVersion());
+                return $context->respond($request, $response);
             });
             
             $response = yield from $next($request);

@@ -103,6 +103,25 @@ class HttpDriverContext
     {
         return $this->responders;
     }
+    
+    public function respond(HttpRequest $request, $result): HttpResponse
+    {
+        if ($result instanceof HttpResponse) {
+            return $result->withProtocolVersion($request->getProtocolVersion());
+        }
+        
+        foreach ($this->responders as $responder) {
+            $response = ($responder->callback)($request, $result);
+            
+            if ($response instanceof HttpResponse) {
+                return $response->withProtocolVersion($request->getProtocolVersion());
+            }
+        }
+        
+        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+        
+        return $response->withProtocolVersion($request->getProtocolVersion());
+    }
 
     public function getProxySettings(): ReverseProxySettings
     {

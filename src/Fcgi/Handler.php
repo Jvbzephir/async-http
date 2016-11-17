@@ -13,6 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Fcgi;
 
+use KoolKode\Async\Awaitable;
+use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
@@ -20,6 +23,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableChannelStream;
+use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerInterface;
 
@@ -86,6 +90,8 @@ class Handler
      */
     protected $body;
     
+    protected $pending;
+    
     /**
      * Create a new FCGI request handler.
      * 
@@ -104,8 +110,33 @@ class Handler
         $this->keepAlive = $keepAlive;
         
         $this->body = new Channel(4);
+        $this->pending = new \SplObjectStorage();
     }
 
+    public function close(int $reason): Awaitable
+    {
+        return new Coroutine(function () use ($reason) {
+            try {
+                foreach ($this->pending as $task) {
+                    $task->cancel(new StreamClosedException());
+                }
+            } finally {
+                $this->pending = new \SplObjectStorage();
+            }
+            
+            $end = \pack('Ncx3', 0, $reason);
+            
+            yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $this->id, $end));
+            
+            return $this->keepAlive;
+        });
+    }
+
+    public function isKeepAlive(): bool
+    {
+        return $this->keepAlive;
+    }
+    
     /**
      * Handle an FCGI params record.
      * 
@@ -163,40 +194,80 @@ class Handler
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $buffer . "\r\n"));
         
-        $bodyStream = yield $body->getReadableStream();
-        $sent = 0;
-        
-        try {
-            $channel = $bodyStream->channel(4096, $size);
-            
-            while (null !== ($chunk = yield $channel->receive())) {
-                $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+        if ($body instanceof DeferredBody) {
+            if ($this->logger) {
+                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                    'ip' => $request->getClientAddress(),
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'protocol' => $request->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'size' => '-'
+                ]);
             }
-        } finally {
-            $bodyStream->close();
-        }
-        
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'size' => $sent ?: '-'
-            ]);
+            
+            $task = new Coroutine($this->sendDeferredResponse($request, $body), true);
+            
+            $this->pending->attach($task);
+            
+            $task->when(function () use ($task) {
+                if ($this->pending->contains($task)) {
+                    $this->pending->detach($task);
+                }
+            });
+            
+            yield $task;
+        } else {
+            $bodyStream = yield $body->getReadableStream();
+            $sent = 0;
+            
+            try {
+                $channel = $bodyStream->channel(4096, $size);
+                
+                while (null !== ($chunk = yield $channel->receive())) {
+                    $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+                }
+            } finally {
+                $bodyStream->close();
+            }
+            
+            if ($this->logger) {
+                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                    'ip' => $request->getClientAddress(),
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'protocol' => $request->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'size' => $sent ?: '-'
+                ]);
+            }
         }
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, ''));
-        
-        $end = \pack('Ncx3', 0, Connection::FCGI_REQUEST_COMPLETE);
-        
-        yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $this->id, $end));
+        yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDERR, $this->id, ''));
         
         $this->conn->closeHandler($this->id);
+    }
+    
+    protected function sendDeferredResponse(HttpRequest $request, DeferredBody $body): \Generator
+    {
+        $body->start($request, $this->logger);
         
-        if (!$this->keepAlive) {
-            yield $this->conn->shutdown();
+        $stream = yield $body->getReadableStream();
+        $e = null;
+        
+        try {
+            while (null !== ($chunk = yield $stream->read())) {
+                yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+            }
+        } catch (StreamClosedException $e) {
+            // Client disconnected from server.
+        } finally {
+            try {
+                $stream->close();
+            } finally {
+                $body->close($e ? true : false);
+            }
         }
     }
 
@@ -319,7 +390,7 @@ class Handler
         
         $uri = Uri::parse($uri . '/' . \ltrim($this->params['REQUEST_URI'] ?? '', '/'));
         
-        $request = new HttpRequest($uri, $this->params['REQUEST_METHOD'] ?? Http::GET);
+        $request = new HttpRequest($uri, $this->params['REQUEST_METHOD'] ?? Http::GET, [], '1.1');
         
         foreach ($this->params as $k => $v) {
             if ('HTTP_' === \substr($k, 0, 5)) {

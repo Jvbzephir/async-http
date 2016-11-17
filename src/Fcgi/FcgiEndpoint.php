@@ -18,7 +18,6 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Responder\ResponderSupported;
@@ -86,7 +85,7 @@ class FcgiEndpoint
                     $pending->attach($conn);
                     
                     while (null !== ($next = yield $conn->nextRequest())) {
-                        new Coroutine($this->processRequest($conn, $action, ...$next));
+                        new Coroutine($this->processRequest($conn, $context, $action, ...$next));
                     }
                 });
             } finally {
@@ -98,21 +97,17 @@ class FcgiEndpoint
             }
         });
     }
-    
-    protected function processRequest(Connection $conn, callable $action, Handler $handler, HttpRequest $request): \Generator
+
+    protected function processRequest(Connection $conn, HttpDriverContext $context, callable $action, Handler $handler, HttpRequest $request): \Generator
     {
-        $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) use ($action) {
+        $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) use ($context, $action) {
             $result = $action($request);
             
             if ($result instanceof \Generator) {
                 $result = yield from $result;
             }
             
-            if (!$result instanceof HttpResponse) {
-                return new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-            }
-            
-            return $result;
+            return $context->respond($request, $result);
         });
         
         yield from $handler->sendResponse($request, yield from $next($request));
