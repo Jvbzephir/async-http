@@ -56,6 +56,8 @@ class Stream
 
     protected $outputDefer;
     
+    protected $pending;
+    
     protected $logger;
 
     public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE, LoggerInterface $logger = null)
@@ -67,6 +69,7 @@ class Stream
         
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();
+        $this->pending = new \SplObjectStorage();
     }
     
     public function getId(): int
@@ -93,6 +96,14 @@ class Stream
         
         if ($this->channel !== null) {
             $this->channel->close($e);
+        }
+        
+        try {
+            foreach ($this->pending as $task) {
+                $task->cancel($e);
+            }
+        } finally {
+            $this->pending = new \SplObjectStorage();
         }
     }
     
@@ -256,7 +267,7 @@ class Stream
 
     public function sendRequest(HttpRequest $request): Awaitable
     {
-        return new Coroutine(function () use ($request) {
+        $task = new Coroutine(function () use ($request) {
             $uri = $request->getUri();
             $target = $request->getRequestTarget();
             
@@ -292,11 +303,21 @@ class Stream
             
             return (yield $this->defer)[1];
         });
+        
+        $this->pending->attach($task);
+        
+        $task->when(function () use ($task) {
+            if ($this->pending->contains($task)) {
+                $this->pending->detach($task);
+            }
+        });
+        
+        return $task;
     }
 
     public function sendResponse(HttpRequest $request, HttpResponse $response): Awaitable
     {
-        return new Coroutine(function () use ($request, $response) {
+        $task = new Coroutine(function () use ($request, $response) {
             try {
                 $headers = [
                     ':status' => [
@@ -339,6 +360,16 @@ class Stream
                 $this->conn->closeStream($this->id);
             }
         });
+        
+        $this->pending->attach($task);
+        
+        $task->when(function () use ($task) {
+            if ($this->pending->contains($task)) {
+                $this->pending->detach($task);
+            }
+        });
+        
+        return $task;
     }
 
     protected function sendHeaders(HttpMessage $message, array $headers, array $remove = []): \Generator
