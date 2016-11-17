@@ -124,7 +124,7 @@ class Handler
                 $this->pending = new \SplObjectStorage();
             }
             
-            $end = \pack('Ncx3', 0, $reason);
+            $end = \pack('Ncx3', ($reason === Connection::FCGI_REQUEST_COMPLETE) ? 0 : 1, $reason);
             
             yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_END_REQUEST, $this->id, $end));
             

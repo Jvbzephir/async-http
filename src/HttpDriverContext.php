@@ -79,31 +79,53 @@ class HttpDriverContext
         $this->proxy = $proxy ?? new ReverseProxySettings();
     }
 
+    /**
+     * Get the local address that the server is bound to (including port).
+     * 
+     * @return string
+     */
     public function getPeer(): string
     {
         return $this->peer;
     }
-
+    
+    /**
+     * Get peer name of the server.
+     * 
+     * @return string
+     */
     public function getPeerName(): string
     {
         return $this->peerName;
     }
 
+    /**
+     * Check if the server is using SSL / TLS encryption.
+     * 
+     * @return bool
+     */
     public function isEncrypted(): bool
     {
         return $this->encrypted;
     }
 
+    /**
+     * Get all registered HTTP server middlewares.
+     * 
+     * @return array
+     */
     public function getMiddlewares(): array
     {
         return $this->middlewares;
     }
     
-    public function getResponders(): array
-    {
-        return $this->responders;
-    }
-    
+    /**
+     * Convert the given outcome of an action into an HTTP response.
+     * 
+     * @param HttpRequest $request
+     * @param mixed $result
+     * @return HttpResponse
+     */
     public function respond(HttpRequest $request, $result): HttpResponse
     {
         if ($result instanceof HttpResponse) {
@@ -118,11 +140,16 @@ class HttpDriverContext
             }
         }
         
-        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+        $reason = \sprintf('Expecting HttpResponse, given %s', \is_object($result) ? \get_class($result) : \gettype($result));
         
-        return $response->withProtocolVersion($request->getProtocolVersion());
+        throw new StatusException(Http::INTERNAL_SERVER_ERROR, $reason);
     }
 
+    /**
+     * Get HTTP reverse proxy settings.
+     * 
+     * @return ReverseProxySettings
+     */
     public function getProxySettings(): ReverseProxySettings
     {
         return $this->proxy;
