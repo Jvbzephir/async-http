@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 use Interop\Async\Loop;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
+use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
@@ -38,8 +39,10 @@ Loop::execute(function () {
     
     echo "FCGI server listening on port 9090\n";
     
-    $http = new HttpEndpoint('0.0.0.0:8080', 'localhost', $logger);
-    $http->addUpgradeResultHandler(new ConnectionHandler($logger));
+    $driver = new Http1Driver(null, $logger);
+    $driver->addUpgradeResultHandler(new ConnectionHandler($logger));
+    
+    $http = new HttpEndpoint('0.0.0.0:8080', 'localhost', $driver);
     
     $websocket = new ExampleEndpoint();
     

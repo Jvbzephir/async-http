@@ -15,16 +15,13 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Http\Http1\Driver;
-use KoolKode\Async\Http\Http1\UpgradeHandler;
-use KoolKode\Async\Http\Http1\UpgradeResultHandler;
+use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
-use Psr\Log\LoggerInterface;
 
 class HttpEndpoint
 {
@@ -37,20 +34,24 @@ class HttpEndpoint
     
     protected $drivers = [];
     
-    protected $http1;
-    
-    protected $logger;
-    
     protected $proxySettings;
     
-    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', LoggerInterface $logger = null)
+    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', HttpDriver ...$drivers)
     {
-        $this->logger = $logger;
-        
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
         
-        $this->http1 = new Driver(null, $logger);
+        if (empty($drivers)) {
+            $this->drivers[] = new Http1Driver();
+        } else {
+            foreach ($drivers as $driver) {
+                $this->drivers[] = $driver;
+            }
+            
+            \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
+                return $b->getPriority() <=> $a->getPriority();
+            });
+        }
     }
     
     public function setCertificate(string $file, bool $allowSelfSigned = false, string $password = null)
@@ -61,29 +62,6 @@ class HttpEndpoint
     public function getSocketServerFactory(): SocketServerFactory
     {
         return $this->factory;
-    }
-    
-    public function addDriver(HttpDriver $driver)
-    {
-        $this->drivers[] = $driver;
-        
-        if ($driver instanceof UpgradeHandler) {
-            $this->http1->addUpgradeHandler($driver);
-        }
-        
-        \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
-            return $b->getPriority() <=> $a->getPriority();
-        });
-    }
-
-    public function addUpgradeHandler(UpgradeHandler $handler)
-    {
-        $this->http1->addUpgradeHandler($handler);
-    }
-    
-    public function addUpgradeResultHandler(UpgradeResultHandler $handler)
-    {
-        $this->http1->addUpgradeResultHandler($handler);
     }
 
     public function setProxySettings(ReverseProxySettings $proxy)
@@ -101,11 +79,12 @@ class HttpEndpoint
                 $protocols = [];
                 
                 foreach ($this->drivers as $driver) {
-                    $protocols = \array_merge($protocols, $driver->getProtocols());
+                    foreach ($driver->getProtocols() as $protocol) {
+                        $protocols[$protocol] = true;
+                    }
                 }
                 
-                $protocols = \array_unique(\array_merge($protocols, $this->http1->getProtocols()));
-                $factory->setOption('ssl', 'alpn_protocols', implode(',', $protocols));
+                $factory->setOption('ssl', 'alpn_protocols', implode(',', \array_keys($protocols)));
             }
             
             $this->server = yield $factory->createSocketServer();
@@ -142,7 +121,17 @@ class HttpEndpoint
                 }
                 
                 if ($request === null) {
-                    $request = $this->http1->handleConnection($context, $socket, $action);
+                    foreach ($this->drivers as $driver) {
+                        if ($driver instanceof Http1Driver) {
+                            $request = $driver->handleConnection($context, $socket, $action);
+                            
+                            break;
+                        }
+                    }
+                }
+                
+                if ($request === null) {
+                    throw new \RuntimeException(\sprintf('No suitable HTTP driver registered to handle protocol: "%s"', $alpn));
                 }
                 
                 $pending->attach($request);

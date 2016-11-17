@@ -360,7 +360,6 @@ class DriverTest extends AsyncTestCase
             $this->assertTrue($response instanceof HttpResponse);
             $this->assertEquals('1.1', $response->getProtocolVersion());
             $this->assertEquals(Http::INTERNAL_SERVER_ERROR, $response->getStatusCode());
-            $this->assertEquals('Expecting HTTP response, server action returned stdClass', yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             $driver->setDebug(true);

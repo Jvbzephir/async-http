@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\PublishFiles;
@@ -26,13 +27,13 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
     
-    $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $logger);
+    $driver = new Http1Driver(null, $logger);
+    $driver->addUpgradeResultHandler(new ConnectionHandler($logger));
+    
+    $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $driver);
     $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1', '10.0.2.2'));
     
-    $endpoint->addUpgradeResultHandler(new ConnectionHandler($logger));
-    
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
-    
     $endpoint->addResponder(new EventResponder());
     
     $endpoint->listen(require __DIR__ . '/listener.php');

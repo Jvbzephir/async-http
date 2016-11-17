@@ -12,9 +12,10 @@
 declare(strict_types = 1);
 
 use Interop\Async\Loop;
+use KoolKode\Async\Http\Http1\Driver as Http1Driver;
+use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
-use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
@@ -26,16 +27,18 @@ require_once __DIR__ . '/../vendor/autoload.php';
 Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
-    
-    $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $logger);
-    $endpoint->setCertificate(__DIR__ . '/localhost.pem');
-    
-    $endpoint->addDriver(new Http2Driver(null, $logger));
-    
+        
     $ws = new ConnectionHandler($logger);
     $ws->setDeflateSupported(true);
     
-    $endpoint->addUpgradeResultHandler($ws);
+    $http2 = new Http2Driver(null, $logger);
+    
+    $http1 = new Http1Driver(null, $logger);
+    $http1->addUpgradeHandler($http2);
+    $http1->addUpgradeResultHandler($ws);
+    
+    $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $http1, $http2);
+    $endpoint->setCertificate(__DIR__ . '/localhost.pem');
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
     $endpoint->addMiddleware(new ContentEncoder());
