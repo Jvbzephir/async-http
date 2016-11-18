@@ -22,11 +22,23 @@ window.onload = function() {
 		var i = 1;
 
 		source.addEventListener('message', function(event) {
-			console.info(event);
+			var el = document.createElement('pre');
+			el.appendChild(document.createTextNode(i + ': ' + event.data));
+			document.getElementById('sse-log').appendChild(el);
 
 			if (i++ > 2) {
 				source.close();
+
+				el = document.createElement('pre');
+				el.appendChild(document.createTextNode('Source closed by client'));
+				document.getElementById('sse-log').appendChild(el);
 			}
+		});
+
+		source.addEventListener('error', function(e) {
+			var el = document.createElement('pre');
+			el.appendChild(document.createTextNode('Source closed by server'));
+			document.getElementById('sse-log').appendChild(el);
 		});
 	}
 

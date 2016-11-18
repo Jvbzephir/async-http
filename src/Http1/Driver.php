@@ -651,6 +651,10 @@ class Driver implements HttpDriver
             ]);
         }
         
+        if (!$nobody) {
+            $close = true;
+        }
+        
         yield $socket->write($this->serializeHeaders($response, $close, null, $nobody, true) . "\r\n");
         yield $socket->flush();
         
@@ -660,10 +664,9 @@ class Driver implements HttpDriver
             return !$close;
         }
         
-        // Ensure socket will only be reported as readable if the client disconnects.
-        $socket->closeReader();
+        $watcher = null;
         
-        $task = new Coroutine(function () use ($socket, $request, $response) {
+        $task = new Coroutine(function () use (& $watcher, $socket, $request, $response) {
             $body = $response->getBody();
             $body->start($request, $this->logger);
             
@@ -682,12 +685,14 @@ class Driver implements HttpDriver
                 } finally {
                     $body->close($e ? true : false);
                 }
+                
+                $watcher->cancel(new \RuntimeException());
             }
             
             return false;
         }, true);
         
-        new Coroutine(function () use ($socket, $task) {
+        $watcher = new Coroutine(function () use ($socket, $task) {
             $socket = $socket->getSocket();
             
             while (\is_resource($socket) && !\feof($socket)) {

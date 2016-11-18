@@ -17,19 +17,47 @@ use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\HttpRequest;
 use Psr\Log\LoggerInterface;
 
+/**
+ * HTTP body implementation that incrementally generates contents as events are being sent.
+ * 
+ * @author Martin Schröder
+ */
 class EventBody extends DeferredBody
 {
+    /**
+     * Event source being used to generate events.
+     * 
+     * @var EventSource
+     */
     protected $source;
     
+    /**
+     * Optional PSR logger instance provided by an HTTP driver on start.
+     * 
+     * @var LoggerInterface
+     */
     protected $logger;
 
+    /**
+     * Address of the HTTP client.
+     * 
+     * @var string
+     */
     protected $address;
     
+    /**
+     * Create an HTTP body that can stream events from the given source.
+     * 
+     * @param EventSource $source
+     */
     public function __construct(EventSource $source)
     {
         $this->source = $source;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function start(HttpRequest $request, LoggerInterface $logger = null)
     {
         $this->logger = $logger;
@@ -44,17 +72,29 @@ class EventBody extends DeferredBody
         }
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close(bool $disconnected)
     {
-        $this->source->close();
-        
-        if ($disconnected && $this->logger) {
-            $this->logger->debug('SSE client {address} disconnected', [
-                'address' => $this->address
-            ]);
+        if ($this->logger) {
+            if ($disconnected) {
+                $this->logger->debug('SSE client {address} disconnected', [
+                    'address' => $this->address
+                ]);
+            } else {
+                $this->logger->debug('SSE source closed for client {address}', [
+                    'address' => $this->address
+                ]);
+            }
         }
+        
+        $this->source->close();
     }
 
+    /**
+     * Each SSE event is streamed as a single chunk of data.
+     */
     protected function nextChunk(): \Generator
     {
         return yield $this->source->getChannel()->receive();

@@ -18,24 +18,33 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Responder\Responder;
 
+/**
+ * HTTP responder that converts an SSE event source into an HTTP response.
+ * 
+ * @author Martin Schröder
+ */
 class EventResponder implements Responder
 {
+    /**
+     * {@inheritdoc}
+     */
     public function getDefaultPriority(): int
     {
         return 0;
     }
 
+    /**
+     * Convert SSE event source into an HTTP response.
+     */
     public function __invoke(HttpRequest $request, $source)
     {
-        if (!$source instanceof EventSource) {
-            return;
+        if ($source instanceof EventSource) {
+            $response = new HttpResponse(Http::OK, [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache'
+            ]);
+            
+            return $response->withBody(new EventBody($source));
         }
-        
-        $response = new HttpResponse(Http::OK, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache'
-        ]);
-        
-        return $response->withBody(new EventBody($source));
     }
 }

@@ -38,6 +38,10 @@ return function (HttpRequest $request) use ($websocket) {
                     yield $source->send('Hello Client :)');
                     
                     yield new Pause(1);
+                    
+                    if (mt_rand(0, 2) === 0) {
+                        return $source->close();
+                    }
                 }
             });
             
