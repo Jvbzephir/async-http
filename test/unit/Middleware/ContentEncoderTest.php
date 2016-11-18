@@ -71,6 +71,7 @@ class ContentEncoderTest extends AsyncTestCase
         
         if ($name !== '' && $name !== 'foo') {
             $this->assertTrue($response->hasHeader('Content-Encoding'));
+            $this->assertEquals('Accept-Encoding', $response->getHeaderLine('Vary'));
         }
         
         $this->assertEquals($message, $func(yield $response->getBody()->getContents()));
