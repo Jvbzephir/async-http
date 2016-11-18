@@ -198,7 +198,6 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals('1.0', $response->getProtocolVersion());
             $this->assertEquals(Http::OK, $response->getStatusCode());
             $this->assertEquals('close', $response->getHeaderLine('Connection'));
-            $this->assertEquals('9876', $response->getHeaderLine('Content-Length'));
             $this->assertEquals('', yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
