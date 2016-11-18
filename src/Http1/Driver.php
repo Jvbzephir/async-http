@@ -551,28 +551,19 @@ class Driver implements HttpDriver
         $response = $this->normalizeResponse($request, $response);
         
         $http11 = ($response->getProtocolVersion() == '1.1');
-        $nobody = Http::isResponseWithoutBody($response->getStatusCode());
         $head = ($request->getMethod() === Http::HEAD);
+        $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
         $sendfile = false;
         
         $body = $response->getBody();
         
         if ($body instanceof DeferredBody) {
-            return yield from $this->sendDeferredResponse($socket, $request, $response);
+            return yield from $this->sendDeferredResponse($socket, $request, $response, $nobody, $close);
         }
         
         $size = yield $body->getSize();
         
-        if ($head) {
-            if ($size === null) {
-                $bodyStream = yield $body->getReadableStream();
-                $size = 0;
-                
-                while (null !== ($chunk = yield $bodyStream->read())) {
-                    $size += \strlen($chunk);
-                }
-            }
-        } elseif (!$nobody) {
+        if (!$nobody) {
             if ($body instanceof FileBody && $socket->isSendfileSupported()) {
                 $sendfile = true;
             } else {
@@ -596,13 +587,13 @@ class Driver implements HttpDriver
             }
         }
         
-        yield $socket->write($this->serializeHeaders($response, $close, $size) . "\r\n");
+        yield $socket->write($this->serializeHeaders($response, $close, $size, $nobody) . "\r\n");
         yield $socket->flush();
         
         $sent = 0;
         
         try {
-            if (!$nobody && !$head) {
+            if (!$nobody) {
                 if ($sendfile) {
                     if ($size) {
                         $sent += yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
@@ -647,7 +638,7 @@ class Driver implements HttpDriver
         return !$close;
     }
 
-    protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response): \Generator
+    protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response, bool $nobody, bool $close): \Generator
     {
         if ($this->logger) {
             $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
@@ -660,10 +651,14 @@ class Driver implements HttpDriver
             ]);
         }
         
-        $close = true;
-        
-        yield $socket->write($this->serializeHeaders($response, $close, null, true) . "\r\n");
+        yield $socket->write($this->serializeHeaders($response, $close, null, $nobody, true) . "\r\n");
         yield $socket->flush();
+        
+        if ($nobody) {
+            $response->getBody()->close(false);
+            
+            return !$close;
+        }
         
         // Ensure socket will only be reported as readable if the client disconnects.
         $socket->closeReader();
@@ -748,7 +743,7 @@ class Driver implements HttpDriver
     /**
      * Serialize HTTP response headers into a string.
      */
-    protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null, bool $deferred = false): string
+    protected function serializeHeaders(HttpResponse $response, bool & $close, int $size = null, bool $nobody = false, bool $deferred = false): string
     {
         $reason = \trim($response->getReasonPhrase());
         
@@ -766,19 +761,21 @@ class Driver implements HttpDriver
         
         $buffer = \sprintf("HTTP/%s %u%s\r\n", $response->getProtocolVersion(), $response->getStatusCode(), \rtrim(' ' . $reason));
         
-        if ($deferred) {
-            $close = true;
-        } else {
-            if ((float) $response->getProtocolVersion() > 1) {
-                if ($size === null) {
-                    $buffer .= "Transfer-Encoding: chunked\r\n";
-                } else {
-                    $buffer .= "Content-Length: $size\r\n";
-                }
-            } elseif ($size !== null) {
-                $buffer .= "Content-Length: $size\r\n";
-            } else {
+        if (!$nobody) {
+            if ($deferred) {
                 $close = true;
+            } else {
+                if ((float) $response->getProtocolVersion() > 1) {
+                    if ($size === null) {
+                        $buffer .= "Transfer-Encoding: chunked\r\n";
+                    } else {
+                        $buffer .= "Content-Length: $size\r\n";
+                    }
+                } elseif ($size !== null) {
+                    $buffer .= "Content-Length: $size\r\n";
+                } else {
+                    $close = true;
+                }
             }
         }
         

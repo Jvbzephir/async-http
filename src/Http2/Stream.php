@@ -325,7 +325,10 @@ class Stream
                     ]
                 ];
                 
-                yield from $this->sendHeaders($response, $headers);
+                $head = ($request->getMethod() === Http::HEAD);
+                $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
+                
+                yield from $this->sendHeaders($response, $headers, [], $nobody);
                 
                 $body = $response->getBody();
                 
@@ -341,10 +344,14 @@ class Stream
                         ]);
                     }
                     
+                    if ($nobody) {
+                        return $body->close(false);
+                    }
+                    
                     return yield from $this->sendDeferredBody($request, $body);
                 }
                 
-                $sent = yield from $this->sendBody(yield $body->getReadableStream());
+                $sent = $nobody ? 0 : yield from $this->sendBody(yield $body->getReadableStream());
                 
                 if ($this->logger) {
                     $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
@@ -353,7 +360,7 @@ class Stream
                         'target' => $request->getRequestTarget(),
                         'protocol' => $request->getProtocolVersion(),
                         'status' => $response->getStatusCode(),
-                        'size' => $sent
+                        'size' => $sent ?: '-'
                     ]);
                 }
             } finally {
@@ -372,7 +379,7 @@ class Stream
         return $task;
     }
 
-    protected function sendHeaders(HttpMessage $message, array $headers, array $remove = []): \Generator
+    protected function sendHeaders(HttpMessage $message, array $headers, array $remove = [], bool $end = false): \Generator
     {
         static $removeDefault = [
             'connection',
@@ -408,6 +415,7 @@ class Stream
         }
         
         $headers = $this->hpack->encode($headerList);
+        $flags = Frame::END_HEADERS | ($end ? Frame::END_STREAM : Frame::NOFLAG);
         
         $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
         
@@ -421,11 +429,11 @@ class Stream
                 $frames[] = new Frame(Frame::CONTINUATION, $parts[$i]);
             }
             
-            $frames[] = new Frame(Frame::CONTINUATION, $parts[\count($parts) - 1], Frame::END_HEADERS);
+            $frames[] = new Frame(Frame::CONTINUATION, $parts[\count($parts) - 1], $flags);
             
             yield $this->conn->writeStreamFrames($this->id, $frames);
         } else {
-            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, Frame::END_HEADERS));
+            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, $flags));
         }
     }
     
