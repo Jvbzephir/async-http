@@ -189,8 +189,10 @@ class Handler
         
         $body = $response->getBody();
         $size = yield $body->getSize();
+        $head = ($request->getMethod() === Http::HEAD);
+        $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
         
-        $buffer = $this->serializeHeaders($response, $size);
+        $buffer = $this->serializeHeaders($response, $nobody ? null : $size);
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $buffer . "\r\n"));
         
@@ -206,29 +208,36 @@ class Handler
                 ]);
             }
             
-            $task = new Coroutine($this->sendDeferredResponse($request, $body), true);
-            
-            $this->pending->attach($task);
-            
-            $task->when(function () use ($task) {
-                if ($this->pending->contains($task)) {
-                    $this->pending->detach($task);
-                }
-            });
-            
-            yield $task;
+            if ($nobody) {
+                $body->close(false);
+            } else {
+                $task = new Coroutine($this->sendDeferredResponse($request, $body), true);
+                
+                $this->pending->attach($task);
+                
+                $task->when(function () use ($task) {
+                    if ($this->pending->contains($task)) {
+                        $this->pending->detach($task);
+                    }
+                });
+                
+                yield $task;
+            }
         } else {
-            $bodyStream = yield $body->getReadableStream();
             $sent = 0;
             
-            try {
-                $channel = $bodyStream->channel(4096, $size);
+            if (!$nobody) {
+                $bodyStream = yield $body->getReadableStream();
                 
-                while (null !== ($chunk = yield $channel->receive())) {
-                    $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+                try {
+                    $channel = $bodyStream->channel(4096, $size);
+                    
+                    while (null !== ($chunk = yield $channel->receive())) {
+                        $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
+                    }
+                } finally {
+                    $bodyStream->close();
                 }
-            } finally {
-                $bodyStream->close();
             }
             
             if ($this->logger) {
