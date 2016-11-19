@@ -155,14 +155,13 @@ class ContentEncoder implements Middleware
                 $stream = new ReadableDeflateStream(yield $response->getBody()->getReadableStream(), $compress);
                 
                 $response = $response->withHeader('Content-Encoding', $encoding);
-                $response = $response->withAddedHeader('Vary', 'Accept-Encoding');
                 $response = $response->withBody(new StreamBody($stream));
                 
                 break;
             }
         }
         
-        return $response;
+        return $response->withAddedHeader('Vary', 'Accept-Encoding');
     }
 
     /**
