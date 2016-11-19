@@ -18,6 +18,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Middleware\BrowserSupport;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
@@ -33,6 +34,7 @@ Loop::execute(function () {
     $endpoint = new FcgiEndpoint('0.0.0.0:9090', 'localhost', $logger);
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+    $endpoint->addMiddleware(new BrowserSupport());
     $endpoint->addMiddleware(new ContentEncoder());
     
     $endpoint->listen(require __DIR__ . '/listener.php');

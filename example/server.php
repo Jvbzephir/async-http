@@ -16,6 +16,7 @@ use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\Middleware\BrowserSupport;
 use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
@@ -41,6 +42,7 @@ Loop::execute(function () {
     $endpoint->setCertificate(__DIR__ . '/localhost.pem');
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+    $endpoint->addMiddleware(new BrowserSupport());
     $endpoint->addMiddleware(new ContentEncoder());
     
     $endpoint->addResponder(new EventResponder());
