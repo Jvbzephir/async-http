@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
@@ -177,7 +178,7 @@ class ContentEncoder implements Middleware
             return false;
         }
         
-        if (Http::isResponseWithoutBody($response->getStatusCode())) {
+        if ($response->getBody() instanceof DeferredBody || Http::isResponseWithoutBody($response->getStatusCode())) {
             return false;
         }
         
