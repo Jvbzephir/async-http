@@ -39,7 +39,9 @@ class ClientTest extends EndToEndTest
         
         $logger = new TestLogger();
         
-        $client = new Client($this->httpClient, $logger);
+        $client = new Client($this->httpClient);
+        $client->setLogger($logger);
+        
         $conn = yield $client->connect('ws://localhost/');
         
         $this->assertTrue($conn instanceof Connection);

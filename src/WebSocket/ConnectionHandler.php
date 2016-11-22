@@ -20,15 +20,18 @@ use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Upgrades an HTTP/1.1+ connection to the WebSocket protocol.
  * 
  * @author Martin Schröder
  */
-class ConnectionHandler implements UpgradeResultHandler
+class ConnectionHandler implements UpgradeResultHandler, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * WebSocket GUID needed during handshake.
      * 
@@ -43,23 +46,6 @@ class ConnectionHandler implements UpgradeResultHandler
      */
     protected $deflateSupported = false;
     
-    /**
-     * PSR logger instance.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
-
-    /**
-     * Create a new WebSocket HTTP/1 upgrade handler.
-     * 
-     * @param LoggerInterface $logger
-     */
-    public function __construct(LoggerInterface $logger = null)
-    {
-        $this->logger = $logger;
-    }
-
     /**
      * Enable / disable usage of permessage-deflate WebSocket extension.
      */
@@ -167,7 +153,11 @@ class ConnectionHandler implements UpgradeResultHandler
             ]);
         }
         
-        $conn = new Connection($socket, false, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
+        $conn = new Connection($socket, false, $response->getHeaderLine('Sec-WebSocket-Protocol'));
+        
+        if ($this->logger) {
+            $conn->setLogger($this->logger);
+        }
         
         if ($deflate = $response->getAttribute(PerMessageDeflate::class)) {
             $conn->enablePerMessageDeflate($deflate);

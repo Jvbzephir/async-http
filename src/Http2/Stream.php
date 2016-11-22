@@ -27,15 +27,18 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Implements an HTTP/2 stream that is multiplexed over a connection.
  * 
  * @author Martin Schröder
  */
-class Stream
+class Stream implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     protected $id;
     
     protected $conn;
@@ -60,12 +63,11 @@ class Stream
     
     protected $logger;
 
-    public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE, LoggerInterface $logger = null)
+    public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE)
     {
         $this->id = $id;
         $this->conn = $conn;
         $this->outputWindow = $outputWindow;
-        $this->logger = $logger;
         
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();

@@ -24,15 +24,17 @@ use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\SocketServer;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Provides a FastCGI responder based on a TCP or unix socket server.
  * 
  * @author Martin Schröder
  */
-class FcgiEndpoint
+class FcgiEndpoint implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
     use MiddlewareSupported;
     use ResponderSupported;
     
@@ -42,19 +44,12 @@ class FcgiEndpoint
     protected $factory;
     
     /**
-     * @var LoggerInterface
-     */
-    protected $logger;
-    
-    /**
      * @var SocketServer
      */
     protected $server;
     
-    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', LoggerInterface $logger = null)
+    public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost')
     {
-        $this->logger = $logger;
-    
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
     }
@@ -80,7 +75,11 @@ class FcgiEndpoint
             
             try {
                 yield $this->server->listen(function (SocketStream $socket) use ($pending, $context, $action) {
-                    $conn = new Connection($socket, $context, $this->logger);
+                    $conn = new Connection($socket, $context);
+                    
+                    if ($this->logger) {
+                        $conn->setLogger($this->logger);
+                    }
                     
                     $pending->attach($conn);
                     

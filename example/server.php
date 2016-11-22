@@ -29,12 +29,15 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
         
-    $ws = new ConnectionHandler($logger);
+    $ws = new ConnectionHandler();
+    $ws->setLogger($logger);
     $ws->setDeflateSupported(true);
     
-    $http2 = new Http2Driver(null, $logger);
+    $http2 = new Http2Driver();
+    $http2->setLogger($logger);
     
-    $http1 = new Http1Driver(null, $logger);
+    $http1 = new Http1Driver();
+    $http1->setLogger($logger);
     $http1->addUpgradeHandler($http2);
     $http1->addUpgradeResultHandler($ws);
     

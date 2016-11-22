@@ -20,15 +20,18 @@ use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * FastCGI connection implementation.
  * 
  * @author Martin Schröder
  */
-class Connection
+class Connection implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Flag that indicates a connection should not be closed after serving a request.
      *
@@ -140,13 +143,6 @@ class Connection
     protected $context;
     
     /**
-     * Optional PSR logger instance.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
-    
-    /**
      * Incoming record processor.
      * 
      * @var Coroutine
@@ -172,13 +168,11 @@ class Connection
      * 
      * @param SocketStream $socket
      * @param HttpDriverContext $context
-     * @param LoggerInterface $logger
      */
-    public function __construct(SocketStream $socket, HttpDriverContext $context, LoggerInterface $logger = null)
+    public function __construct(SocketStream $socket, HttpDriverContext $context)
     {
         $this->socket = $socket;
         $this->context = $context;
-        $this->logger = $logger;
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);
@@ -190,7 +184,7 @@ class Connection
         }
         
         $this->incoming = new Channel();
-        $this->processor = new Coroutine($this->handleIncomingRecords());
+        $this->processor = new Coroutine($this->handleIncomingRecords(), true);
     }
     
     /**
@@ -285,7 +279,11 @@ class Connection
                             throw new \RuntimeException('Unsupported FGCI role');
                         }
                         
-                        $this->handlers[$id] = new Handler($id, $this, $this->context, $this->logger, ($flags & self::FCGI_KEEP_CONNECTION) ? true : false);
+                        $this->handlers[$id] = new Handler($id, $this, $this->context, ($flags & self::FCGI_KEEP_CONNECTION) ? true : false);
+                        
+                        if ($this->logger) {
+                            $this->handlers[$id]->setLogger($this->logger);
+                        }
                         
                         break;
                     case Record::FCGI_ABORT_REQUEST:

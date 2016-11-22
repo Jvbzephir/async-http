@@ -25,15 +25,18 @@ use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * FastCGI-based HTTP request handler.
  * 
  * @author Martin Schröder
  */
-class Handler
+class Handler implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Numeric ID of the HTTP request.
      * 
@@ -54,13 +57,6 @@ class Handler
      * @var bool
      */
     protected $received = false;
-    
-    /**
-     * Optional PSR logger instance.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
     
     /**
      * FCGI connection that handles all records.
@@ -101,12 +97,11 @@ class Handler
      * @param LoggerInterface $logger
      * @param bool $keepAlive
      */
-    public function __construct(int $id, Connection $conn, HttpDriverContext $context, LoggerInterface $logger = null, bool $keepAlive = true)
+    public function __construct(int $id, Connection $conn, HttpDriverContext $context, bool $keepAlive = true)
     {
         $this->id = $id;
         $this->conn = $conn;
         $this->context = $context;
-        $this->logger = $logger;
         $this->keepAlive = $keepAlive;
         
         $this->body = new Channel(4);

@@ -20,15 +20,18 @@ use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Socket\SocketStream;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * WebSocket client that can be used to establish connections to remote WebSocket endpoints.
  * 
  * @author Martin Schröder
  */
-class Client
+class Client implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * WebSocket GUID needed during handshake.
      *
@@ -49,24 +52,15 @@ class Client
      * @var HttpClient
      */
     protected $httpClient;
-    
-    /**
-     * PSR logger instance (optional).
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
 
     /**
      * Cretae a new WebSocket client.
      * 
      * @param HttpClient $httpClient HTTP client to be used for handshake request (requires HTTP/1 connector).
-     * @param LoggerInterface $logger
      */
-    public function __construct(HttpClient $httpClient = null, LoggerInterface $logger = null)
+    public function __construct(HttpClient $httpClient = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
-        $this->logger = $logger;
     }
 
     /**
@@ -132,9 +126,11 @@ class Client
         }
         
         try {
-            $conn = new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'), $this->logger);
+            $conn = new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'));
             
             if ($this->logger) {
+                $conn->setLogger($this->logger);
+                
                 $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
                     'peer' => $socket->getRemoteAddress(),
                     'uri' => $location

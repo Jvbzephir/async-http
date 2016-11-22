@@ -26,15 +26,19 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
+
 
 /**
  * Implements the HTTP/1.x protocol on the client side.
  * 
  * @author Martin Schröder
  */
-class Connector implements HttpConnector
+class Connector implements HttpConnector, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     protected $parser;
     
     protected $keepAlive = true;
@@ -44,14 +48,11 @@ class Connector implements HttpConnector
     protected $pool;
     
     protected $pending;
-    
-    protected $logger;
 
-    public function __construct(ResponseParser $parser = null, ConnectionManager $pool = null, LoggerInterface $logger = null)
+    public function __construct(ResponseParser $parser = null, ConnectionManager $pool = null)
     {
         $this->parser = $parser ?? new ResponseParser();
         $this->pool = $pool ?? new ConnectionManager(8, 15, 100);
-        $this->logger = $logger;
         
         $this->pending = new \SplObjectStorage();
     }

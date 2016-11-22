@@ -102,7 +102,6 @@ abstract class EndToEndTest extends AsyncTestCase
         $ws->setDeflateSupported(true);
         
         $http1 = new Http1Driver();
-        $http1->setDebug(true);
         
         $http1->addUpgradeHandler($http2);
         $http1->addUpgradeResultHandler($ws);

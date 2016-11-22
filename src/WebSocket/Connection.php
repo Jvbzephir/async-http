@@ -22,7 +22,8 @@ use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * WebSocket connection based on a socket and the protocol defined in RFC 6455.
@@ -31,8 +32,10 @@ use Psr\Log\LoggerInterface;
  * 
  * @author Martin Schröder
  */
-class Connection
+class Connection implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Socket stream being used to transmit frames.
      * 
@@ -113,26 +116,17 @@ class Connection
     protected $pings = [];
     
     /**
-     * PSR logger instance (optional).
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
-    
-    /**
      * Create a new WebSocket connection.
      * 
      * @param SocketStream $socket Underlying socket transport.
      * @param bool $client Use client mode?
      * @param string $protocol Negotiated application protocol.
-     * @param LoggerInterface $logger Optional PSR logger.
      */
-    public function __construct(SocketStream $socket, bool $client = true, string $protocol = '', LoggerInterface $logger = null)
+    public function __construct(SocketStream $socket, bool $client = true, string $protocol = '')
     {
         $this->socket = $socket;
         $this->client = $client;
         $this->protocol = $protocol;
-        $this->logger = $logger;
         
         $this->writer = new MessageWriter($socket, $client);
         $this->messages = new Channel(4);

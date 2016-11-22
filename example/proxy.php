@@ -29,8 +29,12 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
     
-    $driver = new Http1Driver(null, $logger);
-    $driver->addUpgradeResultHandler(new ConnectionHandler($logger));
+    $ws = new ConnectionHandler();
+    $ws->setLogger($logger);
+    
+    $driver = new Http1Driver();
+    $driver->setLogger($logger);
+    $driver->addUpgradeResultHandler($ws);
     
     $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $driver);
     $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1', '10.0.2.2'));

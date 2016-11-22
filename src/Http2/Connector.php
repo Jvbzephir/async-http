@@ -23,27 +23,27 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Success;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Implements the HTTP/2 protocol on the client side.
  * 
  * @author Martin Schröder
  */
-class Connector implements HttpConnector
+class Connector implements HttpConnector, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     protected $hpackContext;
     
-    protected $logger;
- 
     protected $connections = [];
     
     protected $connecting = [];
     
-    public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
+    public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createClientContext();
-        $this->logger = $logger;
     }
     
     /**
@@ -154,7 +154,11 @@ class Connector implements HttpConnector
             if ($context->conn) {
                 $conn = $context->conn;
             } else {
-                $conn = new Connection($context->socket, new HPack($this->hpackContext), $this->logger);
+                $conn = new Connection($context->socket, new HPack($this->hpackContext));
+                
+                if ($this->logger) {
+                    $conn->setLogger($this->logger);
+                }
                 
                 yield $conn->performClientHandshake();
                 

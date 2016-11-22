@@ -162,7 +162,8 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals('close', $response->getHeaderLine('Connection'));
             $this->assertEquals($payload, yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) use ($payload, $logger) {
-            $driver = new Driver(null, $logger);
+            $driver = new Driver();
+            $driver->setLogger($logger);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
@@ -287,7 +288,6 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals($payload, yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) use ($payload) {
             $driver = new Driver();
-            $driver->setDebug(true);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
@@ -327,7 +327,6 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals('http://localhost/api/1.0', $response->getHeaderLine('Location'));
         }, function (DuplexStream $stream) {
             $driver = new Driver();
-            $driver->setDebug(true);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 $this->assertEquals(Http::POST, $request->getMethod());
@@ -361,7 +360,6 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals(Http::INTERNAL_SERVER_ERROR, $response->getStatusCode());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
-            $driver->setDebug(true);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 return new \stdClass();
@@ -387,7 +385,6 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals(Http::PRECONDITION_FAILED, $response->getStatusCode());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
-            $driver->setDebug(true);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) {
                 throw new StatusException(Http::PRECONDITION_FAILED, 'Failed to check condition');
@@ -411,10 +408,8 @@ class DriverTest extends AsyncTestCase
             $this->assertTrue($response instanceof HttpResponse);
             $this->assertEquals('1.1', $response->getProtocolVersion());
             $this->assertEquals(Http::BAD_REQUEST, $response->getStatusCode());
-            $this->assertEquals('Missing HTTP Host header', yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
-            $driver->setDebug(true);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function () {});
         });

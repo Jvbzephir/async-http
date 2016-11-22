@@ -18,14 +18,18 @@ use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Success;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Manages HTTP/1 client connections.
  * 
  * @author Martin Schröder
  */
-class ConnectionManager
+class ConnectionManager implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     protected $limit;
     
     protected $maxLifetime;

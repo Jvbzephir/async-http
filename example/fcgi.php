@@ -31,7 +31,8 @@ Loop::execute(function () {
     $logger = LoopConfig::getLogger();
     $logger->addHandler(new PipeLogHandler());
     
-    $endpoint = new FcgiEndpoint('0.0.0.0:9090', 'localhost', $logger);
+    $endpoint = new FcgiEndpoint('0.0.0.0:9090', 'localhost');
+    $endpoint->setLogger($logger);
     
     $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
     $endpoint->addMiddleware(new BrowserSupport());
@@ -41,8 +42,12 @@ Loop::execute(function () {
     
     echo "FCGI server listening on port 9090\n";
     
-    $driver = new Http1Driver(null, $logger);
-    $driver->addUpgradeResultHandler(new ConnectionHandler($logger));
+    $ws = new ConnectionHandler();
+    $ws->setLogger($logger);
+    
+    $driver = new Http1Driver();
+    $driver->setLogger($logger);
+    $driver->addUpgradeResultHandler($ws);
     
     $http = new HttpEndpoint('0.0.0.0:8080', 'localhost', $driver);
     

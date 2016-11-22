@@ -23,23 +23,25 @@ use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Socket\SocketStream;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Implements the HTTP/2 protocol on the server side.
  *
  * @author Martin Schröder
  */
-class Driver implements HttpDriver, UpgradeHandler
+class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     protected $hpackContext;
     
     protected $logger;
     
-    public function __construct(HPackContext $hpackContext = null, LoggerInterface $logger = null)
+    public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
-        $this->logger = $logger;
     }
     
     /**
@@ -74,7 +76,11 @@ class Driver implements HttpDriver, UpgradeHandler
                 ]);
             }
             
-            $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
+            $conn = new Connection($socket, new HPack($this->hpackContext));
+            
+            if ($this->logger) {
+                $conn->setLogger($this->logger);
+            }
             
             yield $conn->performServerHandshake();
             

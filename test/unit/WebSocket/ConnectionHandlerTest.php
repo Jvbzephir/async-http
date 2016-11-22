@@ -158,7 +158,10 @@ class ConnectionHandlerTest extends EndToEndTest
 
     public function testCanUpgradeConnection()
     {
-        $conn = new ConnectionHandler($logger = new TestLogger());
+        $logger = new TestLogger();
+        
+        $conn = new ConnectionHandler();
+        $conn->setLogger($logger);
         
         $response = new HttpResponse(Http::SWITCHING_PROTOCOLS);
         $response = $response->withAttribute(Endpoint::class, new class() extends Endpoint {});

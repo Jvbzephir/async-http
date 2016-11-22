@@ -23,15 +23,18 @@ use KoolKode\Async\Success;
 use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
  * 
  * @author Martin Schröder
  */
-class Connection
+class Connection implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Connection preface that must be sent by the client.
      *
@@ -104,20 +107,14 @@ class Connection
     protected $incoming;
     
     /**
-     * @var LoggerInterface
-     */
-    protected $logger;
-    
-    /**
      * @var string
      */
     protected $remoteAddress;
 
-    public function __construct(SocketStream $socket, HPack $hpack, LoggerInterface $logger = null)
+    public function __construct(SocketStream $socket, HPack $hpack)
     {
         $this->socket = $socket;
         $this->hpack = $hpack;
-        $this->logger = $logger;
         
         $this->writer = new Executor();
         $this->incoming = new Channel();
@@ -262,7 +259,11 @@ class Connection
     
     public function openStream(): Stream
     {
-        $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
+        $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
+        
+        if ($this->logger) {
+            $stream->setLogger($this->logger);
+        }
         
         $this->nextStreamId += 2;
         
@@ -313,7 +314,11 @@ class Connection
             throw new ConnectionException(\sprintf('Cannot open stream %u because it is still open', $streamId), Frame::PROTOCOL_ERROR);
         }
         
-        $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
+        $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
+        
+        if ($this->logger) {
+            $stream->setLogger($this->logger);
+        }
         
         $stream->getDefer()->when(function (\Throwable $e = null, $val = null) {
             $this->incoming->send($e ?? $val);

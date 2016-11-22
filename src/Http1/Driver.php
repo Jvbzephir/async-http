@@ -33,15 +33,18 @@ use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
-use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Implements the HTTP/1.x protocol on the server side.
  * 
  * @author Martin Schröder
  */
-class Driver implements HttpDriver
+class Driver implements HttpDriver, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * HTTP request parser being used to parse incoming requests.
      * 
@@ -55,13 +58,6 @@ class Driver implements HttpDriver
      * @var bool
      */
     protected $keepAliveSupported = true;
-    
-    /**
-     * Turn on debug mode (returns readable error messages).
-     * 
-     * @var bool
-     */
-    protected $debug = false;
     
     /**
      * Registered HTTP connection upgrade handlers.
@@ -78,22 +74,13 @@ class Driver implements HttpDriver
     protected $upgradeResultHandlers = [];
     
     /**
-     * Logger instance.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
-    
-    /**
      * Create a new HTTP/1 driver.
      * 
      * @param RequestParser $parser HTTP request parser.
-     * @param LoggerInterface $logger Optional logger instance.
      */
-    public function __construct(RequestParser $parser = null, LoggerInterface $logger = null)
+    public function __construct(RequestParser $parser = null)
     {
         $this->parser = $parser ?? new RequestParser();
-        $this->logger = $logger;
     }
     
     /**
@@ -102,14 +89,6 @@ class Driver implements HttpDriver
     public function setKeepAliveSupported(bool $keepAlive)
     {
         $this->keepAliveSupported = $keepAlive;
-    }
-    
-    /**
-     * Toggle debug mode setting.
-     */
-    public function setDebug(bool $debug)
-    {
-        $this->debug = $debug;
     }
     
     /**
@@ -516,7 +495,7 @@ class Driver implements HttpDriver
         $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
         
         if ($e instanceof StatusException) {
-            $response = $response->withStatus($e->getCode(), $this->debug ? $e->getMessage() : '');
+            $response = $response->withStatus($e->getCode());
             
             foreach ($response->getHeaders() as $k => $vals) {
                 foreach ($vals as $v) {
@@ -527,11 +506,6 @@ class Driver implements HttpDriver
             $this->logger->critical('', [
                 'exception' => $e
             ]);
-        }
-        
-        if ($this->debug) {
-            $response = $response->withHeader('Content-Type', 'text/plain');
-            $response = $response->withBody(new StringBody($e->getMessage()));
         }
         
         return yield from $this->sendResponse($socket, $request, $response, true);

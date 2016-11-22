@@ -285,7 +285,8 @@ class ConnectorTest extends AsyncTestCase
         $logger = new TestLogger();
         
         yield new SocketStreamTester(function (DuplexStream $socket) use ($logger) {
-            $connector = new Connector(null, null, $logger);
+            $connector = new Connector();
+            $connector->setLogger($logger);
             
             try {
                 for ($i = 0; $i < 3; $i++) {
