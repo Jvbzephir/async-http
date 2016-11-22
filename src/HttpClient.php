@@ -22,13 +22,15 @@ use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Http1\Connector;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * HTTP client that can be configured to use different connectors to support different HTTP versions.
  * 
  * @author Martin Schröder
  */
-class HttpClient
+class HttpClient implements LoggerAwareInterface
 {
     use MiddlewareSupported;
     
@@ -54,6 +56,13 @@ class HttpClient
     protected $connectors;
     
     /**
+     * Optional PSR logger instance.
+     * 
+     * @var LoggerInterface
+     */
+    protected $logger;
+    
+    /**
      * Create a new HTTP client using the given connectors.
      * 
      * Will auto-create an HTTP/1.x connector if no other connector is given. 
@@ -75,6 +84,11 @@ class HttpClient
         }, $this->connectors)));
         
         $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
+    }
+    
+    public function setLogger(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
     }
 
     public function shutdown(): Awaitable
@@ -159,7 +173,7 @@ class HttpClient
                     $connecting[$conn]->dispose();
                 }
             }
-        });
+        }, $this->logger);
         
         return new Coroutine($next($request));
     }

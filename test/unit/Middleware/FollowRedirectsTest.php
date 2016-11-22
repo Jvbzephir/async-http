@@ -110,8 +110,9 @@ class FollowRedirectsTest extends AsyncTestCase
             return $response;
         });
         
-        $this->expectException(TooManyRedirectsException::class);
+        $response = yield from $next(new HttpRequest('http://localhost/test'));
         
-        yield from $next(new HttpRequest('http://localhost/test'));
+        $this->assertTrue($response instanceof HttpResponse);
+        $this->assertEquals(Http::INTERNAL_SERVER_ERROR, $response->getStatusCode());
     }
 }

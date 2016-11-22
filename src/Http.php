@@ -13,6 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use Psr\Log\LoggerInterface;
+
 /**
  * Provides HTTP-related constants and methods.
  *
@@ -828,5 +830,33 @@ abstract class Http
         return \preg_replace_callback("'-[a-z]'", function ($m) {
             return \strtoupper($m[0]);
         }, \ucfirst(\strtolower(\trim($name))));
+    }
+
+    /**
+     * Convert any error into an appropriate HTTP response.
+     * 
+     * @param \Throwable $e The error to be converted.
+     * @param LoggerInterface $logger PSR logger that will log critical errors.
+     * @return HttpResponse
+     */
+    public static function respondToError(\Throwable $e, LoggerInterface $logger = null): HttpResponse
+    {
+        $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+        
+        if ($e instanceof StatusException) {
+            $response = $response->withStatus($e->getCode());
+            
+            foreach ($response->getHeaders() as $k => $vals) {
+                foreach ($vals as $v) {
+                    $response = $response->withAddedHeader($k, $v);
+                }
+            }
+        } elseif ($logger) {
+            $logger->critical('', [
+                'exception' => $e
+            ]);
+        }
+        
+        return $response;
     }
 }

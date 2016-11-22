@@ -264,12 +264,6 @@ class Connection
     {
         $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE], $this->logger);
         
-        if ($this->logger) {
-            $this->logger->debug('New stream created: {id}', [
-                'id' => $stream->getId()
-            ]);
-        }
-        
         $this->nextStreamId += 2;
         
         return $this->streams[$stream->getId()] = $stream;

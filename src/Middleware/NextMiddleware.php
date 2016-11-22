@@ -13,8 +13,10 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use Psr\Log\LoggerInterface;
 
 /**
  * HTTP middleware dispatcher.
@@ -43,31 +45,41 @@ class NextMiddleware
      * @var int
      */
     protected $index = 0;
+    
+    /**
+     * Optional PSR logger instance.
+     * 
+     * @var LoggerInterface
+     */
+    protected $logger;
 
     /**
      * Create a new HTTP middleware dispatcher.
      * 
      * @param array $middlewares Registered middlewares sorted by priority.
      * @param callable $target The target to be invoked if all middlewares delegate dispatching of the HTTP request.
+     * @param LoggerInterface $logger Optional PSR logger to log errors.
      */
-    public function __construct(array $middlewares, callable $target)
+    public function __construct(array $middlewares, callable $target, LoggerInterface $logger = null)
     {
         $this->middlewares = $middlewares;
         $this->target = $target;
+        $this->logger = $logger;
     }
-    
+
     /**
      * Wrap the given middleware and target into a middleware dispatcher.
      * 
      * @param callable $middleware
      * @param callable $target
+     * @param LoggerInterface $logger Optional PSR logger to log errors.
      * @return NextMiddleware
      */
-    public static function wrap(callable $middleware, callable $target): NextMiddleware
+    public static function wrap(callable $middleware, callable $target, LoggerInterface $logger = null): NextMiddleware
     {
         return new static([
             new RegisteredMiddleware($middleware, 0)
-        ], $target);
+        ], $target, $logger);
     }
 
     /**
@@ -80,18 +92,22 @@ class NextMiddleware
      */
     public function __invoke(HttpRequest $request): \Generator
     {
-        if (isset($this->middlewares[$this->index])) {
-            $response = ($this->middlewares[$this->index++]->callback)($request, $this);
-        } else {
-            $response = ($this->target)($request);
-        }
-        
-        if ($response instanceof \Generator) {
-            $response = yield from $response;
-        }
-        
-        if (!$response instanceof HttpResponse) {
-            throw new \RuntimeException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
+        try {
+            if (isset($this->middlewares[$this->index])) {
+                $response = ($this->middlewares[$this->index++]->callback)($request, $this);
+            } else {
+                $response = ($this->target)($request);
+            }
+            
+            if ($response instanceof \Generator) {
+                $response = yield from $response;
+            }
+            
+            if (!$response instanceof HttpResponse) {
+                throw new \RuntimeException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
+            }
+        } catch (\Throwable $e) {
+            $response = Http::respondToError($e, $this->logger);
         }
         
         return $response;

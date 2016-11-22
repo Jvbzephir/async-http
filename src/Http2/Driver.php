@@ -263,8 +263,6 @@ class Driver implements HttpDriver, UpgradeHandler
      */
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
-        // TODO: Implement error handling!
-        
         $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
             $response = $action($request);
             
@@ -273,7 +271,7 @@ class Driver implements HttpDriver, UpgradeHandler
             }
             
             return $context->respond($request, $response);
-        });
+        }, $this->logger);
         
         $response = yield from $next($request);
         

@@ -410,7 +410,7 @@ class Driver implements HttpDriver
                 }
                 
                 return $context->respond($request, $response);
-            });
+            }, $this->logger);
             
             $response = yield from $next($request);
             
@@ -524,11 +524,8 @@ class Driver implements HttpDriver
                 }
             }
         } elseif ($this->logger) {
-            $this->logger->critical('{error} "{message}" in {file} at line {line}', [
-                'error' => \get_class($e),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
+            $this->logger->critical('', [
+                'exception' => $e
             ]);
         }
         

@@ -385,7 +385,6 @@ class DriverTest extends AsyncTestCase
             $this->assertTrue($response instanceof HttpResponse);
             $this->assertEquals('1.1', $response->getProtocolVersion());
             $this->assertEquals(Http::PRECONDITION_FAILED, $response->getStatusCode());
-            $this->assertEquals('Failed to check condition', yield $response->getBody()->getContents());
         }, function (DuplexStream $stream) {
             $driver = new Driver();
             $driver->setDebug(true);

@@ -108,7 +108,7 @@ class FcgiEndpoint
             }
             
             return $context->respond($request, $result);
-        });
+        }, $this->logger);
         
         yield from $handler->sendResponse($request, yield from $next($request));
     }
