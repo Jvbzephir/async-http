@@ -142,7 +142,7 @@ class HttpDriverContext
         
         $reason = \sprintf('Expecting HttpResponse, given %s', \is_object($result) ? \get_class($result) : \gettype($result));
         
-        throw new StatusException(Http::INTERNAL_SERVER_ERROR, $reason);
+        throw new \RuntimeException(Http::INTERNAL_SERVER_ERROR, $reason);
     }
 
     /**
