@@ -19,7 +19,6 @@ use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\FileBody;
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;

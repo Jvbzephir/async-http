@@ -329,7 +329,7 @@ class ConnectorTest extends AsyncTestCase
             }
         });
         
-        $this->assertCount(6, $logger);
+        $this->assertCount(3, $logger);
     }
     
     public function testFinalResponseBeforeExpectContinue()

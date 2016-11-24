@@ -267,9 +267,9 @@ class Stream implements LoggerAwareInterface
         return $default;
     }
 
-    public function sendRequest(HttpRequest $request): Awaitable
+    public function sendRequest(HttpRequest $request, int & $sent = null): Awaitable
     {
-        $task = new Coroutine(function () use ($request) {
+        $task = new Coroutine(function () use ($request, & $sent) {
             $uri = $request->getUri();
             $target = $request->getRequestTarget();
             
@@ -301,7 +301,7 @@ class Stream implements LoggerAwareInterface
                 'host'
             ]);
             
-            yield from $this->sendBody($bodyStream);
+            $sent = yield from $this->sendBody($bodyStream);
             
             return (yield $this->defer)[1];
         });

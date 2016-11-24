@@ -143,7 +143,8 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         $coroutine = new Coroutine(function () use ($context, $request) {
             try {
-                $line = yield from $this->sendRequest($context->socket, $request);
+                $sent = 0;
+                $line = yield from $this->sendRequest($context->socket, $request, $sent);
                 
                 $response = yield from $this->parser->parseResponse($context->socket, $line, $request->getMethod() === Http::HEAD);
                 
@@ -185,16 +186,13 @@ class Connector implements HttpConnector, LoggerAwareInterface
                 $response = $response->withoutHeader('Transfer-Encoding');
                 
                 if ($this->logger) {
-                    $reason = \trim($response->getReasonPhrase());
-                    
-                    if ($reason === '') {
-                        $reason = \trim(Http::getReason($response->getStatusCode()));
-                    }
-                    
-                    $this->logger->info('HTTP/{protocol} {status} {reason}', [
+                    $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                        'ip' => $request->getClientAddress(),
+                        'method' => $request->getMethod(),
+                        'target' => $request->getRequestTarget(),
                         'protocol' => $response->getProtocolVersion(),
                         'status' => $response->getStatusCode(),
-                        'reason' => $reason
+                        'size' => $sent ?: '-'
                     ]);
                 }
                 
@@ -233,17 +231,9 @@ class Connector implements HttpConnector, LoggerAwareInterface
         return false;
     }
     
-    protected function sendRequest(SocketStream $socket, HttpRequest $request): \Generator
+    protected function sendRequest(SocketStream $socket, HttpRequest $request, int & $sent): \Generator
     {
         $request = $this->normalizeRequest($request);
-        
-        if ($this->logger) {
-            $this->logger->info('{method} {target} HTTP/{protocol}', [
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion()
-            ]);
-        }
         
         $body = $request->getBody();
         $size = yield $body->getSize();
@@ -301,24 +291,24 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         if ($sendfile) {
             if ($size) {
-                yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                $sent += yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
             }
         } elseif ($size === null) {
-            yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
+            $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
             
             if ($len === $clen) {
                 // Align each chunk with length and line breaks to fit into 4 KB payload.
-                yield new CopyBytes($bodyStream, $socket, true, null, 4089, function (string $chunk) {
+                $sent += yield new CopyBytes($bodyStream, $socket, true, null, 4089, function (string $chunk) {
                     return \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n";
                 });
             }
             
             yield $socket->write("0\r\n\r\n");
         } elseif ($size > 0) {
-            yield $socket->write($chunk);
+            $sent += yield $socket->write($chunk);
             
             if ($len === $clen) {
-                yield new CopyBytes($bodyStream, $socket, true, $size - $len);
+                $sent += yield new CopyBytes($bodyStream, $socket, true, $size - $len);
             }
         }
         

@@ -168,27 +168,17 @@ class Connector implements HttpConnector, LoggerAwareInterface
             $request = $request->withProtocolVersion('2.0');
             $request = $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
             
+            $sent = 0;
+            $response = yield $conn->openStream()->sendRequest($request, $sent);
+            
             if ($this->logger) {
-                $this->logger->info('{method} {target} HTTP/{protocol}', [
+                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                    'ip' => $request->getClientAddress(),
                     'method' => $request->getMethod(),
                     'target' => $request->getRequestTarget(),
-                    'protocol' => $request->getProtocolVersion()
-                ]);
-            }
-            
-            $response = yield $conn->openStream()->sendRequest($request);
-            
-            if ($this->logger) {
-                $reason = \trim($response->getReasonPhrase());
-                
-                if ($reason === '') {
-                    $reason = \trim(Http::getReason($response->getStatusCode()));
-                }
-                
-                $this->logger->info('HTTP/{protocol} {status} {reason}', [
                     'protocol' => $response->getProtocolVersion(),
                     'status' => $response->getStatusCode(),
-                    'reason' => $reason
+                    'size' => $sent ?: '-'
                 ]);
             }
             
