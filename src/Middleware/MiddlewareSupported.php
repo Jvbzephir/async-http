@@ -25,7 +25,7 @@ trait MiddlewareSupported
      * 
      * @var array
      */
-    protected $middlewares = [];
+    private $middlewares = [];
 
     /**
      * Register a new HTTP middleware.

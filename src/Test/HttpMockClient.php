@@ -36,21 +36,31 @@ class HttpMockClient extends HttpClient
         $this->responses = $responses;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function shutdown(): Awaitable
     {
         return new Success(null);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function send(HttpRequest $request): Awaitable
     {
         if (!$request->hasHeader('User-Agent')) {
             $request = $request->withHeader('User-Agent', $this->userAgent);
         }
         
-        $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) {
-            return \array_shift($this->responses);
-        });
+        $invoke = \Closure::bind(function (HttpRequest $request) {
+            $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) {
+                return \array_shift($this->responses);
+            });
+            
+            return new Coroutine($next($request));
+        }, $this, HttpClient::class);
         
-        return new Coroutine($next($request));
+        return $invoke($request);
     }
 }

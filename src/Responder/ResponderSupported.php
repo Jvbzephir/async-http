@@ -15,7 +15,7 @@ namespace KoolKode\Async\Http\Responder;
 
 trait ResponderSupported
 {
-    protected $responders = [];
+    private $responders = [];
 
     public function addResponder(callable $responder, int $priority = null)
     {
