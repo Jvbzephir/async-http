@@ -23,7 +23,7 @@ use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
-class HttpEndpoint
+class HttpEndpoint implements Endpoint
 {
     use MiddlewareSupported;
     use ResponderSupported;
@@ -69,6 +69,9 @@ class HttpEndpoint
         $this->proxySettings = $proxy;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function listen(callable $action): Awaitable
     {
         return new Coroutine(function () use ($action) {

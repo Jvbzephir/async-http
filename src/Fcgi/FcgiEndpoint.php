@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\Endpoint;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
@@ -32,7 +33,7 @@ use Psr\Log\LoggerAwareTrait;
  * 
  * @author Martin Schröder
  */
-class FcgiEndpoint implements LoggerAwareInterface
+class FcgiEndpoint implements Endpoint, LoggerAwareInterface
 {
     use LoggerAwareTrait;
     use MiddlewareSupported;
@@ -59,6 +60,9 @@ class FcgiEndpoint implements LoggerAwareInterface
         return $this->factory;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function listen(callable $action): Awaitable
     {
         return new Coroutine(function () use ($action) {
