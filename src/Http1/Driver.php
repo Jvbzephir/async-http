@@ -502,9 +502,13 @@ class Driver implements HttpDriver, LoggerAwareInterface
                 }
             }
         } elseif ($this->logger) {
-            $this->logger->critical('', [
-                'exception' => $e
-            ]);
+            if ($e instanceof StreamClosedException) {
+                $logger->debug('Remote peer disconnected');
+            } else {
+                $this->logger->critical('', [
+                    'exception' => $e
+                ]);
+            }
         }
         
         return yield from $this->sendResponse($socket, $request, $response, true);

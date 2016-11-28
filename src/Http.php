@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Stream\StreamClosedException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -852,9 +853,13 @@ abstract class Http
                 }
             }
         } elseif ($logger) {
-            $logger->critical('', [
-                'exception' => $e
-            ]);
+            if ($e instanceof StreamClosedException) {
+                $logger->debug('Remote peer disconnected');
+            } else {
+                $logger->critical('', [
+                    'exception' => $e
+                ]);
+            }
         }
         
         return $response;
