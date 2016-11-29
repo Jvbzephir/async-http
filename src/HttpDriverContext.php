@@ -13,6 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
+use KoolKode\Async\Http\Responder\RegisteredResponder;
+
 /**
  * Passes contextual options to an HTTP driver.
  * 
@@ -153,5 +155,20 @@ class HttpDriverContext
     public function getProxySettings(): ReverseProxySettings
     {
         return $this->proxy;
+    }
+    
+    /**
+     * Prepend a responder to a new context.
+     * 
+     * @param callable $responder
+     * @return HttpDriverContext
+     */
+    public function withPrependedResponder(callable $responder): HttpDriverContext
+    {
+        $context = clone $this;
+        
+        \array_unshift($context->responders, new RegisteredResponder($callback, 1000000));
+        
+        return $context;
     }
 }
