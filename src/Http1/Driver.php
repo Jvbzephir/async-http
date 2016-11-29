@@ -377,14 +377,9 @@ class Driver implements HttpDriver, LoggerAwareInterface
             }
             
             $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
-                $response = $action($request, $context);
-                
-                // TODO: Pass upgrade result handling as responder...
-//                 $context->withPrependedResponder(function (HttpRequest $request, $result) {
-//                     if (!$result instanceof HttpResponse) {
-//                         return $this->upgradeResult($request, $result);
-//                     }
-//                 }
+                $response = $action($request, $context->withPrependedResponder(function (HttpRequest $request, $result) {
+                    return $this->upgradeResult($request, $result);
+                }));
                 
                 if ($response instanceof \Generator) {
                     $response = yield from $response;

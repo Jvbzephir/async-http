@@ -167,7 +167,7 @@ class HttpDriverContext
     {
         $context = clone $this;
         
-        \array_unshift($context->responders, new RegisteredResponder($callback, 1000000));
+        \array_unshift($context->responders, new RegisteredResponder($responder, 1000000));
         
         return $context;
     }
