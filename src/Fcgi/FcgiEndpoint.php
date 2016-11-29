@@ -104,7 +104,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
     protected function processRequest(Connection $conn, HttpDriverContext $context, callable $action, Handler $handler, HttpRequest $request): \Generator
     {
         $next = new NextMiddleware($this->middlewares, function (HttpRequest $request) use ($context, $action) {
-            $result = $action($request);
+            $result = $action($request, $context);
             
             if ($result instanceof \Generator) {
                 $result = yield from $result;

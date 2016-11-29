@@ -270,7 +270,7 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
         $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
-            $response = $action($request);
+            $response = $action($request, $context);
             
             if ($response instanceof \Generator) {
                 $response = yield from $response;

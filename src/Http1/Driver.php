@@ -377,7 +377,9 @@ class Driver implements HttpDriver, LoggerAwareInterface
             }
             
             $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
-                $response = $action($request);
+                // TODO: Need to apply upgrade handlers as additional responders here to work well with nested middleware.
+                
+                $response = $action($request, $context);
                 
                 if ($response instanceof \Generator) {
                     $response = yield from $response;
