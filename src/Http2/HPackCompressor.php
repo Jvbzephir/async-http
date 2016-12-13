@@ -219,7 +219,7 @@ class HPackCompressor
             } else {
                 $table[$local] = $char;
                 
-                for ($max = (\pow(2, 8 - $len)), $j = 0; $j < $max; $j++) {
+                for ($max = (1 << 8 - $len), $j = 0; $j < $max; $j++) {
                     $table[$local | $j] = $char;
                 }
             }
@@ -253,7 +253,7 @@ class HPackCompressor
         } else {
             $table[$local] = $char;
             
-            for ($max = (\pow(2, 8 * $level - $len)), $j = 0; $j < $max; $j++) {
+            for ($max = (1 << 8 * $level - $len), $j = 0; $j < $max; $j++) {
                 $table[$local | $j] = $char;
             }
         }
