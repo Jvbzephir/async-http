@@ -16,7 +16,7 @@
 			"email" : "m.schroeder2007@gmail.com"
 		}
 	],
-	"minimum-stability" : "dev",
+	"minimum-stability" : "stable",
 	"prefer-stable" : true,
 	"require" : {
 		"php" : "~7.0",
