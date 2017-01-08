@@ -61,7 +61,7 @@ class ConnectionManagerTest extends AsyncTestCase
         $this->assertSame($conn1, yield $manager->getConnection($uri));
         $this->assertSame($conn2, yield $manager->getConnection($uri));
         
-        yield $manager->shutdown();
+        $manager->shutdown();
     }
     
     public function testWillLimitConnectionCount()
@@ -85,7 +85,7 @@ class ConnectionManagerTest extends AsyncTestCase
         
         $this->assertSame($conn1, yield $defer);
         
-        yield $manager->shutdown();
+        $manager->shutdown();
     }
     
     public function testWillDisposeExpiredConnection()
@@ -111,7 +111,7 @@ class ConnectionManagerTest extends AsyncTestCase
         $this->assertNotSame($conn1, $conn2);
         $this->assertEquals(1, $manager->getConnectionCount($uri));
         
-        yield $manager->shutdown();
+        $manager->shutdown();
     }
 
     public function testWillDisposeExpiredConnectionDuringRelease()
@@ -140,7 +140,7 @@ class ConnectionManagerTest extends AsyncTestCase
         $this->assertNotSame($conn1, $conn2);
         $this->assertEquals(1, $manager->getConnectionCount($uri));
         
-        yield $manager->shutdown();
+        $manager->shutdown();
     }
 
     public function testCanDisposeConnectionViaContext()
@@ -164,6 +164,6 @@ class ConnectionManagerTest extends AsyncTestCase
         $this->assertNotSame($conn1, $conn2);
         $this->assertEquals(1, $manager->getConnectionCount($uri));
         
-        yield $manager->shutdown();
+        $manager->shutdown();
     }
 }

@@ -95,7 +95,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
                 $this->server = null;
                 
                 foreach ($pending as $task) {
-                    $task->cancel(new \RuntimeException('FCGI server stopped'));
+                    $task->cancel('FCGI server stopped');
                 }
             }
         });

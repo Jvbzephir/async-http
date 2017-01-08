@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\Http;
@@ -83,19 +82,15 @@ class Connector implements HttpConnector, LoggerAwareInterface
     /**
      * {@inheritdoc}
      */
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        $tasks = [];
-        
         try {
             foreach ($this->connections as $conn) {
-                $tasks[] = $conn->shutdown();
+                $conn->shutdown();
             }
         } finally {
             $this->connections = [];
         }
-        
-        return new AwaitPending($tasks);
     }
 
     /**

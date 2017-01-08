@@ -11,7 +11,7 @@
 
 declare(strict_types = 1);
 
-use Interop\Async\Loop;
+use AsyncInterop\Loop;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\WebSocket\Connection;
 use KoolKode\Async\Http\WebSocket\Endpoint;
@@ -55,7 +55,7 @@ class ExampleEndpoint extends Endpoint
         $this->clients->detach($conn);
         
         if ($this->info) {
-            $this->info->cancel(new \RuntimeException('Connection closed'));
+            $this->info->cancel('Connection closed');
         }
     }
 

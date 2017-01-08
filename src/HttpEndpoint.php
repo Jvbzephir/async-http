@@ -149,7 +149,7 @@ class HttpEndpoint implements Endpoint
             $this->server = null;
             
             foreach ($pending as $request) {
-                $request->cancel(new StreamClosedException('HTTP server stopped'));
+                $request->cancel('HTTP server stopped', new StreamClosedException('HTTP server stopped'));
             }
         }
     }

@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Test;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpConnector;
@@ -44,21 +43,15 @@ class HttpTestClient extends HttpClient
         $this->workers = new \SplObjectStorage();
     }
     
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        $close = [];
-        
         foreach ($this->connectors as $connector) {
-            $close[] = $connector->shutdown();
+            $connector->shutdown();
         }
         
         foreach ($this->workers as $worker) {
-            foreach ($worker->cancel(new \RuntimeException()) as $awaitable) {
-                $close[] = $awaitable;
-            }
+            $worker->cancel('HTTP test client shut down');
         }
-        
-        return new AwaitPending($close);
     }
 
     protected function connectSocket(Uri $uri): Awaitable

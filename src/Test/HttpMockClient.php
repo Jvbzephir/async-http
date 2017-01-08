@@ -18,7 +18,6 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
-use KoolKode\Async\Success;
 
 /**
  * HTTP client mock that returns queued HTTP responses.
@@ -39,10 +38,7 @@ class HttpMockClient extends HttpClient
     /**
      * {@inheritdoc}
      */
-    public function shutdown(): Awaitable
-    {
-        return new Success(null);
-    }
+    public function shutdown() { }
 
     /**
      * {@inheritdoc}

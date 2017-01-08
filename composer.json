@@ -20,11 +20,11 @@
 	"prefer-stable" : true,
 	"require" : {
 		"php" : "~7.0",
-		"koolkode/async" : "dev-master",
+		"koolkode/async" : "^0.2.11",
 		"koolkode/util" : "^0.2.6"
 	},
 	"require-dev" : {
-		"phpunit/phpunit" : "^5.5"
+		"phpunit/phpunit" : "^5.7"
 	},
 	"autoload" : {
 		"psr-4" : {

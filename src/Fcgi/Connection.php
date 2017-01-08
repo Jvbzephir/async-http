@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Socket\SocketStream;
@@ -190,15 +189,11 @@ class Connection implements LoggerAwareInterface
     /**
      * Shutdown the inbound record handler of the connection.
      */
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        $stop = [];
-        
         if ($this->processor) {
-            $stop = $this->processor->cancel(new \RuntimeException('Connection closed'));
+            $this->processor->cancel('Connection closed');
         }
-        
-        return new AwaitPending($stop);
     }
     
     /**

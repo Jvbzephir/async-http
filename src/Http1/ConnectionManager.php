@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Success;
@@ -66,10 +65,8 @@ class ConnectionManager implements LoggerAwareInterface
         return $this->max;
     }
 
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        $tasks = [];
-        
         try {
             foreach ($this->connecting as $conn) {
                 foreach ($conn as $defer) {
@@ -79,7 +76,7 @@ class ConnectionManager implements LoggerAwareInterface
             
             foreach ($this->conns as $conns) {
                 foreach ($conns as $context) {
-                    $tasks[] = $context->socket->close();
+                    $context->socket->close();
                 }
             }
         } finally {
@@ -87,8 +84,6 @@ class ConnectionManager implements LoggerAwareInterface
             $this->conns = [];
             $this->connecting = [];
         }
-        
-        return new AwaitPending($tasks);
     }
     
     public function getConnectionCount(Uri $uri)

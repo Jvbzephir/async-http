@@ -662,7 +662,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                     $body->close($e ? true : false);
                 }
                 
-                $watcher->cancel(new \RuntimeException());
+                $watcher->cancel('Finished sending deferred response');
             }
             
             return false;
@@ -675,7 +675,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                 yield new AwaitRead($socket);
             }
             
-            $task->cancel(new StreamClosedException('Client disconnected'));
+            $task->cancel('Client disconnected', new StreamClosedException('Client disconnected'));
         });
         
         return yield $task;

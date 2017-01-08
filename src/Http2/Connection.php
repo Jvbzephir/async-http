@@ -19,12 +19,12 @@ use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Success;
 use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
@@ -139,15 +139,11 @@ class Connection implements LoggerAwareInterface
         return $this->client;
     }
     
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
         if ($this->processor !== null) {
-            $this->processor->cancel(new \RuntimeException('Connection shutdown'));
-            
-            return $this->processor;
+            $this->processor->cancel('Connection shutdown', new StreamClosedException('Connection shutdown'));
         }
-        
-        return new Success(null);
     }
     
     public function getHPack(): HPack

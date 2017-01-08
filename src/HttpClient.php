@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
@@ -80,15 +79,11 @@ class HttpClient implements LoggerAwareInterface
         $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
     }
 
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        $close = [];
-        
         foreach ($this->connectors as $connector) {
-            $close[] = $connector->shutdown();
+            $connector->shutdown();
         }
-        
-        return new AwaitPending($close);
     }
 
     public function addConnector(HttpConnector $connector)

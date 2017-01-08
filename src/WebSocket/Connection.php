@@ -14,12 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerAwareInterface;
@@ -177,17 +175,15 @@ class Connection implements LoggerAwareInterface
      * 
      * @return Awaitable
      */
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
         if ($this->processor) {
             try {
-                return new AwaitPending($this->processor->cancel(new \RuntimeException('WebSocket connection shutdown')));
+                $this->processor->cancel('WebSocket connection shutdown');
             } finally {
                 $this->processor = null;
             }
         }
-        
-        return new Success(null);
     }
     
     /**

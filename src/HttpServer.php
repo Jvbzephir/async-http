@@ -72,7 +72,7 @@ class HttpServer
     {
         if ($this->runner) {
             try {
-                $this->runner->cancel($e ?? new \RuntimeException('HTTP server stopped'));
+                $this->runner->cancel('HTTP server stopped', $e);
             } finally {
                 $this->runner = null;
             }

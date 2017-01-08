@@ -56,7 +56,7 @@ interface HttpConnector
     /**
      * Shutdown connector and all associated resources.
      */
-    public function shutdown(): Awaitable;
+    public function shutdown();
     
     /**
      * Create or reuse an HTTP connector context.

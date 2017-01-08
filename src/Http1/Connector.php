@@ -107,20 +107,17 @@ class Connector implements HttpConnector, LoggerAwareInterface
     /**
      * {@inheritdoc}
      */
-    public function shutdown(): Awaitable
+    public function shutdown()
     {
-        return new Coroutine(function () {
+        new Coroutine(function () {
             try {
                 foreach ($this->pending as $pending) {
-                    foreach ($pending->cancel(new \RuntimeException('HTTP connector closed')) as $task) {
-                        yield $task;
-                    }
+                    $pending->cancel('HTTP connector closed');
                 }
             } finally {
                 $this->pending = new \SplObjectStorage();
+                $this->pool->shutdown();
             }
-            
-            yield $this->pool->shutdown();
         });
     }
     

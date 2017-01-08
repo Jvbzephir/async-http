@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
-use Interop\Async\Loop;
+use AsyncInterop\Loop;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
@@ -102,7 +102,7 @@ class Stream implements LoggerAwareInterface
         
         try {
             foreach ($this->pending as $task) {
-                $task->cancel($e);
+                $task->cancel('HTTP/2 stream closed', $e);
             }
         } finally {
             $this->pending = new \SplObjectStorage();

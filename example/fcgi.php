@@ -11,7 +11,7 @@
 
 declare(strict_types = 1);
 
-use Interop\Async\Loop;
+use AsyncInterop\Loop;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http;

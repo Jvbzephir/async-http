@@ -92,7 +92,7 @@ class HttpEndpointTest extends AsyncTestCase
                 
                 $this->assertEquals('Hello Test Client :)', yield $response->getBody()->getContents());
             } finally {
-                yield $client->shutdown();
+                $client->shutdown();
             }
         } finally {
             $server->stop();
@@ -123,7 +123,7 @@ class HttpEndpointTest extends AsyncTestCase
                 
                 $this->assertEquals('', yield $response->getBody()->getContents());
             } finally {
-                yield $client->shutdown();
+                $client->shutdown();
             }
         } finally {
             $server->stop();
