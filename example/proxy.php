@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use AsyncInterop\Loop;
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
@@ -20,13 +21,13 @@ use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\ReverseProxySettings;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
+use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Log\PipeLogHandler;
-use KoolKode\Async\Loop\LoopConfig;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
 Loop::execute(function () {
-    $logger = LoopConfig::getLogger();
+    $logger = Context::lookup(Logger::class);
     $logger->addHandler(new PipeLogHandler());
     
     $ws = new ConnectionHandler();

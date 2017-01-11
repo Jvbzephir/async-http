@@ -11,14 +11,15 @@
 
 declare(strict_types = 1);
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Events\EventSource;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Pause;
 use KoolKode\Async\ReadContents;
 
@@ -47,7 +48,7 @@ return function (HttpRequest $request) use ($websocket) {
             
             return $source;
         case '':
-            $html = yield new ReadContents(yield LoopConfig::currentFilesystem()->readStream(__DIR__ . '/index.html'));
+            $html = yield new ReadContents(yield Context::lookup(Filesystem::class)->readStream(__DIR__ . '/index.html'));
             
             $peer = $request->getAttribute(HttpDriverContext::class)->getPeer();
             $scheme = ($request->getUri()->getScheme() === 'https') ? 'wss' : 'ws';

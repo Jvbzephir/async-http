@@ -24,7 +24,6 @@ use KoolKode\Async\Util\Channel;
 use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
@@ -142,7 +141,7 @@ class Connection implements LoggerAwareInterface
     public function shutdown()
     {
         if ($this->processor !== null) {
-            $this->processor->cancel('Connection shutdown', new StreamClosedException('Connection shutdown'));
+            $this->processor->cancel('Connection shutdown');
         }
     }
     

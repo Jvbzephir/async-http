@@ -113,7 +113,7 @@ class Handler implements LoggerAwareInterface
         return new Coroutine(function () use ($reason) {
             try {
                 foreach ($this->pending as $task) {
-                    $task->cancel('FCGI request closed', new StreamClosedException());
+                    $task->cancel('FCGI request closed');
                 }
             } finally {
                 $this->pending = new \SplObjectStorage();

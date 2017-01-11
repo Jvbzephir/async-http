@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitRead;
+use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
@@ -504,7 +505,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                     $response = $response->withAddedHeader($k, $v);
                 }
             }
-        } elseif ($this->logger) {
+        } elseif ($this->logger && !$e instanceof CancellationException) {
             if ($e instanceof StreamClosedException) {
                 $logger->debug('Remote peer disconnected');
             } else {
@@ -676,7 +677,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                 yield new AwaitRead($socket);
             }
             
-            $task->cancel('Client disconnected', new StreamClosedException('Client disconnected'));
+            $task->cancel('Client disconnected');
         });
         
         return yield $task;

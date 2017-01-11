@@ -21,7 +21,6 @@ use KoolKode\Async\Http\Responder\ResponderSupported;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Stream\StreamClosedException;
 
 class HttpEndpoint implements Endpoint
 {
@@ -149,7 +148,7 @@ class HttpEndpoint implements Endpoint
             $this->server = null;
             
             foreach ($pending as $request) {
-                $request->cancel('HTTP server stopped', new StreamClosedException('HTTP server stopped'));
+                $request->cancel('HTTP server stopped');
             }
         }
     }
