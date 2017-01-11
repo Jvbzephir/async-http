@@ -13,12 +13,13 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Response\FileResponse;
-use KoolKode\Async\Loop\LoopConfig;
-use KoolKode\Util\Filesystem;
+use KoolKode\Util\Filesystem as FileUtil;
 
 /**
  * Publishes all files within a directory (and all nested directories).
@@ -90,13 +91,13 @@ class PublishFiles
             $path = \substr($path, \strlen($this->basePath) - 1);
         }
         
-        $file = Filesystem::normalizePath($this->directory . \substr($path, 1));
+        $file = FileUtil::normalizePath($this->directory . \substr($path, 1));
         
         if (0 !== \strpos($file, $this->directory)) {
             return yield from $next($request);
         }
         
-        if (!yield LoopConfig::currentFilesystem()->isFile($file)) {
+        if (!yield Context::lookup(Filesystem::class)->isFile($file)) {
             return yield from $next($request);
         }
         

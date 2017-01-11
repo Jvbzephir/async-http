@@ -14,8 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Context;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Http\Body\BufferedBody;
 use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Http;
@@ -24,7 +26,6 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -288,7 +289,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         if ($sendfile) {
             if ($size) {
-                $sent += yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                $sent += yield Context::lookup(Filesystem::class)->sendfile($body->getFile(), $socket->getSocket(), $size);
             }
         } elseif ($size === null) {
             $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");

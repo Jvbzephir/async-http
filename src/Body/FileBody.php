@@ -14,9 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Http\HttpBody;
-use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Success;
 
@@ -67,7 +68,7 @@ class FileBody implements HttpBody
      */
     public function getSize(): Awaitable
     {
-        return LoopConfig::currentFilesystem()->size($this->file);
+        return Context::lookup(Filesystem::class)->size($this->file);
     }
 
     /**
@@ -75,7 +76,7 @@ class FileBody implements HttpBody
      */
     public function getReadableStream(): Awaitable
     {
-        return LoopConfig::currentFilesystem()->readStream($this->file);
+        return Context::lookup(Filesystem::class)->readStream($this->file);
     }
 
     /**

@@ -14,10 +14,11 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Filesystem\FilesystemTempStream;
 use KoolKode\Async\Http\HttpBody;
-use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\ReadableStream;
@@ -120,7 +121,7 @@ class BufferedBody implements HttpBody
                     return $this->size = $len;
                 }
                 
-                $this->temp = yield LoopConfig::currentFilesystem()->tempStream();
+                $this->temp = yield Context::lookup(Filesystem::class)->tempStream();
                 $this->offset += yield $this->temp->write($buffer);
             });
         }
@@ -172,7 +173,7 @@ class BufferedBody implements HttpBody
                 return new ReadableMemoryStream($buffer);
             }
             
-            $this->temp = yield LoopConfig::currentFilesystem()->tempStream();
+            $this->temp = yield Context::lookup(Filesystem::class)->tempStream();
             $this->offset += yield $this->temp->write($buffer);
             
             return new BufferedBodyStream($this->temp, $this->stream, $this->bufferSize, $this);

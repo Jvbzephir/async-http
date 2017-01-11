@@ -15,8 +15,10 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitRead;
+use KoolKode\Async\Context;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Http;
@@ -27,7 +29,6 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Loop\LoopConfig;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
@@ -572,7 +573,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
             if (!$nobody) {
                 if ($sendfile) {
                     if ($size) {
-                        $sent += yield LoopConfig::currentFilesystem()->sendfile($body->getFile(), $socket->getSocket(), $size);
+                        $sent += yield Context::lookup(Filesystem::class)->sendfile($body->getFile(), $socket->getSocket(), $size);
                     }
                 } elseif ($http11 && $size === null) {
                     $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
