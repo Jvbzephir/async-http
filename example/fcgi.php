@@ -12,7 +12,6 @@
 declare(strict_types = 1);
 
 use AsyncInterop\Loop;
-use KoolKode\Async\Context;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http;
@@ -29,7 +28,7 @@ use KoolKode\Async\Log\PipeLogHandler;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 Loop::execute(function () {
-    $logger = Context::lookup(Logger::class);
+    $logger = Logger::get();
     $logger->addHandler(new PipeLogHandler());
     
     $endpoint = new FcgiEndpoint('0.0.0.0:9090', 'localhost');
