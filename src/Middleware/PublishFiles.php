@@ -13,8 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Context;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -48,6 +48,8 @@ class PublishFiles
      * @var int
      */
     protected $ttl;
+    
+    protected $filesystem;
 
     /**
      * Create a new file publisher middleware.
@@ -61,6 +63,8 @@ class PublishFiles
         $this->directory = \rtrim(\str_replace('\\', '/', $directory), '/') . '/';
         $this->basePath = \rtrim('/' . \trim($basePath, '/'), '/') . '/';
         $this->ttl = $ttl;
+        
+        $this->filesystem = new FilesystemProxy();
     }
 
     /**
@@ -97,11 +101,16 @@ class PublishFiles
             return yield from $next($request);
         }
         
-        if (!yield Context::lookup(Filesystem::class)->isFile($file)) {
+        if (!yield $this->filesystem->isFile($file)) {
             return yield from $next($request);
         }
         
         return $this->createResponse($request, $file);
+    }
+    
+    public function setFilesystem(Filesystem $filesystem)
+    {
+        $this->filesystem = $filesystem;
     }
 
     /**

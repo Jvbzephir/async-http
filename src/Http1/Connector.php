@@ -14,10 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Context;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Body\BufferedBody;
 use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Http;
@@ -49,6 +49,8 @@ class Connector implements HttpConnector, LoggerAwareInterface
     protected $pool;
     
     protected $pending;
+    
+    protected $filesystem;
 
     public function __construct(ResponseParser $parser = null, ConnectionManager $pool = null)
     {
@@ -56,6 +58,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
         $this->pool = $pool ?? new ConnectionManager(8, 15, 100);
         
         $this->pending = new \SplObjectStorage();
+        $this->filesystem = new FilesystemProxy();
     }
     
     public function setKeepAlive(bool $keepAlive)
@@ -66,6 +69,11 @@ class Connector implements HttpConnector, LoggerAwareInterface
     public function setExpectContinue($expect)
     {
         $this->expectContinue = $expect;
+    }
+    
+    public function setFilesystem(Filesystem $filesystem)
+    {
+        $this->filesystem = $filesystem;
     }
     
     /**
@@ -289,7 +297,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         if ($sendfile) {
             if ($size) {
-                $sent += yield Context::lookup(Filesystem::class)->sendfile($body->getFile(), $socket->getSocket(), $size);
+                $sent += yield $this->filesystem->sendfile($body->getFile(), $socket->getSocket(), $size);
             }
         } elseif ($size === null) {
             $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");

@@ -11,9 +11,9 @@
 
 declare(strict_types = 1);
 
-use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Events\EventSource;
 use KoolKode\Async\Http\Http;
@@ -26,8 +26,9 @@ use KoolKode\Async\ReadContents;
 require_once __DIR__ . '/websocket.php';
 
 $websocket = new ExampleEndpoint();
+$filesystem = new FilesystemProxy();
 
-return function (HttpRequest $request) use ($websocket) {
+return function (HttpRequest $request) use ($websocket, $filesystem) {
     switch (trim($request->getRequestTarget(), '/')) {
         case 'websocket':
             return $websocket;
@@ -48,7 +49,7 @@ return function (HttpRequest $request) use ($websocket) {
             
             return $source;
         case '':
-            $html = yield new ReadContents(yield Context::lookup(Filesystem::class)->readStream(__DIR__ . '/index.html'));
+            $html = yield new ReadContents(yield $filesystem->readStream(__DIR__ . '/index.html'));
             
             $peer = $request->getAttribute(HttpDriverContext::class)->getPeer();
             $scheme = ($request->getUri()->getScheme() === 'https') ? 'wss' : 'ws';

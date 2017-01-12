@@ -14,9 +14,9 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Success;
@@ -34,6 +34,8 @@ class FileBody implements HttpBody
      * @var string
      */
     protected $file;
+    
+    protected $filesystem;
 
     /**
      * Create a message body that can stream a file.
@@ -43,6 +45,13 @@ class FileBody implements HttpBody
     public function __construct(string $file)
     {
         $this->file = $file;
+        
+        $this->filesystem = new FilesystemProxy();
+    }
+    
+    public function setFilesystem(Filesystem $filesystem)
+    {
+        $this->filesystem = $filesystem;
     }
 
     /**
@@ -68,7 +77,7 @@ class FileBody implements HttpBody
      */
     public function getSize(): Awaitable
     {
-        return Context::lookup(Filesystem::class)->size($this->file);
+        return $this->filesystem->size($this->file);
     }
 
     /**
@@ -76,7 +85,7 @@ class FileBody implements HttpBody
      */
     public function getReadableStream(): Awaitable
     {
-        return Context::lookup(Filesystem::class)->readStream($this->file);
+        return $this->filesystem->readStream($this->file);
     }
 
     /**

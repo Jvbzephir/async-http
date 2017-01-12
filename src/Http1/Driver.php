@@ -16,10 +16,10 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitRead;
 use KoolKode\Async\CancellationException;
-use KoolKode\Async\Context;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Http;
@@ -74,6 +74,8 @@ class Driver implements HttpDriver, LoggerAwareInterface
      */
     protected $upgradeResultHandlers = [];
     
+    protected $filesystem;
+    
     /**
      * Create a new HTTP/1 driver.
      * 
@@ -82,6 +84,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
     public function __construct(RequestParser $parser = null)
     {
         $this->parser = $parser ?? new RequestParser();
+        $this->filesystem = new FilesystemProxy();
     }
     
     /**
@@ -90,6 +93,11 @@ class Driver implements HttpDriver, LoggerAwareInterface
     public function setKeepAliveSupported(bool $keepAlive)
     {
         $this->keepAliveSupported = $keepAlive;
+    }
+    
+    public function setFilesystem(Filesystem $filesystem)
+    {
+        $this->filesystem = $filesystem;
     }
     
     /**
@@ -574,7 +582,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
             if (!$nobody) {
                 if ($sendfile) {
                     if ($size) {
-                        $sent += yield Context::lookup(Filesystem::class)->sendfile($body->getFile(), $socket->getSocket(), $size);
+                        $sent += yield $this->filesystem->sendfile($body->getFile(), $socket->getSocket(), $size);
                     }
                 } elseif ($http11 && $size === null) {
                     $sent += yield $socket->write(\dechex($len) . "\r\n" . $chunk . "\r\n");
