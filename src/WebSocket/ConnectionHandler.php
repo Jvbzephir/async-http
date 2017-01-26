@@ -17,8 +17,8 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerAwareInterface;
@@ -49,7 +49,7 @@ class ConnectionHandler implements UpgradeResultHandler, LoggerAwareInterface
     
     public function __construct()
     {
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     /**

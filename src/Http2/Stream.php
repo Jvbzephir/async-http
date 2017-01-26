@@ -23,8 +23,8 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
@@ -71,7 +71,7 @@ class Stream implements LoggerAwareInterface
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();
         $this->pending = new \SplObjectStorage();
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     public function getId(): int

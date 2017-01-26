@@ -21,8 +21,8 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
@@ -106,7 +106,7 @@ class Handler implements LoggerAwareInterface
         
         $this->body = new Channel(4);
         $this->pending = new \SplObjectStorage();
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
 
     public function close(int $reason): Awaitable

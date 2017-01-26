@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Events;
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 
@@ -51,7 +51,7 @@ class EventBody extends DeferredBody implements LoggerAwareInterface
     public function __construct(EventSource $source)
     {
         $this->source = $source;
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
 
     /**

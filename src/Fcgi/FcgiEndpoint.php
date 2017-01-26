@@ -22,7 +22,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Responder\ResponderSupported;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketServer;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -55,7 +55,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
         
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     public function getSocketServerFactory(): SocketServerFactory

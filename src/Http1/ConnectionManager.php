@@ -15,8 +15,8 @@ namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Success;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -56,7 +56,7 @@ class ConnectionManager implements LoggerAwareInterface
         $this->maxLifetime = $maxLifetime;
         $this->max = $max;
         
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     public function getMaxLifetime(): int

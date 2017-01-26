@@ -25,8 +25,8 @@ use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -61,7 +61,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
         $this->pending = new \SplObjectStorage();
         $this->filesystem = new FilesystemProxy();
         
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     public function setKeepAlive(bool $keepAlive)

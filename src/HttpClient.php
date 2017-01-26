@@ -19,7 +19,6 @@ use KoolKode\Async\DNS\Address;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Http1\Connector;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketFactory;
 use Psr\Log\LoggerAwareInterface;
@@ -78,7 +77,7 @@ class HttpClient implements LoggerAwareInterface
         }, $this->connectors)));
         
         $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
 
     public function shutdown()

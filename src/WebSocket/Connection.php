@@ -17,13 +17,12 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use KoolKode\Async\Http\Http;
 
 /**
  * WebSocket connection based on a socket and the protocol defined in RFC 6455.
@@ -128,7 +127,7 @@ class Connection implements LoggerAwareInterface
         $this->client = $client;
         $this->protocol = $protocol;
         
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
         
         $this->writer = new MessageWriter($socket, $client);
         $this->messages = new Channel(4);

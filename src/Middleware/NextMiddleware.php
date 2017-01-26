@@ -16,7 +16,7 @@ namespace KoolKode\Async\Http\Middleware;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 
@@ -60,7 +60,7 @@ class NextMiddleware implements LoggerAwareInterface
     {
         $this->middlewares = $middlewares;
         $this->target = $target;
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
 
     /**

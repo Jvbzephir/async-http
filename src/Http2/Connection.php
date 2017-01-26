@@ -19,7 +19,7 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
@@ -119,7 +119,7 @@ class Connection implements LoggerAwareInterface
         
         $this->writer = new Executor();
         $this->incoming = new Channel();
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);

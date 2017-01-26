@@ -21,8 +21,8 @@ use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -41,7 +41,7 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
     public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     /**

@@ -27,10 +27,10 @@ use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
@@ -87,7 +87,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
         $this->parser = $parser ?? new RequestParser();
         $this->filesystem = new FilesystemProxy();
         
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
     
     /**

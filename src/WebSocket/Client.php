@@ -19,7 +19,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Log\LoggerProxy;
+use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -62,7 +62,7 @@ class Client implements LoggerAwareInterface
     public function __construct(HttpClient $httpClient = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
-        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
+        $this->logger = new Logger(static::class);
     }
 
     /**
