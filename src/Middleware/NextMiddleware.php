@@ -60,7 +60,7 @@ class NextMiddleware implements LoggerAwareInterface
     {
         $this->middlewares = $middlewares;
         $this->target = $target;
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
 
     /**

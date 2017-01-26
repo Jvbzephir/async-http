@@ -41,7 +41,7 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
     public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     /**

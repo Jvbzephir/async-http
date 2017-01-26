@@ -20,6 +20,7 @@ use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Success;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use KoolKode\Async\Http\Http;
 
 /**
  * Manages HTTP/1 client connections.
@@ -55,7 +56,7 @@ class ConnectionManager implements LoggerAwareInterface
         $this->maxLifetime = $maxLifetime;
         $this->max = $max;
         
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     public function getMaxLifetime(): int

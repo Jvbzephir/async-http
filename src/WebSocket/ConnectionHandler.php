@@ -49,7 +49,7 @@ class ConnectionHandler implements UpgradeResultHandler, LoggerAwareInterface
     
     public function __construct()
     {
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     /**

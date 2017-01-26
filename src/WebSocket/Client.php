@@ -62,7 +62,7 @@ class Client implements LoggerAwareInterface
     public function __construct(HttpClient $httpClient = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
 
     /**

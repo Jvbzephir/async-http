@@ -78,7 +78,7 @@ class HttpClient implements LoggerAwareInterface
         }, $this->connectors)));
         
         $this->userAgent = \sprintf('PHP/%s', \PHP_VERSION);
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
 
     public function shutdown()

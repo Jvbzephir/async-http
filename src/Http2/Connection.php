@@ -25,6 +25,7 @@ use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use KoolKode\Async\Http\Http;
 
 /**
  * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
@@ -118,7 +119,7 @@ class Connection implements LoggerAwareInterface
         
         $this->writer = new Executor();
         $this->incoming = new Channel();
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);

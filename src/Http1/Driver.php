@@ -86,7 +86,8 @@ class Driver implements HttpDriver, LoggerAwareInterface
     {
         $this->parser = $parser ?? new RequestParser();
         $this->filesystem = new FilesystemProxy();
-        $this->logger = new LoggerProxy(static::class);
+        
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     /**

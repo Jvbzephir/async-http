@@ -106,7 +106,7 @@ class Handler implements LoggerAwareInterface
         
         $this->body = new Channel(4);
         $this->pending = new \SplObjectStorage();
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
 
     public function close(int $reason): Awaitable

@@ -60,7 +60,8 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         $this->pending = new \SplObjectStorage();
         $this->filesystem = new FilesystemProxy();
-        $this->logger = new LoggerProxy(static::class);
+        
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     public function setKeepAlive(bool $keepAlive)

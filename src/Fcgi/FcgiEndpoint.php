@@ -55,7 +55,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
         
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     public function getSocketServerFactory(): SocketServerFactory

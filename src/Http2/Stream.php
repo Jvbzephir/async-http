@@ -71,7 +71,7 @@ class Stream implements LoggerAwareInterface
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();
         $this->pending = new \SplObjectStorage();
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     public function getId(): int
@@ -329,14 +329,13 @@ class Stream implements LoggerAwareInterface
                 
                 $head = ($request->getMethod() === Http::HEAD);
                 $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
+                $body = $response->getBody();
                 
                 if ($body instanceof DeferredBody) {
                     $response = $response->withHeader('X-Accel-Buffering', 'no');
                 }
                 
                 yield from $this->sendHeaders($response, $headers, [], $nobody);
-                
-                $body = $response->getBody();
                 
                 if ($body instanceof DeferredBody) {
                     $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [

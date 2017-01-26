@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
@@ -185,7 +186,7 @@ class Connection implements LoggerAwareInterface
         
         $this->incoming = new Channel();
         $this->processor = new Coroutine($this->handleIncomingRecords(), true);
-        $this->logger = new LoggerProxy(static::class);
+        $this->logger = new LoggerProxy(static::class, Http::LOG_CHANNEL);
     }
     
     /**

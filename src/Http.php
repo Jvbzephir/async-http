@@ -28,6 +28,13 @@ use Psr\Log\LoggerInterface;
 abstract class Http
 {
     /**
+     * Additional log channel being used to group HTTP logs.
+     * 
+     * @var string
+     */
+    const LOG_CHANNEL = 'koolkode/async-http';
+    
+    /**
      * Format of DateTime fields in HTTP headers.
      * 
      * @var string
