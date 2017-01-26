@@ -39,6 +39,7 @@ Loop::execute(function () {
         $endpoint->addMiddleware(new ContentEncoder());
         $endpoint->addMiddleware(new BrowserSupport());
         $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+        
         $endpoint->addResponder(new EventResponder());
         
         $endpoint->listen(require __DIR__ . '/listener.php');

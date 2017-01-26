@@ -188,6 +188,10 @@ class Handler implements LoggerAwareInterface
         $head = ($request->getMethod() === Http::HEAD);
         $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
         
+        if ($body instanceof DeferredBody) {
+            $response = $response->withHeader('X-Accel-Buffering', 'no');
+        }
+        
         $buffer = $this->serializeHeaders($response, $nobody ? null : $size);
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $buffer . "\r\n"));

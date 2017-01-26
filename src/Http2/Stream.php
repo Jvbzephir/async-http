@@ -330,6 +330,10 @@ class Stream implements LoggerAwareInterface
                 $head = ($request->getMethod() === Http::HEAD);
                 $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
                 
+                if ($body instanceof DeferredBody) {
+                    $response = $response->withHeader('X-Accel-Buffering', 'no');
+                }
+                
                 yield from $this->sendHeaders($response, $headers, [], $nobody);
                 
                 $body = $response->getBody();

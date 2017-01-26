@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 use AsyncInterop\Loop;
 use KoolKode\Async\Context;
+use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http;
@@ -36,7 +37,7 @@ Loop::execute(function () {
         $endpoint->addMiddleware(new BrowserSupport());
         $endpoint->addMiddleware(new ContentEncoder());
         
-        $endpoint->addResponder(new \KoolKode\Async\Http\Events\EventResponder());
+        $endpoint->addResponder(new EventResponder());
         
         $endpoint->listen(require __DIR__ . '/listener.php');
         

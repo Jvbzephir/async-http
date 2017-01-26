@@ -635,6 +635,8 @@ class Driver implements HttpDriver, LoggerAwareInterface
             $close = true;
         }
         
+        $response = $response->withHeader('X-Accel-Buffering', 'no');
+        
         yield $socket->write($this->serializeHeaders($response, $close, null, $nobody, true) . "\r\n");
         yield $socket->flush();
         
