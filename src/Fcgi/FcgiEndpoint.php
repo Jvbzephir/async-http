@@ -22,6 +22,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Responder\ResponderSupported;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketServer;
 use KoolKode\Async\Socket\SocketServerFactory;
 use KoolKode\Async\Socket\SocketStream;
@@ -53,6 +54,8 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
     {
         $this->factory = new SocketServerFactory($peer);
         $this->factory->setPeerName($peerName);
+        
+        $this->logger = new LoggerProxy(static::class);
     }
     
     public function getSocketServerFactory(): SocketServerFactory
@@ -79,13 +82,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
             
             try {
                 yield $this->server->listen(function (SocketStream $socket) use ($pending, $context, $action) {
-                    $conn = new Connection($socket, $context);
-                    
-                    if ($this->logger) {
-                        $conn->setLogger($this->logger);
-                    }
-                    
-                    $pending->attach($conn);
+                    $pending->attach($conn = new Connection($socket, $context));
                     
                     while (null !== ($next = yield $conn->nextRequest())) {
                         new Coroutine($this->processRequest($conn, $context, $action, ...$next));
@@ -111,7 +108,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
             }
             
             return $context->respond($request, $result);
-        }, $this->logger);
+        });
         
         yield from $handler->sendResponse($request, yield from $next($request));
     }

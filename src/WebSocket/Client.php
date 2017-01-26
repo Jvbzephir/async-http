@@ -19,6 +19,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -61,6 +62,7 @@ class Client implements LoggerAwareInterface
     public function __construct(HttpClient $httpClient = null)
     {
         $this->httpClient = $httpClient ?? new HttpClient();
+        $this->logger = new LoggerProxy(static::class);
     }
 
     /**
@@ -128,14 +130,10 @@ class Client implements LoggerAwareInterface
         try {
             $conn = new Connection($socket, true, $response->getHeaderLine('Sec-WebSocket-Protocol'));
             
-            if ($this->logger) {
-                $conn->setLogger($this->logger);
-                
-                $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
-                    'peer' => $socket->getRemoteAddress(),
-                    'uri' => $location
-                ]);
-            }
+            $this->logger->debug('Established WebSocket connection to {peer} ({uri})', [
+                'peer' => $socket->getRemoteAddress(),
+                'uri' => $location
+            ]);
             
             if ($deflate = $this->negotiatePerMessageDeflate($response)) {
                 if (!$this->deflateSupported) {

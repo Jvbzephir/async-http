@@ -18,6 +18,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerAwareInterface;
@@ -45,6 +46,11 @@ class ConnectionHandler implements UpgradeResultHandler, LoggerAwareInterface
      * @var bool
      */
     protected $deflateSupported = false;
+    
+    public function __construct()
+    {
+        $this->logger = new LoggerProxy(static::class);
+    }
     
     /**
      * Enable / disable usage of permessage-deflate WebSocket extension.
@@ -146,18 +152,12 @@ class ConnectionHandler implements UpgradeResultHandler, LoggerAwareInterface
             throw new \InvalidArgumentException('No endpoint object passed to WebSocket handler');
         }
         
-        if ($this->logger) {
-            $this->logger->debug('HTTP/{protocol} connection from {peer} upgraded to WebSocket', [
-                'protocol' => $request->getProtocolVersion(),
-                'peer' => $socket->getRemoteAddress()
-            ]);
-        }
+        $this->logger->debug('HTTP/{protocol} connection from {peer} upgraded to WebSocket', [
+            'protocol' => $request->getProtocolVersion(),
+            'peer' => $socket->getRemoteAddress()
+        ]);
         
         $conn = new Connection($socket, false, $response->getHeaderLine('Sec-WebSocket-Protocol'));
-        
-        if ($this->logger) {
-            $conn->setLogger($this->logger);
-        }
         
         if ($deflate = $response->getAttribute(PerMessageDeflate::class)) {
             $conn->enablePerMessageDeflate($deflate);

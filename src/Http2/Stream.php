@@ -24,6 +24,7 @@ use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
@@ -60,8 +61,6 @@ class Stream implements LoggerAwareInterface
     protected $outputDefer;
     
     protected $pending;
-    
-    protected $logger;
 
     public function __construct(int $id, Connection $conn, int $outputWindow = Connection::INITIAL_WINDOW_SIZE)
     {
@@ -72,6 +71,7 @@ class Stream implements LoggerAwareInterface
         $this->hpack = $conn->getHPack();
         $this->defer = new Deferred();
         $this->pending = new \SplObjectStorage();
+        $this->logger = new LoggerProxy(static::class);
     }
     
     public function getId(): int
@@ -335,16 +335,14 @@ class Stream implements LoggerAwareInterface
                 $body = $response->getBody();
                 
                 if ($body instanceof DeferredBody) {
-                    if ($this->logger) {
-                        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                            'ip' => $request->getClientAddress(),
-                            'method' => $request->getMethod(),
-                            'target' => $request->getRequestTarget(),
-                            'protocol' => $request->getProtocolVersion(),
-                            'status' => $response->getStatusCode(),
-                            'size' => '-'
-                        ]);
-                    }
+                    $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                        'ip' => $request->getClientAddress(),
+                        'method' => $request->getMethod(),
+                        'target' => $request->getRequestTarget(),
+                        'protocol' => $request->getProtocolVersion(),
+                        'status' => $response->getStatusCode(),
+                        'size' => '-'
+                    ]);
                     
                     if ($nobody) {
                         return $body->close(false);
@@ -355,16 +353,14 @@ class Stream implements LoggerAwareInterface
                 
                 $sent = $nobody ? 0 : yield from $this->sendBody(yield $body->getReadableStream());
                 
-                if ($this->logger) {
-                    $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                        'ip' => $request->getClientAddress(),
-                        'method' => $request->getMethod(),
-                        'target' => $request->getRequestTarget(),
-                        'protocol' => $request->getProtocolVersion(),
-                        'status' => $response->getStatusCode(),
-                        'size' => $sent ?: '-'
-                    ]);
-                }
+                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                    'ip' => $request->getClientAddress(),
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'protocol' => $request->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'size' => $sent ?: '-'
+                ]);
             } finally {
                 $this->conn->closeStream($this->id);
             }
@@ -495,7 +491,7 @@ class Stream implements LoggerAwareInterface
     
     protected function sendDeferredBody(HttpRequest $request, DeferredBody $body): \Generator
     {
-        $body->start($request, $this->logger);
+        $body->start($request);
         
         $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
         $stream = yield $body->getReadableStream();

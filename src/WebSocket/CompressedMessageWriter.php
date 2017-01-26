@@ -55,7 +55,7 @@ class CompressedMessageWriter extends MessageWriter
             return new Failure(new \InvalidArgumentException('Message is not UTF-8 encoded'));
         }
         
-        return $this->writer->execute(function () use ($text) {
+        return $this->writer->submit(function () use ($text) {
             $type = Frame::TEXT;
             $reserved = Frame::RESERVED1;
             $context = $this->deflate->getCompressionContext();
@@ -81,7 +81,7 @@ class CompressedMessageWriter extends MessageWriter
      */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($stream) {
+        return $this->writer->submit(function () use ($stream) {
             $type = Frame::BINARY;
             $reserved = Frame::RESERVED1;
             $context = $this->deflate->getCompressionContext();

@@ -17,7 +17,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -141,7 +140,6 @@ class DriverTest extends AsyncTestCase
     
     public function testCanCopyHttp10ContentsOfUnknownSize()
     {
-        $logger = new TestLogger();
         $payload = random_bytes(20000);
         
         yield new SocketStreamTester(function (DuplexStream $stream) use ($payload) {
@@ -161,9 +159,8 @@ class DriverTest extends AsyncTestCase
             $this->assertEquals(Http::OK, $response->getStatusCode());
             $this->assertEquals('close', $response->getHeaderLine('Connection'));
             $this->assertEquals($payload, yield $response->getBody()->getContents());
-        }, function (DuplexStream $stream) use ($payload, $logger) {
+        }, function (DuplexStream $stream) use ($payload) {
             $driver = new Driver();
-            $driver->setLogger($logger);
             
             yield $driver->handleConnection(new HttpDriverContext(), $stream, function (HttpRequest $request) use ($payload) {
                 $this->assertEquals(Http::POST, $request->getMethod());
@@ -179,8 +176,6 @@ class DriverTest extends AsyncTestCase
                 return $response;
             });
         });
-        
-        $this->assertCount(3, $logger);
     }
     
     public function testHeadRequest()

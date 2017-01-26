@@ -15,28 +15,25 @@ namespace KoolKode\Async\Http\Events;
 
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\HttpRequest;
-use Psr\Log\LoggerInterface;
+use KoolKode\Async\Log\LoggerProxy;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * HTTP body implementation that incrementally generates contents as events are being sent.
  * 
  * @author Martin Schröder
  */
-class EventBody extends DeferredBody
+class EventBody extends DeferredBody implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Event source being used to generate events.
      * 
      * @var EventSource
      */
     protected $source;
-    
-    /**
-     * Optional PSR logger instance provided by an HTTP driver on start.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
 
     /**
      * Address of the HTTP client.
@@ -53,23 +50,20 @@ class EventBody extends DeferredBody
     public function __construct(EventSource $source)
     {
         $this->source = $source;
+        $this->logger = new LoggerProxy(static::class);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function start(HttpRequest $request, LoggerInterface $logger = null)
+    public function start(HttpRequest $request)
     {
-        $this->logger = $logger;
+        $this->address = $request->getClientAddress();
         
-        if ($this->logger) {
-            $this->address = $request->getClientAddress();
-            
-            $this->logger->debug('Enabled SSE for {address} using HTTP/{version}', [
-                'address' => $this->address,
-                'version' => $request->getProtocolVersion()
-            ]);
-        }
+        $this->logger->debug('Enabled SSE for {address} using HTTP/{version}', [
+            'address' => $this->address,
+            'version' => $request->getProtocolVersion()
+        ]);
     }
 
     /**
@@ -77,16 +71,14 @@ class EventBody extends DeferredBody
      */
     public function close(bool $disconnected)
     {
-        if ($this->logger) {
-            if ($disconnected) {
-                $this->logger->debug('SSE client {address} disconnected', [
-                    'address' => $this->address
-                ]);
-            } else {
-                $this->logger->debug('SSE source closed for client {address}', [
-                    'address' => $this->address
-                ]);
-            }
+        if ($disconnected) {
+            $this->logger->debug('SSE client {address} disconnected', [
+                'address' => $this->address
+            ]);
+        } else {
+            $this->logger->debug('SSE source closed for client {address}', [
+                'address' => $this->address
+            ]);
         }
         
         $this->source->close();

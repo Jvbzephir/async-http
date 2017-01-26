@@ -14,14 +14,15 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
-use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 
@@ -117,6 +118,7 @@ class Connection implements LoggerAwareInterface
         
         $this->writer = new Executor();
         $this->incoming = new Channel();
+        $this->logger = new LoggerProxy(static::class);
         
         $parts = \explode(':', $socket->getRemoteAddress());
         \array_pop($parts);
@@ -195,11 +197,9 @@ class Connection implements LoggerAwareInterface
             $this->nextStreamId = 1;
             $this->processor = new Coroutine($this->processIncomingFrames($frames), true);
             
-            if ($this->logger) {
-                $this->logger->debug('Performed HTTP/2 client handshake with {peer}', [
-                    'peer' => $this->socket->getRemoteAddress()
-                ]);
-            }
+            $this->logger->debug('Performed HTTP/2 client handshake with {peer}', [
+                'peer' => $this->socket->getRemoteAddress()
+            ]);
         });
     }
 
@@ -244,21 +244,15 @@ class Connection implements LoggerAwareInterface
             $this->nextStreamId = 2;
             $this->processor = new Coroutine($this->processIncomingFrames(), true);
             
-            if ($this->logger) {
-                $this->logger->debug('Performed HTTP/2 server handshake with {peer}', [
-                    'peer' => $this->socket->getRemoteAddress()
-                ]);
-            }
+            $this->logger->debug('Performed HTTP/2 server handshake with {peer}', [
+                'peer' => $this->socket->getRemoteAddress()
+            ]);
         });
     }
     
     public function openStream(): Stream
     {
         $stream = new Stream($this->nextStreamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
-        
-        if ($this->logger) {
-            $stream->setLogger($this->logger);
-        }
         
         $this->nextStreamId += 2;
         
@@ -310,10 +304,6 @@ class Connection implements LoggerAwareInterface
         }
         
         $stream = new Stream($streamId, $this, $this->remoteSettings[self::SETTING_INITIAL_WINDOW_SIZE]);
-        
-        if ($this->logger) {
-            $stream->setLogger($this->logger);
-        }
         
         $stream->getDefer()->when(function (\Throwable $e = null, $val = null) {
             $this->incoming->send($e ?? $val);
@@ -603,21 +593,21 @@ class Connection implements LoggerAwareInterface
 
     public function writeFrame(Frame $frame, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($frame) {
+        return $this->writer->submit(function () use ($frame) {
             return $this->socket->write($frame->encode(0));
         }, $priority);
     }
 
     public function writeStreamFrame(int $stream, Frame $frame, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($stream, $frame) {
+        return $this->writer->submit(function () use ($stream, $frame) {
             return $this->socket->write($frame->encode($stream));
         }, $priority);
     }
 
     public function writeStreamFrames(int $stream, array $frames, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($stream, $frames) {
+        return $this->writer->submit(function () use ($stream, $frames) {
             $len = 0;
             
             foreach ($frames as $frame) {

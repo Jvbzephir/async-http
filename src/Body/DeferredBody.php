@@ -21,11 +21,10 @@ use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Util\Channel;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Coroutine;
-use Psr\Log\LoggerInterface;
 
 abstract class DeferredBody implements HttpBody
 {
-    public function start(HttpRequest $request, LoggerInterface $logger = null)
+    public function start(HttpRequest $request)
     {
         // Can be used to implement some startup logic, might even be async.
     }

@@ -12,6 +12,7 @@
 declare(strict_types = 1);
 
 use AsyncInterop\Loop;
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Events\EventResponder;
@@ -26,31 +27,29 @@ use KoolKode\Async\Log\PipeLogHandler;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 Loop::execute(function () {
-    $logger = Logger::get();
-    $logger->addHandler(new PipeLogHandler());
+    Context::invoke(function () {
+        $ws = new ConnectionHandler();
+        $ws->setDeflateSupported(true);
         
-    $ws = new ConnectionHandler();
-    $ws->setLogger($logger);
-    $ws->setDeflateSupported(true);
-    
-    $http2 = new Http2Driver();
-    $http2->setLogger($logger);
-    
-    $http1 = new Http1Driver();
-    $http1->setLogger($logger);
-    $http1->addUpgradeHandler($http2);
-    $http1->addUpgradeResultHandler($ws);
-    
-    $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $http1, $http2);
-    $endpoint->setCertificate(__DIR__ . '/localhost.pem');
-    
-    $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
-    $endpoint->addMiddleware(new BrowserSupport());
-    $endpoint->addMiddleware(new ContentEncoder());
-    
-    $endpoint->addResponder(new EventResponder());
-    
-    $endpoint->listen(require __DIR__ . '/listener.php');
-    
-    echo "HTTPS server listening on port 8888\n\n";
+        $http2 = new Http2Driver();
+        
+        $http1 = new Http1Driver();
+        $http1->addUpgradeHandler($http2);
+        $http1->addUpgradeResultHandler($ws);
+        
+        $endpoint = new HttpEndpoint('0.0.0.0:8888', 'localhost', $http1, $http2);
+        $endpoint->setCertificate(__DIR__ . '/localhost.pem');
+        
+        $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
+        $endpoint->addMiddleware(new BrowserSupport());
+        $endpoint->addMiddleware(new ContentEncoder());
+        
+        $endpoint->addResponder(new EventResponder());
+        
+        $endpoint->listen(require __DIR__ . '/listener.php');
+        
+        echo "HTTPS server listening on port 8888\n\n";
+    }, Context::inherit([
+        Logger::class => new Logger(new PipeLogHandler())
+    ]));
 });

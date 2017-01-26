@@ -21,6 +21,7 @@ use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Success;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -43,6 +44,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
     public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createClientContext();
+        $this->logger = new LoggerProxy(static::class);
     }
     
     /**
@@ -151,10 +153,6 @@ class Connector implements HttpConnector, LoggerAwareInterface
             } else {
                 $conn = new Connection($context->socket, new HPack($this->hpackContext));
                 
-                if ($this->logger) {
-                    $conn->setLogger($this->logger);
-                }
-                
                 yield $conn->performClientHandshake();
                 
                 $this->connections[$key] = $conn;
@@ -166,16 +164,14 @@ class Connector implements HttpConnector, LoggerAwareInterface
             $sent = 0;
             $response = yield $conn->openStream()->sendRequest($request, $sent);
             
-            if ($this->logger) {
-                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                    'ip' => $request->getClientAddress(),
-                    'method' => $request->getMethod(),
-                    'target' => $request->getRequestTarget(),
-                    'protocol' => $response->getProtocolVersion(),
-                    'status' => $response->getStatusCode(),
-                    'size' => $sent ?: '-'
-                ]);
-            }
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $response->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => $sent ?: '-'
+            ]);
             
             if (isset($this->connecting[$key])) {
                 $context->connected = true;

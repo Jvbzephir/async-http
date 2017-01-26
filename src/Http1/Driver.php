@@ -30,6 +30,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Timeout;
@@ -85,6 +86,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
     {
         $this->parser = $parser ?? new RequestParser();
         $this->filesystem = new FilesystemProxy();
+        $this->logger = new LoggerProxy(static::class);
     }
     
     /**
@@ -147,11 +149,9 @@ class Driver implements HttpDriver, LoggerAwareInterface
             $remotePeer = $socket->getRemoteAddress();
             $upgraded = false;
             
-            if ($this->logger) {
-                $this->logger->debug('Accepted new HTTP/1 connection from {peer}', [
-                    'peer' => $remotePeer
-                ]);
-            }
+            $this->logger->debug('Accepted new HTTP/1 connection from {peer}', [
+                'peer' => $remotePeer
+            ]);
             
             try {
                 $request = yield from $this->parseNextRequest($context, $socket);
@@ -202,7 +202,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                 try {
                     $socket->close();
                 } finally {
-                    if ($this->logger && !$upgraded) {
+                    if (!$upgraded) {
                         $this->logger->debug('Closed HTTP/1 connection to {peer}', [
                             'peer' => $remotePeer
                         ]);
@@ -400,7 +400,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
                 }
                 
                 return $context->respond($request, $response);
-            }, $this->logger);
+            });
             
             $response = yield from $next($request);
             
@@ -484,16 +484,14 @@ class Driver implements HttpDriver, LoggerAwareInterface
         yield $socket->write($buffer . "\r\n");
         yield $socket->flush();
         
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'size' => '-'
-            ]);
-        }
+        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+            'ip' => $request->getClientAddress(),
+            'method' => $request->getMethod(),
+            'target' => $request->getRequestTarget(),
+            'protocol' => $request->getProtocolVersion(),
+            'status' => $response->getStatusCode(),
+            'size' => '-'
+        ]);
         
         return yield from $handler->upgradeConnection($socket, $request, $response);
     }
@@ -513,9 +511,9 @@ class Driver implements HttpDriver, LoggerAwareInterface
                     $response = $response->withAddedHeader($k, $v);
                 }
             }
-        } elseif ($this->logger && !$e instanceof CancellationException) {
+        } elseif (!$e instanceof CancellationException) {
             if ($e instanceof StreamClosedException) {
-                $logger->debug('Remote peer disconnected');
+                $this->logger->debug('Remote peer disconnected');
             } else {
                 $this->logger->critical('', [
                     'exception' => $e
@@ -610,32 +608,28 @@ class Driver implements HttpDriver, LoggerAwareInterface
             }
         }
         
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'size' => $sent ?: '-'
-            ]);
-        }
+        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+            'ip' => $request->getClientAddress(),
+            'method' => $request->getMethod(),
+            'target' => $request->getRequestTarget(),
+            'protocol' => $request->getProtocolVersion(),
+            'status' => $response->getStatusCode(),
+            'size' => $sent ?: '-'
+        ]);
         
         return !$close;
     }
 
     protected function sendDeferredResponse(SocketStream $socket, HttpRequest $request, HttpResponse $response, bool $nobody, bool $close): \Generator
     {
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => $response->getStatusCode(),
-                'size' => '-'
-            ]);
-        }
+        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+            'ip' => $request->getClientAddress(),
+            'method' => $request->getMethod(),
+            'target' => $request->getRequestTarget(),
+            'protocol' => $request->getProtocolVersion(),
+            'status' => $response->getStatusCode(),
+            'size' => '-'
+        ]);
         
         if (!$nobody) {
             $close = true;
@@ -654,7 +648,7 @@ class Driver implements HttpDriver, LoggerAwareInterface
         
         $task = new Coroutine(function () use (& $watcher, $socket, $request, $response) {
             $body = $response->getBody();
-            $body->start($request, $this->logger);
+            $body->start($request);
             
             $bodyStream = yield $body->getReadableStream();
             $e = null;

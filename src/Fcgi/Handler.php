@@ -22,6 +22,7 @@ use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;
@@ -94,7 +95,6 @@ class Handler implements LoggerAwareInterface
      * @param int $id
      * @param Connection $conn
      * @param HttpDriverContext $context
-     * @param LoggerInterface $logger
      * @param bool $keepAlive
      */
     public function __construct(int $id, Connection $conn, HttpDriverContext $context, bool $keepAlive = true)
@@ -106,6 +106,7 @@ class Handler implements LoggerAwareInterface
         
         $this->body = new Channel(4);
         $this->pending = new \SplObjectStorage();
+        $this->logger = new LoggerProxy(static::class);
     }
 
     public function close(int $reason): Awaitable
@@ -192,16 +193,14 @@ class Handler implements LoggerAwareInterface
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $buffer . "\r\n"));
         
         if ($body instanceof DeferredBody) {
-            if ($this->logger) {
-                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                    'ip' => $request->getClientAddress(),
-                    'method' => $request->getMethod(),
-                    'target' => $request->getRequestTarget(),
-                    'protocol' => $request->getProtocolVersion(),
-                    'status' => $response->getStatusCode(),
-                    'size' => '-'
-                ]);
-            }
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => '-'
+            ]);
             
             if ($nobody) {
                 $body->close(false);
@@ -235,16 +234,14 @@ class Handler implements LoggerAwareInterface
                 }
             }
             
-            if ($this->logger) {
-                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                    'ip' => $request->getClientAddress(),
-                    'method' => $request->getMethod(),
-                    'target' => $request->getRequestTarget(),
-                    'protocol' => $request->getProtocolVersion(),
-                    'status' => $response->getStatusCode(),
-                    'size' => $sent ?: '-'
-                ]);
-            }
+            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                'ip' => $request->getClientAddress(),
+                'method' => $request->getMethod(),
+                'target' => $request->getRequestTarget(),
+                'protocol' => $request->getProtocolVersion(),
+                'status' => $response->getStatusCode(),
+                'size' => $sent ?: '-'
+            ]);
         }
         
         yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, ''));
@@ -255,7 +252,7 @@ class Handler implements LoggerAwareInterface
     
     protected function sendDeferredResponse(HttpRequest $request, DeferredBody $body): \Generator
     {
-        $body->start($request, $this->logger);
+        $body->start($request);
         
         $stream = yield $body->getReadableStream();
         $e = null;

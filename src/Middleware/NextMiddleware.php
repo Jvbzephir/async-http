@@ -16,15 +16,19 @@ namespace KoolKode\Async\Http\Middleware;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use Psr\Log\LoggerInterface;
+use KoolKode\Async\Log\LoggerProxy;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * HTTP middleware dispatcher.
  * 
  * @author Martin Schröder
  */
-class NextMiddleware
+class NextMiddleware implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+    
     /**
      * Registered middlewares sorted by priority.
      * 
@@ -45,26 +49,18 @@ class NextMiddleware
      * @var int
      */
     protected $index = 0;
-    
-    /**
-     * Optional PSR logger instance.
-     * 
-     * @var LoggerInterface
-     */
-    protected $logger;
 
     /**
      * Create a new HTTP middleware dispatcher.
      * 
      * @param array $middlewares Registered middlewares sorted by priority.
      * @param callable $target The target to be invoked if all middlewares delegate dispatching of the HTTP request.
-     * @param LoggerInterface $logger Optional PSR logger to log errors.
      */
-    public function __construct(array $middlewares, callable $target, LoggerInterface $logger = null)
+    public function __construct(array $middlewares, callable $target)
     {
         $this->middlewares = $middlewares;
         $this->target = $target;
-        $this->logger = $logger;
+        $this->logger = new LoggerProxy(static::class);
     }
 
     /**
@@ -72,14 +68,13 @@ class NextMiddleware
      * 
      * @param callable $middleware
      * @param callable $target
-     * @param LoggerInterface $logger Optional PSR logger to log errors.
      * @return NextMiddleware
      */
-    public static function wrap(callable $middleware, callable $target, LoggerInterface $logger = null): NextMiddleware
+    public static function wrap(callable $middleware, callable $target): NextMiddleware
     {
         return new static([
             new RegisteredMiddleware($middleware, 0)
-        ], $target, $logger);
+        ], $target);
     }
 
     /**

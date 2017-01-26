@@ -15,7 +15,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
-use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Http\Test\EndToEndTest;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Socket\Socket;
@@ -158,10 +157,7 @@ class ConnectionHandlerTest extends EndToEndTest
 
     public function testCanUpgradeConnection()
     {
-        $logger = new TestLogger();
-        
         $conn = new ConnectionHandler();
-        $conn->setLogger($logger);
         
         $response = new HttpResponse(Http::SWITCHING_PROTOCOLS);
         $response = $response->withAttribute(Endpoint::class, new class() extends Endpoint {});
@@ -171,8 +167,6 @@ class ConnectionHandlerTest extends EndToEndTest
         Socket::shutdown($b);
         
         $this->assertNull(yield from $conn->upgradeConnection(new SocketStream($a), new HttpRequest('/'), $response));
-        
-        $this->assertCount(2, $logger);
     }
 
     public function provideDeflateSettings()

@@ -14,10 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Failure;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
-use KoolKode\Async\Util\Executor;
 
 /**
  * Default message writer being used to frame, prioritize and transmit WebSocket messages.
@@ -87,7 +87,7 @@ class MessageWriter
             return new Failure(new \InvalidArgumentException('Message is not UTF-8 encoded'));
         }
         
-        return $this->writer->execute(function () use ($text) {
+        return $this->writer->submit(function () use ($text) {
             $type = Frame::TEXT;
             $chunks = \str_split($text, 4092);
             
@@ -112,7 +112,7 @@ class MessageWriter
      */
     public function sendBinary(ReadableStream $stream, int $priority = 0): Awaitable
     {
-        return $this->writer->execute(function () use ($stream) {
+        return $this->writer->submit(function () use ($stream) {
             $type = Frame::BINARY;
             $len = 0;
             

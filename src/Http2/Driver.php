@@ -22,6 +22,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -37,11 +38,10 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
     
     protected $hpackContext;
     
-    protected $logger;
-    
     public function __construct(HPackContext $hpackContext = null)
     {
         $this->hpackContext = $hpackContext ?? HPackContext::createServerContext();
+        $this->logger = new LoggerProxy(static::class);
     }
     
     /**
@@ -70,17 +70,11 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         return new Coroutine(function () use ($context, $socket, $action) {
             $remotePeer = $socket->getRemoteAddress();
             
-            if ($this->logger) {
-                $this->logger->debug('Accepted new HTTP/2 connection from {peer}', [
-                    'peer' => $remotePeer
-                ]);
-            }
+            $this->logger->debug('Accepted new HTTP/2 connection from {peer}', [
+                'peer' => $remotePeer
+            ]);
             
             $conn = new Connection($socket, new HPack($this->hpackContext));
-            
-            if ($this->logger) {
-                $conn->setLogger($this->logger);
-            }
             
             yield $conn->performServerHandshake();
             
@@ -92,11 +86,9 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
                 try {
                     $conn->shutdown();
                 } finally {
-                    if ($this->logger) {
-                        $this->logger->debug('Closed HTTP/2 connection to {peer}', [
-                            'peer' => $remotePeer
-                        ]);
-                    }
+                    $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                        'peer' => $remotePeer
+                    ]);
                 }
             }
         });
@@ -140,16 +132,14 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         // Discard request body before switching to HTTP/2.
         yield $request->getBody()->discard();
         
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => Http::SWITCHING_PROTOCOLS,
-                'size' => '-'
-            ]);
-        }
+        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+            'ip' => $request->getClientAddress(),
+            'method' => $request->getMethod(),
+            'target' => $request->getRequestTarget(),
+            'protocol' => $request->getProtocolVersion(),
+            'status' => Http::SWITCHING_PROTOCOLS,
+            'size' => '-'
+        ]);
         
         $buffer = Http::getStatusLine(Http::SWITCHING_PROTOCOLS, $request->getProtocolVersion()) . "\r\n";
         $buffer .= "Connection: upgrade\r\n";
@@ -157,16 +147,14 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         
         yield $socket->write($buffer . "\r\n");
         
-        $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
+        $conn = new Connection($socket, new HPack($this->hpackContext));
         
         yield $conn->performServerHandshake(new Frame(Frame::SETTINGS, $settings));
         
-        if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
-                'protocol' => $request->getProtocolVersion(),
-                'peer' => $socket->getRemoteAddress()
-            ]);
-        }
+        $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
+            'protocol' => $request->getProtocolVersion(),
+            'peer' => $socket->getRemoteAddress()
+        ]);
         
         $remotePeer = $socket->getRemoteAddress();
         
@@ -178,11 +166,9 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
             try {
                 $conn->shutdown();
             } finally {
-                if ($this->logger) {
-                    $this->logger->debug('Closed HTTP/2 connection to {peer}', [
-                        'peer' => $remotePeer
-                    ]);
-                }
+                $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                    'peer' => $remotePeer
+                ]);
             }
         }
     }
@@ -203,27 +189,23 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
             throw new StatusException(Http::BAD_REQUEST, 'Invalid HTTP/2 connection preface body');
         }
         
-        if ($this->logger) {
-            $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                'ip' => $request->getClientAddress(),
-                'method' => $request->getMethod(),
-                'target' => $request->getRequestTarget(),
-                'protocol' => $request->getProtocolVersion(),
-                'status' => Http::SWITCHING_PROTOCOLS,
-                'size' => '-'
-            ]);
-        }
+        $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+            'ip' => $request->getClientAddress(),
+            'method' => $request->getMethod(),
+            'target' => $request->getRequestTarget(),
+            'protocol' => $request->getProtocolVersion(),
+            'status' => Http::SWITCHING_PROTOCOLS,
+            'size' => '-'
+        ]);
         
-        $conn = new Connection($socket, new HPack($this->hpackContext), $this->logger);
+        $conn = new Connection($socket, new HPack($this->hpackContext));
         
         yield $conn->performServerHandshake(null, true);
         
-        if ($this->logger) {
-            $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
-                'protocol' => $request->getProtocolVersion(),
-                'peer' => $socket->getRemoteAddress()
-            ]);
-        }
+        $this->logger->info('HTTP/{protocol} connection from {peer} upgraded to HTTP/2', [
+            'protocol' => $request->getProtocolVersion(),
+            'peer' => $socket->getRemoteAddress()
+        ]);
         
         $remotePeer = $socket->getRemoteAddress();
         
@@ -235,11 +217,9 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
             try {
                 $conn->shutdown();
             } finally {
-                if ($this->logger) {
-                    $this->logger->debug('Closed HTTP/2 connection to {peer}', [
-                        'peer' => $remotePeer
-                    ]);
-                }
+                $this->logger->debug('Closed HTTP/2 connection to {peer}', [
+                    'peer' => $remotePeer
+                ]);
             }
         }
     }
@@ -277,7 +257,7 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
             }
             
             return $context->respond($request, $response);
-        }, $this->logger);
+        });
         
         $response = yield from $next($request);
         

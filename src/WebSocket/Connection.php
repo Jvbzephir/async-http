@@ -14,12 +14,13 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Util\Channel;
-use KoolKode\Async\Util\Executor;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 
@@ -129,6 +130,7 @@ class Connection implements LoggerAwareInterface
         $this->writer = new MessageWriter($socket, $client);
         $this->messages = new Channel(4);
         $this->processor = new Coroutine($this->processIncomingFrames(), true);
+        $this->logger = new LoggerProxy(static::class);
     }
     
     /**
@@ -163,11 +165,9 @@ class Connection implements LoggerAwareInterface
         $this->deflate = $deflate;
         $this->writer = new CompressedMessageWriter($this->socket, $this->client, $deflate);
         
-        if ($this->logger) {
-            $this->logger->debug('Enabled extension: {extension}', [
-                'extension' => $deflate->getExtensionHeader()
-            ]);
-        }
+        $this->logger->debug('Enabled extension: {extension}', [
+            'extension' => $deflate->getExtensionHeader()
+        ]);
     }
 
     /**
@@ -289,7 +289,6 @@ class Connection implements LoggerAwareInterface
             } finally {
                 $this->pings = [];
             }
-            
             try {
                 if ($this->socket->isAlive()) {
                     $reason = ($e === null || $e->getCode() === 0) ? Frame::NORMAL_CLOSURE : $e->getCode();
@@ -297,11 +296,9 @@ class Connection implements LoggerAwareInterface
                     yield $this->writer->sendFrame(new Frame(Frame::CONNECTION_CLOSE, \pack('n', $reason)));
                 }
             } finally {
-                if ($this->logger) {
-                    $this->logger->debug('WebSocket connection to {peer} closed', [
-                        'peer' => $this->socket->getRemoteAddress()
-                    ]);
-                }
+                $this->logger->debug('WebSocket connection to {peer} closed', [
+                    'peer' => $this->socket->getRemoteAddress()
+                ]);
                 
                 $this->socket->close();
             }

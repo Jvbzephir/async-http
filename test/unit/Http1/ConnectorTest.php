@@ -18,7 +18,6 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -282,11 +281,8 @@ class ConnectorTest extends AsyncTestCase
     
     public function testPersistentConnection()
     {
-        $logger = new TestLogger();
-        
-        yield new SocketStreamTester(function (DuplexStream $socket) use ($logger) {
+        yield new SocketStreamTester(function (DuplexStream $socket) {
             $connector = new Connector();
-            $connector->setLogger($logger);
             
             try {
                 for ($i = 0; $i < 3; $i++) {
@@ -328,8 +324,6 @@ class ConnectorTest extends AsyncTestCase
                 ]));
             }
         });
-        
-        $this->assertCount(3, $logger);
     }
     
     public function testFinalResponseBeforeExpectContinue()

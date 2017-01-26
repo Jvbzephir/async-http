@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Fcgi;
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpDriverContext;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
@@ -184,6 +185,7 @@ class Connection implements LoggerAwareInterface
         
         $this->incoming = new Channel();
         $this->processor = new Coroutine($this->handleIncomingRecords(), true);
+        $this->logger = new LoggerProxy(static::class);
     }
     
     /**
@@ -249,11 +251,9 @@ class Connection implements LoggerAwareInterface
         try {
             $peer = $this->socket->getRemoteAddress();
             
-            if ($this->logger) {
-                $this->logger->debug('Accepted new FCGI connection from {peer}', [
-                    'peer' => $peer
-                ]);
-            }
+            $this->logger->debug('Accepted new FCGI connection from {peer}', [
+                'peer' => $peer
+            ]);
             
             while (true) {
                 list ($version, $type, $id, $len, $pad) = \array_values(\unpack($header, yield $this->socket->readBuffer(8, true)));
@@ -275,11 +275,6 @@ class Connection implements LoggerAwareInterface
                         }
                         
                         $this->handlers[$id] = new Handler($id, $this, $this->context, ($flags & self::FCGI_KEEP_CONNECTION) ? true : false);
-                        
-                        if ($this->logger) {
-                            $this->handlers[$id]->setLogger($this->logger);
-                        }
-                        
                         break;
                     case Record::FCGI_ABORT_REQUEST:
                         if (!yield $this->closeHandler($id)) {
@@ -296,14 +291,11 @@ class Connection implements LoggerAwareInterface
             }
         } finally {
             $this->socket->close();
-            
             $this->processor = null;
             
-            if ($this->logger) {
-                $this->logger->debug('Closed FCGi connection to {peer}', [
-                    'peer' => $peer
-                ]);
-            }
+            $this->logger->debug('Closed FCGi connection to {peer}', [
+                'peer' => $peer
+            ]);
         }
     }
 }

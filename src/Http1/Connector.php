@@ -26,6 +26,7 @@ use KoolKode\Async\Http\HttpConnectorContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Log\LoggerProxy;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -59,6 +60,7 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         $this->pending = new \SplObjectStorage();
         $this->filesystem = new FilesystemProxy();
+        $this->logger = new LoggerProxy(static::class);
     }
     
     public function setKeepAlive(bool $keepAlive)
@@ -191,16 +193,14 @@ class Connector implements HttpConnector, LoggerAwareInterface
                 $response = $response->withoutHeader('Content-Length');
                 $response = $response->withoutHeader('Transfer-Encoding');
                 
-                if ($this->logger) {
-                    $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
-                        'ip' => $request->getClientAddress(),
-                        'method' => $request->getMethod(),
-                        'target' => $request->getRequestTarget(),
-                        'protocol' => $response->getProtocolVersion(),
-                        'status' => $response->getStatusCode(),
-                        'size' => $sent ?: '-'
-                    ]);
-                }
+                $this->logger->info('{ip} "{method} {target} HTTP/{protocol}" {status} {size}', [
+                    'ip' => $request->getClientAddress(),
+                    'method' => $request->getMethod(),
+                    'target' => $request->getRequestTarget(),
+                    'protocol' => $response->getProtocolVersion(),
+                    'status' => $response->getStatusCode(),
+                    'size' => $sent ?: '-'
+                ]);
                 
                 return $response;
             } catch (\Throwable $e) {

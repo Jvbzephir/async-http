@@ -14,7 +14,6 @@ namespace KoolKode\Async\Http\WebSocket;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http;
-use KoolKode\Async\Http\TestLogger;
 use KoolKode\Async\Http\Test\EndToEndTest;
 use KoolKode\Async\Http\Test\HttpMockClient;
 
@@ -37,11 +36,7 @@ class ClientTest extends EndToEndTest
             return $endpoint;
         });
         
-        $logger = new TestLogger();
-        
         $client = new Client($this->httpClient);
-        $client->setLogger($logger);
-        
         $conn = yield $client->connect('ws://localhost/');
         
         $this->assertTrue($conn instanceof Connection);
@@ -55,8 +50,6 @@ class ClientTest extends EndToEndTest
         } finally {
             $conn->shutdown();
         }
-        
-        $this->assertCount(1, $logger);
     }
     
     public function testCompressedEcho()
