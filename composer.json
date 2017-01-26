@@ -20,7 +20,7 @@
 	"prefer-stable" : true,
 	"require" : {
 		"php" : "~7.0",
-		"koolkode/async" : "dev-master",
+		"koolkode/async" : "^0.3.0",
 		"koolkode/util" : "^0.2.6"
 	},
 	"require-dev" : {
