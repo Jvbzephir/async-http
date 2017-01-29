@@ -52,7 +52,7 @@ class FcgiEndpoint implements Endpoint, LoggerAwareInterface
     
     public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost')
     {
-        $this->factory = new SocketServerFactory($peer);
+        $this->factory = new SocketServerFactory($peer, (($peer[0] ?? '') === '/') ? 'unix' : 'tcp');
         $this->factory->setPeerName($peerName);
         
         $this->logger = new Logger(static::class);

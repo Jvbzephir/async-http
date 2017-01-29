@@ -37,7 +37,7 @@ class HttpEndpoint implements Endpoint
     
     public function __construct(string $peer = '0.0.0.0:0', string $peerName = 'localhost', HttpDriver ...$drivers)
     {
-        $this->factory = new SocketServerFactory($peer);
+        $this->factory = new SocketServerFactory($peer, (($peer[0] ?? '') === '/') ? 'unix' : 'tcp');
         $this->factory->setPeerName($peerName);
         
         if (empty($drivers)) {

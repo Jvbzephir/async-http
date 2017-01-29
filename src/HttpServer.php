@@ -50,7 +50,7 @@ class HttpServer
     {
         $parts = \explode(':', $this->socketFactory->getPeer());
         
-        return (int) \array_pop($parts);
+        return isset($parts[1]) ? (int) \array_pop($parts) : 0;
     }
     
     public function isEncrypted(): bool
