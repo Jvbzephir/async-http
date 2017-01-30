@@ -297,7 +297,6 @@ class Stream implements LoggerAwareInterface
             $bodyStream = yield $request->getBody()->getReadableStream();
             
             yield from $this->sendHeaders($request, $headers, [
-                'content-encoding',
                 'host'
             ]);
             

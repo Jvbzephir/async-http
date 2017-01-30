@@ -48,7 +48,6 @@ class RequestParser extends MessageParser
         $body = Body::fromMessage($stream, $request);
         
         static $remove = [
-            'Content-Encoding',
             'Trailer'
         ];
         
