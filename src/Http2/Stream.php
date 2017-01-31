@@ -440,7 +440,8 @@ class Stream implements LoggerAwareInterface
     protected function sendBody(ReadableStream $body): \Generator
     {
         $chunkSize = \min(4087, $this->conn->getRemoteSetting(Connection::SETTING_MAX_FRAME_SIZE));
-        $channel = $body->channel($chunkSize);
+        $channel = Channel::fromStream($body, true, $chunkSize);
+        
         $done = false;
         $sent = 0;
         
@@ -485,7 +486,7 @@ class Stream implements LoggerAwareInterface
                 yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::DATA, '', Frame::END_STREAM));
             }
         } finally {
-            $body->close();
+            $channel->close();
         }
         
         return $sent;

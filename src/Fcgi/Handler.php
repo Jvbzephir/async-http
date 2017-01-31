@@ -225,16 +225,14 @@ class Handler implements LoggerAwareInterface
             $sent = 0;
             
             if (!$nobody) {
-                $bodyStream = yield $body->getReadableStream();
+                $channel = Channel::fromStream(yield $body->getReadableStream(), true, 4096, $size);
                 
                 try {
-                    $channel = $bodyStream->channel(4096, $size);
-                    
                     while (null !== ($chunk = yield $channel->receive())) {
                         $sent += yield $this->conn->sendRecord(new Record(Record::FCGI_VERSION_1, Record::FCGI_STDOUT, $this->id, $chunk));
                     }
                 } finally {
-                    $bodyStream->close();
+                    $channel->close();
                 }
             }
             
