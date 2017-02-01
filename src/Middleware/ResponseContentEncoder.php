@@ -32,7 +32,7 @@ use KoolKode\Util\InvalidMediaTypeException;
  * 
  * @author Martin Schröder
  */
-class ContentEncoder implements Middleware
+class ResponseContentEncoder implements Middleware
 {
     /**
      * Compressable content types.

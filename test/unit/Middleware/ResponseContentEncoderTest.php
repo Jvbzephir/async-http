@@ -18,9 +18,9 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
- * @covers \KoolKode\Async\Http\Middleware\ContentEncoder
+ * @covers \KoolKode\Async\Http\Middleware\ResponseContentEncoder
  */
-class ContentEncoderTest extends AsyncTestCase
+class ResponseContentEncoderTest extends AsyncTestCase
 {
     protected function setUp()
     {
@@ -33,7 +33,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testDeclaresDefaultPriority()
     {
-        $encoder = new ContentEncoder();
+        $encoder = new ResponseContentEncoder();
     
         $this->assertEquals(100000, $encoder->getDefaultPriority());
     }
@@ -53,7 +53,7 @@ class ContentEncoderTest extends AsyncTestCase
     {
         $message = 'Hello decoded world! :)';
         
-        $next = NextMiddleware::wrap(new ContentEncoder([
+        $next = NextMiddleware::wrap(new ResponseContentEncoder([
             'text/plain'
         ]), function (HttpRequest $request) use ($message, $name, $func) {
             $response = new HttpResponse();
@@ -79,7 +79,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testWillNotEncodeResponseToHeadRequest()
     {
-        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withBody(new StringBody('Foo'));
             
@@ -116,7 +116,7 @@ class ContentEncoderTest extends AsyncTestCase
      */
     public function testWillNotEncodeUmcompressableResponse(HttpResponse $response)
     {
-        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) use ($response) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) use ($response) {
             return $response;
         });
         
@@ -131,7 +131,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testWillNotDoubleEncodeResponse()
     {
-        $next = NextMiddleware::wrap(new ContentEncoder(), function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
             $response = new HttpResponse();
             $response = $response->withHeader('Content-Encoding', 'foo');
             
@@ -149,7 +149,7 @@ class ContentEncoderTest extends AsyncTestCase
     
     public function testCanAddCompressableType()
     {
-        $encoder = new ContentEncoder();
+        $encoder = new ResponseContentEncoder();
         $encoder->addType('foo/bar');
         
         $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
@@ -170,7 +170,7 @@ class ContentEncoderTest extends AsyncTestCase
 
     public function testCanAddCompressableSubType()
     {
-        $encoder = new ContentEncoder(null, [
+        $encoder = new ResponseContentEncoder(null, [
             'foo'
         ]);
         $encoder->addSubType('bar');

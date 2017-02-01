@@ -19,24 +19,24 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\ReadableInflateStream;
 
 /**
- * HTTP client-side middeware that decompresses HTTP response bodies.
+ * HTTP server-side middeware that decompresses HTTP request bodies.
  * 
- * Give this middleware a very low (maybe even negative) priority to have it decompress responses before other middleware!
+ * Give this middleware a very high priority to have it decompress requets before other middleware!
  * 
  * Supported content encodings are "gzip" and "deflate".
  * 
  * @author Martin Schröder
  */
-class ContentDecoder implements Middleware
+class RequestContentDecoder implements Middleware
 {
     /**
      * {@inheritdoc}
      */
     public function getDefaultPriority(): int
     {
-        return -100000;
+        return 100000;
     }
-    
+
     /**
      * Handles compressed HTTP response bodies using an inflate stream.
      * 
@@ -51,15 +51,9 @@ class ContentDecoder implements Middleware
         static $zlib;
         
         if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
-            $request = $request->withAddedHeader('Accept-Encoding', 'gzip, deflate');
-        }
-        
-        $response = yield from $next($request);
-        
-        if ($zlib && $response->hasHeader('Content-Encoding')) {
             $encoding = null;
             
-            switch (\strtolower($response->getHeaderLine('Content-Encoding'))) {
+            switch (\strtolower($request->getHeaderLine('Content-Encoding'))) {
                 case 'gzip':
                     $encoding = \ZLIB_ENCODING_GZIP;
                     break;
@@ -69,13 +63,13 @@ class ContentDecoder implements Middleware
             }
             
             if ($encoding !== null) {
-                $stream = new ReadableInflateStream(yield $response->getBody()->getReadableStream(), $encoding);
+                $stream = new ReadableInflateStream(yield $request->getBody()->getReadableStream(), $encoding);
                 
-                $response = $response->withoutHeader('Content-Encoding');
-                $response = $response->withBody(new StreamBody($stream));
+                $request = $request->withoutHeader('Content-Encoding');
+                $request = $request->withBody(new StreamBody($stream));
             }
         }
         
-        return $response;
+        return yield from $next($request);
     }
 }

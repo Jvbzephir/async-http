@@ -18,8 +18,9 @@ use KoolKode\Async\Http\Http2\Driver as Http2Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\BrowserSupport;
-use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
+use KoolKode\Async\Http\Middleware\RequestContentDecoder;
+use KoolKode\Async\Http\Middleware\ResponseContentEncoder;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Log\PipeLogHandler;
@@ -42,7 +43,8 @@ Loop::execute(function () {
         
         $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
         $endpoint->addMiddleware(new BrowserSupport());
-        $endpoint->addMiddleware(new ContentEncoder());
+        $endpoint->addMiddleware(new RequestContentDecoder());
+        $endpoint->addMiddleware(new ResponseContentEncoder());
         
         $endpoint->addResponder(new EventResponder());
         

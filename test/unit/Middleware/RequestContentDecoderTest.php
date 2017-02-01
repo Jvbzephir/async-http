@@ -15,11 +15,12 @@ use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Test\AsyncTestCase;
+use KoolKode\Async\Http\Http;
 
 /**
- * @covers \KoolKode\Async\Http\Middleware\ContentDecoder
+ * @covers \KoolKode\Async\Http\Middleware\RequestContentDecoder
  */
-class ContentDecoderTest extends AsyncTestCase
+class RequestContentDecoderTest extends AsyncTestCase
 {
     protected function setUp()
     {
@@ -32,9 +33,9 @@ class ContentDecoderTest extends AsyncTestCase
     
     public function testDeclaresDefaultPriority()
     {
-        $decoder = new ContentDecoder();
+        $decoder = new RequestContentDecoder();
         
-        $this->assertEquals(-100000, $decoder->getDefaultPriority());
+        $this->assertEquals(100000, $decoder->getDefaultPriority());
     }
     
     public function provideEncodingSettings()
@@ -43,7 +44,7 @@ class ContentDecoderTest extends AsyncTestCase
         yield ['gzip', 'gzencode'];
         yield ['deflate', 'gzcompress'];
     }
-    
+
     /**
      * @dataProvider provideEncodingSettings
      */
@@ -51,25 +52,28 @@ class ContentDecoderTest extends AsyncTestCase
     {
         $message = 'Hello decoded world! :)';
         
-        $next = NextMiddleware::wrap(new ContentDecoder(), function (HttpRequest $request) use ($message, $name, $func) {
-            $this->assertEquals([
-                'gzip',
-                'deflate'
-            ], $request->getHeaderTokenValues('Accept-Encoding'));
+        $next = NextMiddleware::wrap(new RequestContentDecoder(), function (HttpRequest $request) use ($message, $name) {
+            $this->assertFalse($request->hasHeader('Content-Encoding'));
+            $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
             
-            $response = new HttpResponse();
+            $response = new HttpResponse(Http::OK, [
+                'Content-Type' => 'text/plain'
+            ]);
             
-            if ($name !== '') {
-                $response = $response->withHeader('Content-Encoding', $name);
-            }
-            
-            return $response->withBody(new StringBody($func($message)));
+            return $response->withBody(new StringBody(yield $request->getBody()->getContents()));
         });
         
-        $response = yield from $next(new HttpRequest('http://localhost/'));
+        $request = new HttpRequest('http://localhost/', Http::POST, [
+            'Content-Type' => 'text/plain'
+        ]);
+        
+        if ($name !== '') {
+            $request = $request->withHeader('Content-Encoding', $name);
+        }
+        
+        $response = yield from $next($request->withBody(new StringBody($func($message))));
         
         $this->assertTrue($response instanceof HttpResponse);
-        $this->assertFalse($response->hasHeader('Content-Encoding'));
         $this->assertEquals($message, yield $response->getBody()->getContents());
     }
 }

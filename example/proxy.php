@@ -17,8 +17,9 @@ use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\BrowserSupport;
-use KoolKode\Async\Http\Middleware\ContentEncoder;
 use KoolKode\Async\Http\Middleware\PublishFiles;
+use KoolKode\Async\Http\Middleware\RequestContentDecoder;
+use KoolKode\Async\Http\Middleware\ResponseContentEncoder;
 use KoolKode\Async\Http\ReverseProxySettings;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Log\Logger;
@@ -36,7 +37,8 @@ Loop::execute(function () {
         $endpoint = new HttpEndpoint('0.0.0.0:8080', 'localhost', $driver);
         $endpoint->setProxySettings(new ReverseProxySettings('127.0.0.1', '::1', '10.0.2.2'));
         
-        $endpoint->addMiddleware(new ContentEncoder());
+        $endpoint->addMiddleware(new RequestContentDecoder());
+        $endpoint->addMiddleware(new ResponseContentEncoder());
         $endpoint->addMiddleware(new BrowserSupport());
         $endpoint->addMiddleware(new PublishFiles(__DIR__ . '/public', '/asset'));
         
