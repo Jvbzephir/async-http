@@ -66,9 +66,9 @@ class HttpEndpointTest extends AsyncTestCase
                     'payload' => 'test'
                 ], JSON_UNESCAPED_SLASHES);
                 
-                $request = new HttpRequest($server->getBaseUri(), Http::POST);
-                $request = $request->withHeader('Content-Type', 'application/json');
-                $request = $request->withBody(new StringBody($data));
+                $request = new HttpRequest($server->getBaseUri(), Http::POST, [
+                    'Content-Type' => 'application/json'
+                ], new StringBody($data));
                 
                 $response = yield $client->send($request);
                 
@@ -113,7 +113,7 @@ class HttpEndpointTest extends AsyncTestCase
             $client = new HttpClient();
             
             try {
-                $request = new HttpRequest($server->getBaseUri(), Http::HEAD, [], '1.0');
+                $request = new HttpRequest($server->getBaseUri(), Http::HEAD, [], null, '1.0');
                 $response = yield $client->send($request);
                 
                 $this->assertTrue($response instanceof HttpResponse);
@@ -146,8 +146,9 @@ class HttpEndpointTest extends AsyncTestCase
         });
         
         try {
-            $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT);
-            $request = $request->withBody(new StringBody('Hello World :)'));
+            $request = new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [
+                'Content-Type' => 'text/plain'
+            ], new StringBody('Hello World :)'));
             
             $response = yield $client->send($request);
             

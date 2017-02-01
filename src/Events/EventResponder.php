@@ -39,12 +39,10 @@ class EventResponder implements Responder
     public function __invoke(HttpRequest $request, $source)
     {
         if ($source instanceof EventSource) {
-            $response = new HttpResponse(Http::OK, [
+            return new HttpResponse(Http::OK, [
                 'Content-Type' => 'text/event-stream',
                 'Cache-Control' => 'no-cache'
-            ]);
-            
-            return $response->withBody(new EventBody($source));
+            ], new EventBody($source));
         }
     }
 }

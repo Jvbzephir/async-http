@@ -24,7 +24,7 @@ class HttpResponseTest extends \PHPUnit_Framework_TestCase
         
         $response = new HttpResponse(Http::SEE_OTHER, [
             'test-foo' => 'bar'
-        ], '1.0');
+        ], null, '1.0');
         $response = $response->withStatus(Http::NO_CONTENT, 'Test');
         $response = $response->withAddedHeader('Test-Foo', 'baz');
         $response = $response->withBody($body);

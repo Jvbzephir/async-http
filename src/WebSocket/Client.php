@@ -168,7 +168,7 @@ class Client implements LoggerAwareInterface
             'Upgrade' => 'websocket',
             'Sec-WebSocket-Version' => '13',
             'Sec-WebSocket-Key' => $nonce
-        ], '1.1');
+        ], null, '1.1');
         
         if (!empty($protocols)) {
             $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));

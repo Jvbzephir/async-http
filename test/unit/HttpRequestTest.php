@@ -24,8 +24,8 @@ class HttpRequestTest extends \PHPUnit_Framework_TestCase
         
         $request = new HttpRequest('http://localhost/', Http::POST, [
             'foo' => 'bar'
-        ], '1.0');
-        $request = $request->withBody($body);
+        ], $body, '1.0');
+        
         $request = $request->withAttribute('foo', 'bar');
         
         $this->assertEquals([

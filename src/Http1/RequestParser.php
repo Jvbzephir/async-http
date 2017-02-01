@@ -40,7 +40,7 @@ class RequestParser extends MessageParser
             throw new StreamClosedException('Invalid HTTP request line received');
         }
         
-        $request = new HttpRequest($m[2], $m[1], [], $m[3]);
+        $request = new HttpRequest($m[2], $m[1], [], null, $m[3]);
         $request = $request->withRequestTarget(\trim($m[2]));
         
         $request = yield from $this->parseHeaders($stream, $request);

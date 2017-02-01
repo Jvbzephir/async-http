@@ -20,11 +20,18 @@ class HttpMessageTest extends \PHPUnit_Framework_TestCase
 {
     public function testCanUseProtocolVersion()
     {
-        $message = new HttpResponse(Http::OK, [], '1.0');
+        $message = new HttpResponse(Http::OK, [], null, '1.0');
         $this->assertEquals('1.0', $message->getProtocolVersion());
         
         $this->assertNotSame($message, $message = $message->withProtocolVersion('1.1'));
         $this->assertEquals('1.1', $message->getProtocolVersion());
+    }
+    
+    public function testCanSetBodyInConstructor()
+    {
+        $message = new HttpResponse(Http::OK, [], $body = new StringBody());
+        
+        $this->assertSame($body, $message->getBody());
     }
 
     public function testCanSetHeadersUsingConstructor()

@@ -56,14 +56,14 @@ class ResponseContentEncoderTest extends AsyncTestCase
         $next = NextMiddleware::wrap(new ResponseContentEncoder([
             'text/plain'
         ]), function (HttpRequest $request) use ($message, $name, $func) {
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Type', 'text/plain');
-            
-            return $response->withBody(new StringBody($message));
+            return new HttpResponse(Http::OK, [
+                'Content-Type' => 'text/plain'
+            ], new StringBody($message));
         });
         
-        $request = new HttpRequest('http://localhost/');
-        $request = $request->withHeader('Accept-Encoding', $name);
+        $request = new HttpRequest('http://localhost/', Http::GET, [
+            'Accept-Encoding' => $name
+        ]);
         
         $response = yield from $next($request);
         
@@ -80,14 +80,12 @@ class ResponseContentEncoderTest extends AsyncTestCase
     public function testWillNotEncodeResponseToHeadRequest()
     {
         $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
-            $response = new HttpResponse();
-            $response = $response->withBody(new StringBody('Foo'));
-            
-            return $response;
+            return new HttpResponse(Http::OK, [], new StringBody('Foo'));
         });
         
-        $request = new HttpRequest('http://localhost/', Http::HEAD);
-        $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $request = new HttpRequest('http://localhost/', Http::HEAD, [
+            'Accept-Encoding' => 'gzip, deflate'
+        ]);
         
         $response = yield from $next($request);
         
@@ -99,16 +97,8 @@ class ResponseContentEncoderTest extends AsyncTestCase
     {
         yield [new HttpResponse(Http::NO_CONTENT)];
         yield [new HttpResponse()];
-        
-        $response = new HttpResponse();
-        $response = $response->withHeader('Content-Type', 'text/x-foo');
-        
-        yield [$response];
-        
-        $response = new HttpResponse();
-        $response = $response->withHeader('Content-Type', 'foo');
-        
-        yield [$response];
+        yield [new HttpResponse(Http::OK, ['Content-Type' => 'text/x-foo'])];
+        yield [new HttpResponse(Http::OK, ['Content-Type' => 'foo'])];
     }
 
     /**
@@ -120,8 +110,9 @@ class ResponseContentEncoderTest extends AsyncTestCase
             return $response;
         });
         
-        $request = new HttpRequest('http://localhost/');
-        $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $request = new HttpRequest('http://localhost/', Http::GET, [
+            'Accept-Encoding' => 'gzip, deflate'
+        ]);
         
         $response = yield from $next($request);
         
@@ -132,14 +123,14 @@ class ResponseContentEncoderTest extends AsyncTestCase
     public function testWillNotDoubleEncodeResponse()
     {
         $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Encoding', 'foo');
-            
-            return $response;
+            return new HttpResponse(Http::OK, [
+                'Content-Encoding' => 'foo'
+            ]);
         });
         
-        $request = new HttpRequest('http://localhost/');
-        $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $request = new HttpRequest('http://localhost/', Http::GET, [
+            'Accept-Encoding' => 'gzip, deflate'
+        ]);
         
         $response = yield from $next($request);
         
@@ -153,14 +144,14 @@ class ResponseContentEncoderTest extends AsyncTestCase
         $encoder->addType('foo/bar');
         
         $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Type', 'foo/bar');
-            
-            return $response;
+            return new HttpResponse(Http::OK, [
+                'Content-Type' => 'foo/bar'
+            ]);
         });
         
-        $request = new HttpRequest('http://localhost/');
-        $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $request = new HttpRequest('http://localhost/', Http::GET, [
+            'Accept-Encoding' => 'gzip, deflate'
+        ]);
         
         $response = yield from $next($request);
         
@@ -176,14 +167,14 @@ class ResponseContentEncoderTest extends AsyncTestCase
         $encoder->addSubType('bar');
         
         $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Type', 'foo/bar');
-            
-            return $response;
+            return new HttpResponse(Http::OK, [
+                'Content-Type' => 'foo/bar'
+            ]);
         });
         
-        $request = new HttpRequest('http://localhost/');
-        $request = $request->withHeader('Accept-Encoding', 'gzip, deflate');
+        $request = new HttpRequest('http://localhost/', Http::GET, [
+            'Accept-Encoding' => 'gzip, deflate'
+        ]);
         
         $response = yield from $next($request);
         

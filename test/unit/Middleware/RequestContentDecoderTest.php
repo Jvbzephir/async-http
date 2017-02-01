@@ -56,22 +56,20 @@ class RequestContentDecoderTest extends AsyncTestCase
             $this->assertFalse($request->hasHeader('Content-Encoding'));
             $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
             
-            $response = new HttpResponse(Http::OK, [
+            return new HttpResponse(Http::OK, [
                 'Content-Type' => 'text/plain'
-            ]);
-            
-            return $response->withBody(new StringBody(yield $request->getBody()->getContents()));
+            ], new StringBody(yield $request->getBody()->getContents()));
         });
         
         $request = new HttpRequest('http://localhost/', Http::POST, [
             'Content-Type' => 'text/plain'
-        ]);
+        ], new StringBody($func($message)));
         
         if ($name !== '') {
             $request = $request->withHeader('Content-Encoding', $name);
         }
         
-        $response = yield from $next($request->withBody(new StringBody($func($message))));
+        $response = yield from $next($request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals($message, yield $response->getBody()->getContents());

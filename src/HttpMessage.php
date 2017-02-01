@@ -32,10 +32,10 @@ abstract class HttpMessage
 
     protected $attributes = [];
 
-    public function __construct(array $headers = [], string $protocolVersion = '2.0')
+    public function __construct(array $headers = [], HttpBody $body = null, string $protocolVersion = '2.0')
     {
         $this->protocolVersion = (string) $protocolVersion;
-        $this->body = new StringBody();
+        $this->body = $body ?? new StringBody();
         $this->headers = [];
         
         foreach ($headers as $k => $v) {

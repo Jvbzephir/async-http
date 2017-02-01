@@ -393,7 +393,7 @@ class Handler implements LoggerAwareInterface
         
         $uri = Uri::parse($uri . '/' . \ltrim($this->params['REQUEST_URI'] ?? '', '/'));
         
-        $request = new HttpRequest($uri, $this->params['REQUEST_METHOD'] ?? Http::GET, [], '1.1');
+        $request = new HttpRequest($uri, $this->params['REQUEST_METHOD'] ?? Http::GET, [], null, '1.1');
         
         foreach ($this->params as $k => $v) {
             if ('HTTP_' === \substr($k, 0, 5)) {

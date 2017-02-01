@@ -61,11 +61,9 @@ return function (HttpRequest $request) use ($websocket, $filesystem) {
                 '###WEBSOCKET_URI###' => htmlspecialchars($uri, ENT_QUOTES | ENT_HTML5, 'UTF-8')
             ]);
             
-            $response = new HttpResponse(Http::OK, [
+            return new HttpResponse(Http::OK, [
                 'Content-Type' => 'text/html;charset="utf-8"'
-            ]);
-            
-            return $response->withBody(new StringBody($html));
+            ], new StringBody($html));
     }
     
     return new HttpResponse(Http::NOT_FOUND);

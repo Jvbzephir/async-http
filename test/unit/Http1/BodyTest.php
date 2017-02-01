@@ -18,6 +18,7 @@ use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
+use KoolKode\Async\Http\Http;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Body
@@ -117,8 +118,9 @@ class BodyTest extends AsyncTestCase
     
     public function testLengthEncodedBodyFromMessage()
     {
-        $message = new HttpResponse();
-        $message = $message->withHeader('Content-Length', 4);
+        $message = new HttpResponse(Http::OK, [
+            'Content-Length' => '4'
+        ]);
         
         $body = Body::fromMessage(new ReadableMemoryStream('Test'), $message);
         
@@ -127,8 +129,9 @@ class BodyTest extends AsyncTestCase
     
     public function testInvalidContentLengthFromMessage()
     {
-        $message = new HttpResponse();
-        $message = $message->withHeader('Content-Length', 'x');
+        $message = new HttpResponse(Http::OK, [
+            'Content-Length' => 'x'
+        ]);
         
         $this->expectException(StatusException::class);
         
@@ -137,8 +140,9 @@ class BodyTest extends AsyncTestCase
     
     public function testChunkEncodedBodyFromMessage()
     {
-        $message = new HttpResponse();
-        $message = $message->withHeader('Transfer-Encoding', 'chunked');
+        $message = new HttpResponse(Http::OK, [
+            'Transfer-Encoding' => 'chunked'
+        ]);
         
         $body = Body::fromMessage(new ReadableMemoryStream("4\r\nTest\r\n0\r\n\r\n"), $message);
         
@@ -147,8 +151,9 @@ class BodyTest extends AsyncTestCase
     
     public function testInvalidTransferEncodingFromMessage()
     {
-        $message = new HttpResponse();
-        $message = $message->withHeader('Transfer-Encoding', 'x');
+        $message = new HttpResponse(Http::OK, [
+            'Transfer-Encoding' => 'x'
+        ]);
     
         $this->expectException(StatusException::class);
     
@@ -159,9 +164,9 @@ class BodyTest extends AsyncTestCase
     {
         $input = new ReadableMemoryStream('Hi');
         
-        $message = new HttpResponse();
-        $message = $message->withHeader('Connection', 'close');
-        $message = $message->withBody(new StreamBody($input));
+        $message = new HttpResponse(Http::OK, [
+            'Connection' => 'close'
+        ], new StreamBody($input));
         
         $stream = yield Body::fromMessage($input, $message)->getReadableStream();
         

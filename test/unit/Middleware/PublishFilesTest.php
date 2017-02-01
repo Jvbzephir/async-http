@@ -45,7 +45,7 @@ class PublishFilesTest extends AsyncTestCase
             return new HttpResponse(Http::NOT_FOUND);
         });
         
-        $response = yield from $next(new HttpRequest('http://localhost/PublishFilesTest.php', Http::GET, [], '1.0'));
+        $response = yield from $next(new HttpRequest('http://localhost/PublishFilesTest.php', Http::GET, [], null, '1.0'));
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals(Http::OK, $response->getStatusCode());

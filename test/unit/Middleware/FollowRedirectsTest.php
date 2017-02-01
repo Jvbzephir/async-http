@@ -37,24 +37,21 @@ class FollowRedirectsTest extends AsyncTestCase
             $this->assertEquals(Http::POST, $request->getMethod());
             
             if ($request->getRequestTarget() === '/test') {
-                $response = new HttpResponse(Http::TEMPORARY_REDIRECT);
-                $response = $response->withHeader('Location', 'http://localhost/redirected');
-                
-                return $response;
+                return new HttpResponse(Http::TEMPORARY_REDIRECT, [
+                    'Location' => 'http://localhost/redirected'
+                ]);
             }
             
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Type', $request->getHeaderLine('Content-Type'));
-            $response = $response->withBody(new StringBody(yield $request->getBody()->getContents()));
-            
-            return $response;
+            return new HttpResponse(Http::OK, [
+                'Content-Type' => $request->getHeaderLine('Content-Type')
+            ], new StringBody(yield $request->getBody()->getContents()));
         });
         
         $payload = 'Test Payload :)';
         
-        $request = new HttpRequest('http://localhost/test', Http::POST);
-        $request = $request->withHeader('Content-Type', 'text/plain');
-        $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
+        $request = new HttpRequest('http://localhost/test', Http::POST, [
+            'Content-Type' => 'text/plain'
+        ], new StreamBody(new ReadableMemoryStream($payload)));
         
         $response = yield from $next($request);
         
@@ -72,26 +69,23 @@ class FollowRedirectsTest extends AsyncTestCase
                 $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
                 $this->assertEquals('Test Body', yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse(Http::SEE_OTHER);
-                $response = $response->withHeader('Location', 'http://localhost/redirected?foo=bar');
-                
-                return $response;
+                return new HttpResponse(Http::SEE_OTHER, [
+                    'Location' => 'http://localhost/redirected?foo=bar'
+                ]);
             }
             
             $this->assertEquals(Http::GET, $request->getMethod());
             $this->assertEquals('bar', $request->getQueryParam('foo'));
             $this->assertEquals('', yield $request->getBody()->getContents());
             
-            $response = new HttpResponse();
-            $response = $response->withHeader('Content-Type', 'text/plain');
-            $response = $response->withBody(new StringBody('Echo Body'));
-            
-            return $response;
+            return new HttpResponse(Http::OK, [
+                'Content-Type' => 'text/plain'
+            ], new StringBody('Echo Body'));
         });
         
-        $request = new HttpRequest('http://localhost/test', Http::POST);
-        $request = $request->withHeader('Content-Type', 'text/plain');
-        $request = $request->withBody(new StringBody('Test Body'));
+        $request = new HttpRequest('http://localhost/test', Http::POST, [
+            'Content-Type' => 'text/plain'
+        ], new StringBody('Test Body'));
         
         $response = yield from $next($request);
         
@@ -104,10 +98,9 @@ class FollowRedirectsTest extends AsyncTestCase
     public function testEnforcesRedirectLimit()
     {
         $next = NextMiddleware::wrap(new FollowRedirects(), function (HttpRequest $request) {
-            $response = new HttpResponse(Http::TEMPORARY_REDIRECT);
-            $response = $response->withHeader('Location', 'http://localhost/redirected');
-            
-            return $response;
+            return new HttpResponse(Http::TEMPORARY_REDIRECT, [
+                'Location' => 'http://localhost/redirected'
+            ]);
         });
         
         $response = yield from $next(new HttpRequest('http://localhost/test'));

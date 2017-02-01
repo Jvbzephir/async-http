@@ -69,11 +69,9 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('localhost', $request->getHeaderLine('Host'));
                 $this->assertEquals('', yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Content-Type', 'text/plain');
-                $response = $response->withBody(new StringBody('Hello Client :)'));
-                
-                return $response;
+                return new HttpResponse(Http::OK, [
+                    'Content-Type' => 'text/plain'
+                ], new StringBody('Hello Client :)'));
             });
         });
     }
@@ -169,11 +167,9 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('localhost', $request->getHeaderLine('Host'));
                 $this->assertEquals($payload, yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Content-Type', 'application/otet-stream');
-                $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
-                
-                return $response;
+                return new HttpResponse(Http::OK, [
+                    'Content-Type' => 'application/otet-stream'
+                ], new StreamBody(new ReadableMemoryStream($payload)));
             });
         });
     }
@@ -204,11 +200,9 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('1.0', $request->getProtocolVersion());
                 $this->assertEquals('localhost', $request->getHeaderLine('Host'));
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Content-Type', 'application/otet-stream');
-                $response = $response->withBody(new StreamBody(new ReadableMemoryStream(\str_repeat('A', 9876))));
-                
-                return $response;
+                return new HttpResponse(Http::OK, [
+                    'Content-Type' => 'application/otet-stream'
+                ], new StreamBody(new ReadableMemoryStream(\str_repeat('A', 9876))));
             });
         });
     }
@@ -247,11 +241,9 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('localhost', $request->getHeaderLine('Host'));
                 $this->assertEquals($payload, yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Content-Type', 'application/otet-stream');
-                $response = $response->withBody(new StreamBody(new ReadableMemoryStream($payload)));
-                
-                return $response;
+                return new HttpResponse(Http::OK, [
+                    'Content-Type' => 'application/otet-stream'
+                ], new StreamBody(new ReadableMemoryStream($payload)));
             });
         });
     }
@@ -292,11 +284,9 @@ class DriverTest extends AsyncTestCase
                 
                 $this->assertEquals($payload, yield $request->getBody()->getContents());
                 
-                $response = new HttpResponse();
-                $response = $response->withHeader('Content-Type', 'text/plain');
-                $response = $response->withBody(new StringBody($payload));
-                
-                return $response;
+                return new HttpResponse(Http::OK, [
+                    'Content-Type' => 'text/plain'
+                ], new StringBody($payload));
             });
         });
     }
@@ -329,10 +319,9 @@ class DriverTest extends AsyncTestCase
                 $this->assertEquals('1.1', $request->getProtocolVersion());
                 $this->assertEquals('localhost', $request->getHeaderLine('Host'));
                 
-                $response = new HttpResponse(Http::SEE_OTHER);
-                $response = $response->withHeader('Location', 'http://localhost/api/1.0');
-                
-                return $response;
+                return new HttpResponse(Http::SEE_OTHER, [
+                    'Location' => 'http://localhost/api/1.0'
+                ]);
             });
         });
     }

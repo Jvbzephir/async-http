@@ -112,9 +112,9 @@ class ConnectorTest extends AsyncTestCase
                     'message' => 'Hello World :)'
                 ];
                 
-                $request = new HttpRequest('http://localhost/api', Http::POST);
-                $request = $request->withHeader('Content-Type', 'application/json');
-                $request = $request->withBody(new StringBody(json_encode($payload)));
+                $request = new HttpRequest('http://localhost/api', Http::POST, [
+                    'Content-Type' => 'application/json'
+                ], new StringBody(json_encode($payload)));
                 
                 $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
@@ -172,9 +172,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setExpectContinue(false);
             
             try {
-                $request = new HttpRequest('http://localhost/api', Http::POST);
-                $request = $request->withProtocolVersion('1.0');
-                $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
+                $request = new HttpRequest('http://localhost/api', Http::POST, [], new StreamBody(new ReadableMemoryStream($payload)), '1.0');
                 
                 $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
@@ -209,8 +207,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setExpectContinue(false);
             
             try {
-                $request = new HttpRequest('http://localhost/api', Http::POST);
-                $request = $request->withBody(new FileBody(__FILE__));
+                $request = new HttpRequest('http://localhost/api', Http::POST, [], new FileBody(__FILE__));
                 
                 $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
@@ -250,8 +247,7 @@ class ConnectorTest extends AsyncTestCase
             $connector->setExpectContinue(false);
             
             try {
-                $request = new HttpRequest('http://localhost/api', Http::POST);
-                $request = $request->withBody(new StreamBody(new ReadableMemoryStream($payload)));
+                $request = new HttpRequest('http://localhost/api', Http::POST, [], new StreamBody(new ReadableMemoryStream($payload)));
                 
                 $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;
@@ -334,8 +330,7 @@ class ConnectorTest extends AsyncTestCase
             $connector = new Connector();
             
             try {
-                $request = new HttpRequest('http://localhost/api', Http::POST);
-                $request = $request->withBody(new StringBody($payload));
+                $request = new HttpRequest('http://localhost/api', Http::POST, [], new StringBody($payload));
                 
                 $context = yield $connector->getConnectorContext($request->getUri());
                 $context->socket = $socket;

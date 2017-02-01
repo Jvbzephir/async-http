@@ -32,9 +32,9 @@ class HttpRequest extends HttpMessage
     
     protected $addresses = [];
 
-    public function __construct($uri, string $method = Http::GET, array $headers = [], string $protocolVersion = '2.0')
+    public function __construct($uri, string $method = Http::GET, array $headers = [], HttpBody $body = null, string $protocolVersion = '2.0')
     {
-        parent::__construct($headers, $protocolVersion);
+        parent::__construct($headers, $body, $protocolVersion);
         
         $this->method = $this->filterMethod($method);
         $this->uri = Uri::parse($uri);
