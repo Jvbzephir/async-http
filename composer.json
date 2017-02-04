@@ -28,10 +28,7 @@
 	},
 	"autoload" : {
 		"psr-4" : {
-			"KoolKode\\Async\\Http\\" : [
-				"src",
-				"test/src"
-			]
+			"KoolKode\\Async\\Http\\" : "src/"
 		}
 	},
 	"autoload-dev" : {
