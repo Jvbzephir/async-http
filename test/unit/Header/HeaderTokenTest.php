@@ -96,6 +96,17 @@ class HeaderTokenTest extends \PHPUnit_Framework_TestCase
         ], $token->getParams());
     }
     
+    public function testCanParseMultipleQuotedValues()
+    {
+        $token = HeaderToken::parse('form-data; name="img"; filename="a.png"');
+        
+        $this->assertEquals('form-data', $token->getValue());
+        $this->assertEquals([
+            'name' => 'img',
+            'filename' => 'a.png'
+        ], $token->getParams());
+    }
+    
     public function testCanParseNumericParams()
     {
         $token = HeaderToken::parse('foo; bar = 2;baz=.5 ');

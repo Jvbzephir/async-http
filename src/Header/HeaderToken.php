@@ -69,7 +69,7 @@ class HeaderToken implements \Countable
         $lookup = [];
         $m = null;
         
-        if (\preg_match_all("'\"(.*(?<!\\\\))\"'", $input, $m)) {
+        if (\preg_match_all("'\"(.*(?<!\\\\)(?:\\\\\\\\)*?)\"'U", $input, $m)) {
             foreach ($m[0] as $i => $str) {
                 $replacements[$str] = "\"$i\"";
                 $lookup["\"$i\""] = $m[1][$i];
@@ -99,7 +99,7 @@ class HeaderToken implements \Countable
         $lookup = [];
         $m = null;
         
-        if (\preg_match_all("'\"(.*(?<!\\\\))\"'", $input, $m)) {
+        if (\preg_match_all("'\"(.*(?<!\\\\)(?:\\\\\\\\)*?)\"'U", $input, $m)) {
             foreach ($m[0] as $i => $str) {
                 $replacements[$str] = "\"$i\"";
                 $lookup["\"$i\""] = $m[1][$i];
