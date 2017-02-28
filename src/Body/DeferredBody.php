@@ -24,10 +24,10 @@ use KoolKode\Async\Coroutine;
 
 abstract class DeferredBody implements HttpBody
 {
-    public function start(HttpRequest $request)
-    {
-        // Can be used to implement some startup logic, might even be async.
-    }
+    /**
+     * Can be used to implement some startup logic, might even be async (method must be a generator in this case).
+     */
+    public function start(HttpRequest $request) { }
     
     public function isCached(): bool
     {
@@ -74,8 +74,6 @@ abstract class DeferredBody implements HttpBody
      */
     public function discard(): Awaitable
     {
-        $this->source->close(false);
-        
         return new Success(0);
     }
 

@@ -13,6 +13,7 @@ namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Test\AsyncTestCase;
 use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Filesystem\Filesystem;
 
 /**
  * @covers \KoolKode\Async\Http\Body\BufferedBody
@@ -73,5 +74,18 @@ class BufferedBodyTest extends AsyncTestCase
         
         $this->assertEquals(\strlen($payload) - $bufferSize, yield $body->discard());
         $this->assertEquals($payload, yield $body->getContents());
+    }
+
+    public function testCanInjectFilesystem()
+    {
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->expects($this->once())->method('tempStream')->will($this->throwException(new \LogicException('Verify')));
+        
+        $body = new BufferedBody(new ReadableMemoryStream('Hello!'), 5);
+        $body->setFilesystem($filesystem);
+        
+        $this->expectException(\LogicException::class);
+        
+        yield $body->getSize();
     }
 }

@@ -13,10 +13,12 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Events;
 
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Logger;
+use KoolKode\Async\Success;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 
@@ -42,7 +44,7 @@ class EventBody extends DeferredBody implements LoggerAwareInterface
      * @var string
      */
     protected $address;
-    
+
     /**
      * Create an HTTP body that can stream events from the given source.
      * 
@@ -83,6 +85,16 @@ class EventBody extends DeferredBody implements LoggerAwareInterface
         }
         
         $this->source->close();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function discard(): Awaitable
+    {
+        $this->source->close(false);
+        
+        return new Success(0);
     }
 
     /**

@@ -11,7 +11,9 @@
 
 namespace KoolKode\Async\Http\Body;
 
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\ReadContents;
+use KoolKode\Async\Success;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
@@ -24,6 +26,17 @@ class FileBodyTest extends AsyncTestCase
         $body = new FileBody(__FILE__);
         
         $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents());
+    }
+
+    public function testCanInjectFilesystem()
+    {
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->expects($this->once())->method('size')->with(__FILE__)->will($this->returnValue(new Success(1337)));
+        
+        $body = new FileBody(__FILE__);
+        $body->setFilesystem($filesystem);
+        
+        $this->assertEquals(1337, yield $body->getSize());
     }
 
     public function testCanAccessBodyStream()

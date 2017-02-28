@@ -122,7 +122,7 @@ class BufferedBody implements HttpBody
         if ($this->size === null && !$this->temp) {
             return new Coroutine(function () {
                 $buffer = yield $this->stream->readBuffer($this->bufferSize);
-                $len = \strlen($buffer);
+                $len = \strlen($buffer ?? '');
                 
                 if ($len < $this->bufferSize) {
                     $this->buffer = $buffer;
