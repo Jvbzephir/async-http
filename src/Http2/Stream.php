@@ -111,7 +111,7 @@ class Stream implements LoggerAwareInterface
     
     public function processFrame(Frame $frame)
     {
-        if ($frame->type === Frame::RST_STREAM) {
+        if ($frame->type == Frame::RST_STREAM) {
             return $this->conn->closeStream($this->id);
         }
         
@@ -316,9 +316,9 @@ class Stream implements LoggerAwareInterface
         return $task;
     }
 
-    public function sendResponse(HttpRequest $request, HttpResponse $response): Awaitable
+    public function sendResponse(HttpRequest $request, HttpResponse $response, array $push = []): Awaitable
     {
-        $task = new Coroutine(function () use ($request, $response) {
+        $task = new Coroutine(function () use ($request, $response, $push) {
             try {
                 $headers = [
                     ':status' => [
@@ -332,6 +332,10 @@ class Stream implements LoggerAwareInterface
                 
                 if ($body instanceof DeferredBody) {
                     $response = $response->withHeader('X-Accel-Buffering', 'no');
+                }
+                
+                foreach ($push as $res) {
+                    yield from $this->push(...$res);
                 }
                 
                 yield from $this->sendHeaders($response, $headers, [], $nobody);
@@ -378,8 +382,41 @@ class Stream implements LoggerAwareInterface
         
         return $task;
     }
+    
+    protected function push(HttpRequest $request, int $id): \Generator
+    {
+        if (!$this->conn->getRemoteSetting(Connection::SETTING_ENABLE_PUSH)) {
+            return;
+        }
+        
+        $uri = $request->getUri();
+        $target = $request->getRequestTarget();
+        
+        if ($target === '*') {
+            $path = '*';
+        } else {
+            $path = '/' . \ltrim($request->getRequestTarget(), '/');
+        }
+        
+        $headers = [
+            ':method' => [
+                $request->getMethod()
+            ],
+            ':scheme' => [
+                $uri->getScheme()
+            ],
+            ':authority' => [
+                $uri->getAuthority()
+            ],
+            ':path' => [
+                $path
+            ]
+        ];
+        
+        return yield from $this->sendHeaders($request, $headers, [], true, $id);
+    }
 
-    protected function sendHeaders(HttpMessage $message, array $headers, array $remove = [], bool $end = false): \Generator
+    protected function sendHeaders(HttpMessage $message, array $headers, array $remove = [], bool $end = false, int $push = 0): \Generator
     {
         static $removeDefault = [
             'connection',
@@ -421,9 +458,13 @@ class Stream implements LoggerAwareInterface
         
         if (\strlen($headers) > $chunkSize) {
             $parts = \str_split($headers, $chunkSize);
-            $frames = [
-                new Frame(Frame::HEADERS, $parts[0])
-            ];
+            $frames = [];
+            
+            if ($push) {
+                $frames[] = new Frame(Frame::PUSH_PROMISE, \pack('N', $push) . $parts[0]);
+            } else {
+                $frames[] = new Frame(Frame::HEADERS, $parts[0]);
+            }
             
             for ($size = \count($parts) - 2, $i = 1; $i < $size; $i++) {
                 $frames[] = new Frame(Frame::CONTINUATION, $parts[$i]);
@@ -433,7 +474,11 @@ class Stream implements LoggerAwareInterface
             
             yield $this->conn->writeStreamFrames($this->id, $frames);
         } else {
-            yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, $flags));
+            if ($push) {
+                yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::PUSH_PROMISE, \pack('N', $push) . $headers, $flags));
+            } else {
+                yield $this->conn->writeStreamFrame($this->id, new Frame(Frame::HEADERS, $headers, $flags));
+            }
         }
     }
     

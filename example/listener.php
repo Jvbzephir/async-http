@@ -62,7 +62,11 @@ return function (HttpRequest $request) use ($websocket, $filesystem) {
             ]);
             
             return new HttpResponse(Http::OK, [
-                'Content-Type' => 'text/html;charset="utf-8"'
+                'Content-Type' => 'text/html; charset="utf-8"',
+                'Link' => [
+                    '</asset/websocket.js>; rel=preload',
+                    '</asset/big-bang-theory.jpg>; rel=preload; nopush'
+                ]
             ], new StringBody($html));
     }
     

@@ -17,6 +17,7 @@ use KoolKode\Async\Awaitable;
 use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Logger;
@@ -25,7 +26,6 @@ use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use KoolKode\Async\Http\Http;
 
 /**
  * Provides access to an HTTP/2 connection that is being used to multiplex frames across streams.
@@ -212,6 +212,7 @@ class Connection implements LoggerAwareInterface
             }
             
             $this->client = false;
+            $this->localSettings[self::SETTING_ENABLE_PUSH] = 1;
             
             if (!$skipPreface) {
                 $preface = yield $this->socket->readBuffer(\strlen(self::PREFACE), true);
@@ -353,6 +354,17 @@ class Connection implements LoggerAwareInterface
             $frame = new Frame($type, yield $this->socket->readBuffer($length, true), \ord($header[4]));
         } else {
             $frame = new Frame($type, '', \ord($header[4]));
+        }
+        
+        if ($stream) {
+            $this->logger->debug('IN <{stream}>: {frame}', [
+                'stream' => $stream,
+                'frame' => (string) $frame
+            ]);
+        } else {
+            $this->logger->debug('IN: {frame}', [
+                'frame' => (string) $frame
+            ]);
         }
         
         return $frame;
@@ -549,7 +561,7 @@ class Connection implements LoggerAwareInterface
         
         return $this->outputDefer;
     }
-    
+
     protected function processStreamFrame(int $stream, Frame $frame): \Generator
     {
         if ($frame->type === Frame::PRIORITY) {
@@ -595,6 +607,10 @@ class Connection implements LoggerAwareInterface
     public function writeFrame(Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->submit(function () use ($frame) {
+            $this->logger->debug('OUT: {frame}', [
+                'frame' => (string) $frame
+            ]);
+            
             return $this->socket->write($frame->encode(0));
         }, $priority);
     }
@@ -602,6 +618,20 @@ class Connection implements LoggerAwareInterface
     public function writeStreamFrame(int $stream, Frame $frame, int $priority = 0): Awaitable
     {
         return $this->writer->submit(function () use ($stream, $frame) {
+            if (empty($this->streams[$stream])) {
+                switch ($frame->type) {
+                    case Frame::SETTINGS:
+                    case Frame::PRIORITY:
+                    case Frame::RST_STREAM:
+                        return 0;
+                }
+            }
+            
+            $this->logger->debug('OUT <{stream}>: {frame}', [
+                'stream' => $stream,
+                'frame' => (string) $frame
+            ]);
+            
             return $this->socket->write($frame->encode($stream));
         }, $priority);
     }
@@ -612,6 +642,20 @@ class Connection implements LoggerAwareInterface
             $len = 0;
             
             foreach ($frames as $frame) {
+                if (empty($this->streams[$stream])) {
+                    switch ($frame->type) {
+                        case Frame::SETTINGS:
+                        case Frame::PRIORITY:
+                        case Frame::RST_STREAM:
+                            break 2;
+                    }
+                }
+                
+                $this->logger->debug('OUT <{stream}>: {frame}', [
+                    'stream' => $stream,
+                    'frame' => (string) $frame
+                ]);
+                
                 $len += yield $this->socket->write($frame->encode($stream));
             }
             

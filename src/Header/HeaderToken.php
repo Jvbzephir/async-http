@@ -243,7 +243,7 @@ class HeaderToken implements \Countable
     public function setParam(string $name, $value): HeaderToken
     {
         if ($value === null) {
-            return $this->removeParam($name);
+            return $this->withoutParam($name);
         }
         
         if (!\is_scalar($value)) {
@@ -261,7 +261,7 @@ class HeaderToken implements \Countable
      * @param string $name
      * @return HeaderToken
      */
-    public function removeParam(string $name): HeaderToken
+    public function withoutParam(string $name): HeaderToken
     {
         unset($this->params[$name]);
         

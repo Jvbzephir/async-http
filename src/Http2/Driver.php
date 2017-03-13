@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\AwaitPending;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
@@ -249,6 +250,19 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
      */
     protected function processRequest(HttpDriverContext $context, Connection $conn, callable $action, Stream $stream, HttpRequest $request): \Generator
     {
+        static $copy = [
+            'Accept',
+            'Accept-Charset',
+            'Accept-Encoding',
+            'Accept-Language',
+            'Authorization',
+            'Cookie',
+            'Date',
+            'DNT',
+            'User-Agent',
+            'Via'
+        ];
+        
         $next = new NextMiddleware($context->getMiddlewares(), function (HttpRequest $request) use ($context, $action) {
             $response = $action($request, $context);
             
@@ -260,9 +274,55 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         });
         
         $response = yield from $next($request);
-        
         $response = $response->withHeader('Date', \gmdate(Http::DATE_RFC1123));
         
-        yield $stream->sendResponse($request, $response);
+        $actions = [];
+        $pushed = [];
+        
+        if ($conn->getRemoteSetting(Connection::SETTING_ENABLE_PUSH)) {
+            $base = $request->getUri()->withQueryParams([])->withFragment('');
+            $links = [];
+            
+            foreach ($response->getHeaderTokens('Link') as $link) {
+                if ($link->getParam('rel', '') !== 'preload' || $link->getParam('nopush', false)) {
+                    $links[] = (string) $link;
+                    
+                    continue;
+                }
+                
+                $resource = new HttpRequest($base->withPath(\substr($link->getValue(), 1, -1)), Http::GET, [
+                    'Accept' => '*/*',
+                    'Cache-Control' => 'max-age=0',
+                    'Referer' => (string) $request->getUri()
+                ]);
+                
+                foreach ($copy as $name) {
+                    if ($request->hasHeader($name)) {
+                        $resource = $resource->withHeader($name, ...$request->getHeader($name));
+                    }
+                }
+                
+                $push = $conn->openStream();
+                
+                $actions[] = new Coroutine($this->processRequest($context, $conn, $action, $push, $resource, false));
+                
+                $pushed[] = [
+                    $resource,
+                    $push->getId()
+                ];
+                
+                $this->logger->info('Pushing resource <{path}>', [
+                    'path' => $resource->getUri()->getPath()
+                ]);
+            }
+            
+            if ($pushed) {
+                $response = $response->withHeader('Link', ...$links);
+            }
+        }
+        
+        \array_unshift($actions, $stream->sendResponse($request, $response, $pushed));
+        
+        yield new AwaitPending($actions);
     }
 }

@@ -27,6 +27,7 @@ use KoolKode\Async\Http\Middleware\ResponseContentEncoder;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Log\PipeLogHandler;
+use Psr\Log\LogLevel;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -64,6 +65,6 @@ Loop::execute(function () {
         
         echo "WebSocket server listening on port 8080\n\n";
     }, Context::inherit([
-        Logger::class => new Logger(new PipeLogHandler())
+        Logger::class => new Logger(new PipeLogHandler(STDERR, LogLevel::INFO))
     ]));
 });
