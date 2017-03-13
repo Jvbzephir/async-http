@@ -24,6 +24,7 @@ use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -280,8 +281,10 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         $pushed = [];
         
         if ($conn->getRemoteSetting(Connection::SETTING_ENABLE_PUSH)) {
-            $base = $request->getUri()->withQueryParams([])->withFragment('');
             $links = [];
+            
+            $base = $request->getUri()->withQueryParams([])->withFragment('');
+            $baseUri = (string) $base;
             
             foreach ($response->getHeaderTokens('Link') as $link) {
                 if ($link->getParam('rel', '') !== 'preload' || $link->getParam('nopush', false)) {
@@ -290,11 +293,42 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
                     continue;
                 }
                 
-                $resource = new HttpRequest($base->withPath(\substr($link->getValue(), 1, -1)), Http::GET, [
+                if (!\preg_match("'^<[^>]+>$'", $link->getValue())) {
+                    $links[] = (string) $link;
+                    
+                    continue;
+                }
+                
+                $url = \substr($link->getValue(), 1, -1);
+                
+                if (($url[0] ?? '') === '/') {
+                    $uri = $base->withPath($url);
+                } elseif (0 === \strpos($url, $baseUri)) {
+                    try {
+                        $uri = Uri::parse($uri);
+                    } catch (\InvalidArgumentException $e) {
+                        $this->logger->error('Malformed URL in HTTP push link: {message}', [
+                            'message' => $e->getMessage(),
+                            'exception' => $e
+                        ]);
+                        
+                        $links[] = (string) $link;
+                        
+                        continue;
+                    }
+                } else {
+                    $links[] = (string) $link;
+                    
+                    continue;
+                }
+                
+                $resource = new HttpRequest($uri, Http::GET, [
                     'Accept' => '*/*',
                     'Cache-Control' => 'max-age=0',
                     'Referer' => (string) $request->getUri()
                 ]);
+                
+                $resource = $resource->withAddress($request->getClientAddress(), ...$request->getProxyAddresses());
                 
                 foreach ($copy as $name) {
                     if ($request->hasHeader($name)) {
@@ -310,10 +344,6 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
                     $resource,
                     $push->getId()
                 ];
-                
-                $this->logger->info('Pushing resource <{path}>', [
-                    'path' => $resource->getUri()->getPath()
-                ]);
             }
             
             if ($pushed) {
