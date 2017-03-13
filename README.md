@@ -28,6 +28,7 @@ Async HTTP server and client written in PHP 7.
 | `Direct` | yes | |
 | `HPACK compression` | yes | yes |
 | `Flow control` | yes | yes |
+| `Server push` | yes | no |
 | **FCGI** | (:heavy_check_mark:) responder | |
 | `Persistent connections` | yes | |
 | **WebSocket** | :heavy_check_mark: | :heavy_check_mark: |
