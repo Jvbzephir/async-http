@@ -280,7 +280,7 @@ class Driver implements HttpDriver, UpgradeHandler, LoggerAwareInterface
         $actions = [];
         $pushed = [];
         
-        if ($conn->getRemoteSetting(Connection::SETTING_ENABLE_PUSH)) {
+        if ($response->hasHeader('Link') && $conn->getRemoteSetting(Connection::SETTING_ENABLE_PUSH)) {
             $links = [];
             
             $base = $request->getUri()->withQueryParams([])->withFragment('');
