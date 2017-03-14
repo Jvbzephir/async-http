@@ -623,6 +623,8 @@ class Connection implements LoggerAwareInterface
                     case Frame::SETTINGS:
                     case Frame::PRIORITY:
                     case Frame::RST_STREAM:
+                        break;
+                    default:
                         return 0;
                 }
             }
@@ -647,6 +649,8 @@ class Connection implements LoggerAwareInterface
                         case Frame::SETTINGS:
                         case Frame::PRIORITY:
                         case Frame::RST_STREAM:
+                            break;
+                        default:
                             break 2;
                     }
                 }
