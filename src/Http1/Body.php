@@ -259,11 +259,11 @@ class Body implements HttpBody
                         $len += \strlen($chunk);
                     }
                 }
-                
-                return $len;
             } finally {
                 $this->decodedStream->close();
             }
+            
+            return $len;
         });
     }
 
