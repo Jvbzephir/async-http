@@ -152,12 +152,14 @@ class HttpClient implements LoggerAwareInterface
                 
                 $connecting->detach($connector);
                 
-                return yield $connector->send($context, $request);
+                $response = yield $connector->send($context, $request);
             } finally {
                 foreach ($connecting as $conn) {
                     $connecting[$conn]->dispose();
                 }
             }
+            
+            return $response;
         });
         
         return new Coroutine($next($request));

@@ -105,11 +105,11 @@ class CompressedMessageWriter extends MessageWriter
                     
                     $len += yield $this->writeFrame(new Frame($type, $chunk, true, $reserved));
                 }
-                
-                return $len;
             } finally {
                 $stream->close();
             }
+            
+            return $len;
         }, $priority);
     }
 }

@@ -88,11 +88,11 @@ class StreamBody implements HttpBody
                 while (null !== ($chunk = yield $this->stream->read())) {
                     $len += \strlen($chunk);
                 }
-                
-                return $len;
             } finally {
                 $this->stream->close();
             }
+            
+            return $len;
         });
     }
 }

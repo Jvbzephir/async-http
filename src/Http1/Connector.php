@@ -286,13 +286,11 @@ class Connector implements HttpConnector, LoggerAwareInterface
         
         if ($expect) {
             if (!\preg_match("'^HTTP/1\\.1\s+100(?:$|\s)'i", ($line = yield $socket->readLine()))) {
-                try {
-                    return $line;
-                } finally {
-                    if (isset($bodyStream)) {
-                        $bodyStream->close();
-                    }
+                if (isset($bodyStream)) {
+                    $bodyStream->close();
                 }
+                
+                return $line;
             }
         }
         

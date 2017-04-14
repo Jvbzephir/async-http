@@ -129,11 +129,11 @@ class MessageWriter
                 if ($chunk !== null) {
                     $len += yield $this->writeFrame(new Frame($type, $chunk));
                 }
-                
-                return $len;
             } finally {
                 $stream->close();
             }
+            
+            return $len;
         }, $priority);
     }
 }

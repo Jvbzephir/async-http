@@ -465,11 +465,10 @@ class Connection implements LoggerAwareInterface
         
         if ($frame->flags & Frame::ACK) {
             if (isset($this->pings[$frame->data])) {
-                try {
-                    $this->pings[$frame->data]->resolve(true);
-                } finally {
-                    unset($this->pings[$frame->data]);
-                }
+                $ping = $this->pings[$frame->data];
+                unset($this->pings[$frame->data]);
+                
+                $ping->resolve(true);
             }
         } else {
             yield $this->writeFrame(new Frame(Frame::PING, $frame->data, Frame::ACK), 1000);
