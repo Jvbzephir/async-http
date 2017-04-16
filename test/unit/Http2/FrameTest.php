@@ -11,10 +11,12 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * @covers \KoolKode\Async\Http\Http2\Frame
  */
-class FrameTest extends \PHPUnit_Framework_TestCase
+class FrameTest extends TestCase
 {
     public function testCanConstructFrame()
     {

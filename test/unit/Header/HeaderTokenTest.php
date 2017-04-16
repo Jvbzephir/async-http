@@ -11,10 +11,12 @@
 
 namespace KoolKode\Async\Http\Header;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * @covers \KoolKode\Async\Http\Header\HeaderToken
  */
-class HeaderTokenTest extends \PHPUnit_Framework_TestCase
+class HeaderTokenTest extends TestCase
 {
     public function testBasicToken()
     {

@@ -12,11 +12,12 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Body\StringBody;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \KoolKode\Async\Http\HttpMessage
  */
-class HttpMessageTest extends \PHPUnit_Framework_TestCase
+class HttpMessageTest extends TestCase
 {
     public function testCanUseProtocolVersion()
     {

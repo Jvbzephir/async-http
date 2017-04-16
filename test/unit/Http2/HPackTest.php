@@ -11,10 +11,12 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * @covers \KoolKode\Async\Http\Http2\HPack
  */
-class HPackTest extends \PHPUnit_Framework_TestCase
+class HPackTest extends TestCase
 {
     /**
      * C.1.1 Example 1: Encoding 10 Using a 5-Bit Prefix

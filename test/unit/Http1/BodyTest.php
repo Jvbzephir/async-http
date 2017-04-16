@@ -12,13 +12,13 @@
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Http\Body\StreamBody;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\WritableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
-use KoolKode\Async\Http\Http;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\Body

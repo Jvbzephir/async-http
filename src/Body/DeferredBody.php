@@ -14,13 +14,13 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
+use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Success;
-use KoolKode\Async\Stream\ReadableChannelStream;
-use KoolKode\Async\Util\Channel;
 use KoolKode\Async\ReadContents;
-use KoolKode\Async\Coroutine;
+use KoolKode\Async\Stream\ReadableChannelStream;
+use KoolKode\Async\Success;
+use KoolKode\Async\Util\Channel;
 
 abstract class DeferredBody implements HttpBody
 {

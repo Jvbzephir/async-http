@@ -11,10 +11,12 @@
 
 namespace KoolKode\Async\Http\Http2;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * @covers \KoolKode\Async\Http\Http2\HPackCompressor
  */
-class HPackCompressorTest extends \PHPUnit_Framework_TestCase
+class HPackCompressorTest extends TestCase
 {
     public function providePlainData()
     {

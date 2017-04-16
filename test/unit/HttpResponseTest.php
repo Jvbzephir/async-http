@@ -12,11 +12,12 @@
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Http\Body\StringBody;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \KoolKode\Async\Http\HttpResponse
  */
-class HttpResponseTest extends \PHPUnit_Framework_TestCase
+class HttpResponseTest extends TestCase
 {
     public function testDebugInfo()
     {

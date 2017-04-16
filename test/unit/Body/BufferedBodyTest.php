@@ -11,9 +11,9 @@
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\Test\AsyncTestCase;
-use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Test\AsyncTestCase;
 
 /**
  * @covers \KoolKode\Async\Http\Body\BufferedBody

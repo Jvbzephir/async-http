@@ -11,11 +11,11 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Deferred;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Test\AsyncTestCase;
-use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Deferred;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\ConnectionManager

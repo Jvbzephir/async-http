@@ -11,10 +11,12 @@
 
 namespace KoolKode\Async\Http;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * @covers \KoolKode\Async\Http\Uri
  */
-class UriTest extends \PHPUnit_Framework_TestCase
+class UriTest extends TestCase
 {
     public function testCanParseAllUriParts()
     {

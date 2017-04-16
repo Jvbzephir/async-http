@@ -11,10 +11,10 @@
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Test\AsyncTestCase;
-use KoolKode\Async\ReadContents;
 
 /**
  * @covers \KoolKode\Async\Http\Http1\ChunkDecodedStream

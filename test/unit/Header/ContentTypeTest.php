@@ -12,11 +12,12 @@
 namespace KoolKode\Async\Http\Header;
 
 use KoolKode\Util\MediaType;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \KoolKode\Async\Http\Header\ContentType
  */
-class ContentTypeTest extends \PHPUnit_Framework_TestCase
+class ContentTypeTest extends TestCase
 {
     public function testCanCreateContentType()
     {

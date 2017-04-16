@@ -13,11 +13,12 @@ namespace KoolKode\Async\Http\Header;
 
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \KoolKode\Async\Http\Header\Accept
  */
-class AcceptTest extends \PHPUnit_Framework_TestCase
+class AcceptTest extends TestCase
 {
     public function testAccessorsAndConstructionFromMessage()
     {
