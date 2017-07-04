@@ -14,11 +14,11 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Http\Http;
-use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\StatusException;
+use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 use Psr\Log\LoggerAwareInterface;

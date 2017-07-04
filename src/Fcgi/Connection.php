@@ -15,11 +15,10 @@ namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Http\Http;
+use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;

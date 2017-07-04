@@ -13,27 +13,27 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitRead;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\CopyBytes;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Timeout;
 use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Filesystem\FilesystemProxy;
-use KoolKode\Async\Http\Body\DeferredBody;
-use KoolKode\Async\Http\Body\FileBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Logger;
-use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Body\DeferredBody;
+use KoolKode\Async\Http\Body\FileBody;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\StreamClosedException;
-use KoolKode\Async\Timeout;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -246,7 +246,8 @@ class Driver implements HttpDriver, LoggerAwareInterface
     /**
      * Coroutine that parses incoming requests and queues them into the request pipeline.
      * 
-     * @param DuplexStream $socket Stream being used to transmit HTTP messages.
+     * @param HttpDriverContext $context Context provided by HTTP endpoint.
+     * @param SocketStream $socket Stream being used to transmit HTTP messages.
      * @param Channel $pipeline HTTP request pipeline.
      * @param HttpRequest $request First HTTP request within the pipeline.
      */

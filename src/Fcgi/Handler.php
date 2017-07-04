@@ -15,14 +15,14 @@ namespace KoolKode\Async\Http\Fcgi;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Http\Body\DeferredBody;
-use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Body\DeferredBody;
+use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableChannelStream;
 use KoolKode\Async\Stream\StreamClosedException;
 use KoolKode\Async\Util\Channel;

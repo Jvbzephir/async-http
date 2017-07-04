@@ -11,9 +11,9 @@
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\ReadContents;
 use KoolKode\Async\Success;
+use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**

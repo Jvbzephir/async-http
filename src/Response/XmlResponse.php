@@ -13,9 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Response;
 
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\StringBody;
 
 /**
  * HTTP response that contains a string of XML-encoded data.
@@ -28,8 +28,6 @@ class XmlResponse extends HttpResponse
      * Create an XML repsonse from the given payload.
      * 
      * Supports XML strings, DOM documents / nodes and SimpleXML elements.
-     * 
-     * @param mixed $payload
      */
     public function __construct($payload)
     {

@@ -13,14 +13,14 @@ declare(strict_types = 1);
 
 use AsyncInterop\Loop;
 use KoolKode\Async\Context;
+use KoolKode\Async\Http\HttpEndpoint;
+use KoolKode\Async\Http\ReverseProxySettings;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
-use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\BrowserSupport;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\Middleware\RequestContentDecoder;
 use KoolKode\Async\Http\Middleware\ResponseContentEncoder;
-use KoolKode\Async\Http\ReverseProxySettings;
 use KoolKode\Async\Http\WebSocket\ConnectionHandler;
 use KoolKode\Async\Log\Logger;
 use KoolKode\Async\Log\PipeLogHandler;

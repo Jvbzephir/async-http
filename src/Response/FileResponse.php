@@ -13,10 +13,10 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Response;
 
-use KoolKode\Async\Http\Body\FileBody;
-use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\FileBody;
+use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Util\Filesystem;
 
 /**

@@ -13,13 +13,13 @@ declare(strict_types = 1);
 
 use AsyncInterop\Loop;
 use KoolKode\Async\Context;
-use KoolKode\Async\Http\Events\EventResponder;
-use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
 use KoolKode\Async\Http\Http;
-use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Events\EventResponder;
+use KoolKode\Async\Http\Fcgi\FcgiEndpoint;
+use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Middleware\BrowserSupport;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\Middleware\RequestContentDecoder;

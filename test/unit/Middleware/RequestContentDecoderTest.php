@@ -11,10 +11,10 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**

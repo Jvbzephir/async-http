@@ -14,15 +14,14 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Http\Http;
+use KoolKode\Async\Transform;
+use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Logger;
 use KoolKode\Async\Socket\SocketStream;
-use KoolKode\Async\Transform;
 use KoolKode\Async\Util\Channel;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;

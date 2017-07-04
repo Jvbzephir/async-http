@@ -13,10 +13,10 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Response;
 
-use KoolKode\Async\Http\Body\StringBody;
-use KoolKode\Async\Http\Header\ContentType;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\StringBody;
+use KoolKode\Async\Http\Header\ContentType;
 
 /**
  * HTTP response that transfers a text-based payload.

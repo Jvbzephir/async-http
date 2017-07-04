@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Socket\SocketStream;
 
+
 /**
  * Extendable context object that is used to allow for persistent connections etc.
  * 

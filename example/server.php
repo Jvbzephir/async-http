@@ -13,10 +13,10 @@ declare(strict_types = 1);
 
 use AsyncInterop\Loop;
 use KoolKode\Async\Context;
+use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Events\EventResponder;
 use KoolKode\Async\Http\Http1\Driver as Http1Driver;
 use KoolKode\Async\Http\Http2\Driver as Http2Driver;
-use KoolKode\Async\Http\HttpEndpoint;
 use KoolKode\Async\Http\Middleware\BrowserSupport;
 use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\Middleware\RequestContentDecoder;
@@ -53,6 +53,6 @@ Loop::execute(function () {
         
         echo "HTTPS server listening on port 8888\n\n";
     }, Context::inherit([
-        Logger::class => new Logger(new PipeLogHandler(STDERR, LogLevel::INFO))
+        Logger::class => new Logger(new PipeLogHandler(STDERR, LogLevel::DEBUG))
     ]));
 });

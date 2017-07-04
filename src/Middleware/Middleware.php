@@ -39,7 +39,7 @@ interface Middleware
      * 
      * @param HttpRequest $request The request to be dispatched.
      * @param NextMiddleware $next Provides delegation of the dispatch process.
-     * @return HttpResponse
+     * @return HttpResponse HTTP response assembled by middleware or nested application.
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator;
 }

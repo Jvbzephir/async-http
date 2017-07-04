@@ -11,12 +11,12 @@
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\ReadContents;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Test\EndToEndTest;
-use KoolKode\Async\ReadContents;
 use KoolKode\Async\Socket\Socket;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;

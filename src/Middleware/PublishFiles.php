@@ -69,10 +69,6 @@ class PublishFiles
 
     /**
      * Check if the HTTP request matches a public file and server it as needed.
-     * 
-     * @param HttpRequest $request
-     * @param NextMiddleware $next
-     * @return HttpResponse
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {

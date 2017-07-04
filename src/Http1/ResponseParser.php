@@ -13,9 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 

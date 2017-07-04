@@ -13,12 +13,11 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Http\Body\BufferedBody;
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Body\BufferedBody;
+use KoolKode\Async\Http\Body\StringBody;
 
 /**
  * Middleware that automatically follows HTTP redirects.
@@ -56,10 +55,6 @@ class FollowRedirects implements Middleware
      * Automatically follow HTTP redirects according to HTTP status code and location header.
      * 
      * Uncached HTTP request bodies will be cached prior to being sent to the remote endpoint.
-     * 
-     * @param HttpRequest $request
-     * @param NextMiddleware $next
-     * @return HttpResponse
      * 
      * @throws TooManyRedirectsException When the maximum number of redirects for a single HTTP request has been exceeded.
      */

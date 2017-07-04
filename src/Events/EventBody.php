@@ -14,11 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Events;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Http\Body\DeferredBody;
-use KoolKode\Async\Http\Http;
+use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Logger;
-use KoolKode\Async\Success;
+use KoolKode\Async\Http\Body\DeferredBody;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 

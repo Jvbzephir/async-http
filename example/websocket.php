@@ -13,9 +13,9 @@ declare(strict_types = 1);
 
 use AsyncInterop\Loop;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Pause;
 use KoolKode\Async\Http\WebSocket\Connection;
 use KoolKode\Async\Http\WebSocket\Endpoint;
-use KoolKode\Async\Pause;
 
 /**
  * Example endpoint that broadcasts text messages to all connected clients.

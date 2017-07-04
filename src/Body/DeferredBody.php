@@ -15,11 +15,11 @@ namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\ReadContents;
+use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\ReadContents;
 use KoolKode\Async\Stream\ReadableChannelStream;
-use KoolKode\Async\Success;
 use KoolKode\Async\Util\Channel;
 
 abstract class DeferredBody implements HttpBody
@@ -29,20 +29,24 @@ abstract class DeferredBody implements HttpBody
      */
     public function start(HttpRequest $request) { }
     
+    /**
+     * {@inheritdoc}
+     */
     public function isCached(): bool
     {
         return false;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function getSize(): Awaitable
     {
         return new Success(null);
     }
     
     /**
-     * Provides an input stream that can be used to read HTTP body contents.
-     *
-     * @return ReadableStream
+     * {@inheritdoc}
      */
     public function getReadableStream(): Awaitable
     {
@@ -54,11 +58,7 @@ abstract class DeferredBody implements HttpBody
     }
 
     /**
-     * Assemble HTTP body contents into a string.
-     *
-     * This method should not be used on large HTTP bodies because it loads all data into memory!
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getContents(): Awaitable
     {
@@ -68,9 +68,7 @@ abstract class DeferredBody implements HttpBody
     }
 
     /**
-     * Discard remaining body contents.
-     *
-     * @return int The number of body bytes that have been discarded.
+     * {@inheritdoc}
      */
     public function discard(): Awaitable
     {

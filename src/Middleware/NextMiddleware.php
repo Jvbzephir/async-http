@@ -80,9 +80,6 @@ class NextMiddleware implements LoggerAwareInterface
     /**
      * Invoke next HTTP middleware or the decorated action.
      * 
-     * @param HttpRequest $request
-     * @return HttpResponse
-     * 
      * @throws \RuntimeException When the middleware / action does not return / resolve into an HTTP response.
      */
     public function __invoke(HttpRequest $request): \Generator

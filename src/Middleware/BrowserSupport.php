@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Middleware;
 
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\HttpResponse;
 
 /**
  * Middleware that adds browser-specific HTTP headers.
@@ -46,10 +45,6 @@ class BrowserSupport implements Middleware
 
     /**
      * Inject additional browser-related HTTP headers into the HTTP response.
-     * 
-     * @param HttpRequest $request
-     * @param NextMiddleware $next
-     * @return HttpResponse
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {

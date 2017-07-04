@@ -94,8 +94,6 @@ class HPack
 
     /**
      * Create a new HPACK encoder / decoder.
-     * 
-     * @param HuffmanDecoder $decoder
      */
     public function __construct(HPackContext $context = null, HPackCompressor $compressor = null)
     {

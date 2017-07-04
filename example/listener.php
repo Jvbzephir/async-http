@@ -12,16 +12,15 @@
 declare(strict_types = 1);
 
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Pause;
+use KoolKode\Async\ReadContents;
 use KoolKode\Async\Filesystem\FilesystemProxy;
-use KoolKode\Async\Http\Body\StringBody;
-use KoolKode\Async\Http\Events\EventSource;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Pause;
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Http\Body\StringBody;
+use KoolKode\Async\Http\Events\EventSource;
 
 require_once __DIR__ . '/websocket.php';
 

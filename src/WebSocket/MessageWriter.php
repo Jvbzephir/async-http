@@ -14,8 +14,8 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Awaitable;
-use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Failure;
+use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Socket\SocketStream;
 use KoolKode\Async\Stream\ReadableStream;
 

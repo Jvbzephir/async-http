@@ -15,11 +15,11 @@ namespace KoolKode\Async\Http\Body;
 
 use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\ReadContents;
+use KoolKode\Async\Success;
 use KoolKode\Async\Filesystem\Filesystem;
 use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\HttpBody;
-use KoolKode\Async\ReadContents;
-use KoolKode\Async\Success;
 
 /**
  * HTTP body that can stream contents of a file.

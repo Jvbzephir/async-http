@@ -13,9 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableInflateStream;
 
 /**
@@ -41,10 +40,6 @@ class ResponseContentDecoder implements Middleware
      * Handles compressed HTTP response bodies using an inflate stream.
      * 
      * The content encoding header will be removed if the middleware was able to decompress the body.
-     * 
-     * @param HttpRequest $request
-     * @param NextMiddleware $next
-     * @return HttpResponse
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {

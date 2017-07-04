@@ -39,7 +39,7 @@ class ConnectorContext extends HttpConnectorContext
     /**
      * Dispose callback.
      * 
-     * @var callback
+     * @var callable
      */
     protected $disposer;
 

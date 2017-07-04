@@ -13,11 +13,11 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
-use KoolKode\Async\Http\Body\DeferredBody;
-use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\DeferredBody;
+use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableDeflateStream;
 use KoolKode\Util\InvalidMediaTypeException;
 
@@ -125,10 +125,6 @@ class ResponseContentEncoder implements Middleware
      * Compresses the response body using a deflate stream if compression is supported by the client (accept encoding header).
      * 
      * Will set a content encoding header if the body has been compressed.
-     * 
-     * @param HttpRequest $request
-     * @param NextMiddleware $next
-     * @return HttpResponse
      */
     public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
     {

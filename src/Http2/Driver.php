@@ -13,18 +13,18 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http2;
 
-use KoolKode\Async\Awaitable;
 use KoolKode\Async\AwaitPending;
+use KoolKode\Async\Awaitable;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Http\Http;
-use KoolKode\Async\Http\Http1\UpgradeHandler;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpDriverContext;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Logger;
-use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Http\StatusException;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Http1\UpgradeHandler;
+use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\SocketStream;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
