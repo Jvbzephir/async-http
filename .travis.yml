@@ -17,8 +17,7 @@ before_install:
   - composer selfupdate --no-interaction
 
 install:
-  - travis_retry composer update --no-interaction --prefer-source $DEPS
-  - composer info
+  - travis_retry composer update -n $DEPS
 
 script:
   - ./vendor/bin/phpunit -c "./test/phpunit.xml"
