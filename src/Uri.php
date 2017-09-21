@@ -63,7 +63,7 @@ class Uri implements \JsonSerializable
      * @param string $uri
      * @return Uri
      */
-    public static function parse($uri): Uri
+    public static function parse($uri): self
     {
         if ($uri instanceof Uri) {
             return $uri;
@@ -144,7 +144,7 @@ class Uri implements \JsonSerializable
         return $this->scheme;
     }
 
-    public function withScheme(string $scheme): Uri
+    public function withScheme(string $scheme): self
     {
         $scheme = $this->filterScheme($scheme);
         
@@ -167,7 +167,7 @@ class Uri implements \JsonSerializable
         return \sprintf('%s:%s', $this->username, $this->password);
     }
 
-    public function withUserInfo(string $user, string $password = null): Uri
+    public function withUserInfo(string $user, ?string $password = null): self
     {
         $user = \trim($user);
         
@@ -223,7 +223,7 @@ class Uri implements \JsonSerializable
         return empty($port) ? $this->host : \sprintf('%s:%u', $this->host, $port);
     }
 
-    public function withHost(string $host): Uri
+    public function withHost(string $host): self
     {
         $m = null;
         
@@ -239,12 +239,12 @@ class Uri implements \JsonSerializable
         return $uri;
     }
 
-    public function getPort()
+    public function getPort(): ?int
     {
         return $this->port;
     }
 
-    public function withPort(int $port = null): Uri
+    public function withPort(?int $port): self
     {
         if ($port !== null) {
             if ($port < 1 || $port > 65535) {
@@ -263,7 +263,7 @@ class Uri implements \JsonSerializable
         return $this->path;
     }
 
-    public function withPath(string $path): Uri
+    public function withPath(string $path): self
     {
         $path = $this->filterPath($path);
         
@@ -278,7 +278,7 @@ class Uri implements \JsonSerializable
         return $this->query;
     }
 
-    public function withQuery(string $query): Uri
+    public function withQuery(string $query): self
     {
         $query = $this->filterQuery($query);
         
@@ -328,7 +328,7 @@ class Uri implements \JsonSerializable
         return $this->parsedQuery;
     }
 
-    public function withQueryParams(array $params): Uri
+    public function withQueryParams(array $params): self
     {
         $uri = clone $this;
         $uri->parsedQuery = $params;
@@ -342,7 +342,7 @@ class Uri implements \JsonSerializable
         return $this->fragment ?: '';
     }
 
-    public function withFragment(string $fragment): Uri
+    public function withFragment(string $fragment): self
     {
         $uri = clone $this;
         $uri->fragment = $this->filterFragment($fragment);

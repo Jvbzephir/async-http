@@ -32,7 +32,7 @@ class HttpRequest extends HttpMessage
     
     protected $addresses = [];
 
-    public function __construct($uri, string $method = Http::GET, array $headers = [], HttpBody $body = null, string $protocolVersion = '2.0')
+    public function __construct($uri, string $method = Http::GET, array $headers = [], ?HttpBody $body = null, string $protocolVersion = '2.0')
     {
         parent::__construct($headers, $body, $protocolVersion);
         
@@ -74,7 +74,7 @@ class HttpRequest extends HttpMessage
         return empty($target) ? '/' : $target;
     }
 
-    public function withRequestTarget(string $requestTarget): HttpRequest
+    public function withRequestTarget(string $requestTarget): self
     {
         $requestTarget = \trim($requestTarget);
         
@@ -93,7 +93,7 @@ class HttpRequest extends HttpMessage
         return $this->method;
     }
 
-    public function withMethod(string $method): HttpRequest
+    public function withMethod(string $method): self
     {
         $request = clone $this;
         $request->method = $this->filterMethod($method);
@@ -106,7 +106,7 @@ class HttpRequest extends HttpMessage
         return $this->uri;
     }
 
-    public function withUri($uri): HttpRequest
+    public function withUri($uri): self
     {
         $uri = Uri::parse($uri);
         
@@ -196,7 +196,7 @@ class HttpRequest extends HttpMessage
         return \array_slice($this->addresses, 1);
     }
 
-    public function withAddress(string ...$address): HttpRequest
+    public function withAddress(string ...$address): self
     {
         $request = clone $this;
         

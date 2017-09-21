@@ -13,12 +13,11 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\Awaitable;
-use KoolKode\Async\Coroutine;
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Context;
+use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
-use KoolKode\Async\Filesystem\Filesystem;
-use KoolKode\Async\Filesystem\FilesystemProxy;
+use KoolKode\Async\Concurrent\Filesystem\PoolFilesystem;
+use KoolKode\Async\Concurrent\Pool\SyncPool;
 use KoolKode\Async\Http\HttpBody;
 
 /**
@@ -44,14 +43,10 @@ class FileBody implements HttpBody
      */
     public function __construct(string $file)
     {
-        $this->file = $file;
+        // FIXME: Re-implement filesystem proxy!
         
-        $this->filesystem = new FilesystemProxy();
-    }
-    
-    public function setFilesystem(Filesystem $filesystem)
-    {
-        $this->filesystem = $filesystem;
+        $this->file = $file;
+        $this->filesystem = new PoolFilesystem(new SyncPool());
     }
 
     /**
@@ -61,7 +56,7 @@ class FileBody implements HttpBody
     {
         return true;
     }
-    
+
     /**
      * Get the path of the transfered file.
      * 
@@ -75,34 +70,45 @@ class FileBody implements HttpBody
     /**
      * {@inheritdoc}
      */
-    public function getSize(): Awaitable
+    public function getSize(Context $context): Promise
     {
-        return $this->filesystem->size($this->file);
+        return $this->filesystem->size($context, $this->file);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getReadableStream(): Awaitable
+    public function getReadableStream(Context $context): Promise
     {
-        return $this->filesystem->readStream($this->file);
+        return $this->filesystem->readStream($context, $this->file);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getContents(): Awaitable
+    public function getContents(Context $context): Promise
     {
-        return new Coroutine(function () {
-            return yield new ReadContents(yield $this->getReadableStream());
+        return $context->task(function (Context $context) {
+            $stream = yield $this->filesystem->readStream($context, $this->file);
+            $buffer = '';
+            
+            try {
+                while (null !== ($chunk = yield $stream->read($context))) {
+                    $buffer .= $chunk;
+                }
+            } finally {
+                $stream->close();
+            }
+            
+            return $buffer;
         });
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function discard(): Awaitable
+    public function discard(Context $context): Promise
     {
-        return new Success(0);
+        return new Success($context, 0);
     }
 }

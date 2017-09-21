@@ -24,7 +24,7 @@ class HttpResponse extends HttpMessage
 
     protected $reason = '';
 
-    public function __construct(int $status = Http::OK, array $headers = [], HttpBody $body = null, string $protocolVersion = '2.0')
+    public function __construct(int $status = Http::OK, array $headers = [], ?HttpBody $body = null, string $protocolVersion = '2.0')
     {
         parent::__construct($headers, $body, $protocolVersion);
         
@@ -62,7 +62,7 @@ class HttpResponse extends HttpMessage
         return $this->reason;
     }
 
-    public function withStatus(int $code, string $reasonPhrase = ''): HttpResponse
+    public function withStatus(int $code, string $reasonPhrase = ''): self
     {
         $response = clone $this;
         $response->status = $this->filterStatus($code);
@@ -71,7 +71,7 @@ class HttpResponse extends HttpMessage
         return $response;
     }
     
-    public function withReason(string $reason)
+    public function withReason(string $reason): self
     {
         $response = clone $this;
         $response->reason = \trim($reason);

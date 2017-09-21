@@ -13,9 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\Awaitable;
-use KoolKode\Async\Coroutine;
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Context;
+use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Stream\ReadableStream;
@@ -55,37 +54,49 @@ class StreamBody implements HttpBody
     /**
      * {@inheritdoc}
      */
-    public function getSize(): Awaitable
+    public function getSize(Context $context): Promise
     {
-        return new Success(null);
+        return new Success($context);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getReadableStream(): Awaitable
+    public function getReadableStream(Context $context): Promise
     {
-        return new Success($this->stream);
+        return new Success($context, $this->stream);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getContents(): Awaitable
+    public function getContents(Context $context): Promise
     {
-        return new ReadContents($this->stream);
+        return $context->task(function (Context $context) {
+            $buffer = '';
+            
+            try {
+                while (null !== ($chunk = yield $this->stream->read($context))) {
+                    $buffer .= $chunk;
+                }
+            } finally {
+                $this->stream->close();
+            }
+            
+            return $buffer;
+        });
     }
     
     /**
      * {@inheritdoc}
      */
-    public function discard(): Awaitable
+    public function discard(Context $context): Promise
     {
-        return new Coroutine(function () {
+        return $context->task(function (Context $context) {
             $len = 0;
             
             try {
-                while (null !== ($chunk = yield $this->stream->read())) {
+                while (null !== ($chunk = yield $this->stream->read($context))) {
                     $len += \strlen($chunk);
                 }
             } finally {

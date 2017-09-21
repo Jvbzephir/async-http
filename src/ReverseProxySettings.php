@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\DNS\Address;
-use KoolKode\Async\DNS\MalformedAddressException;
 
 /**
  * Configures HTTP reverse proxy support to be used by an HTTP endpoint / drivers.
@@ -90,7 +89,7 @@ class ReverseProxySettings
         
         try {
             return isset($this->trustedProxies[(string) new Address($address)]);
-        } catch (MalformedAddressException $e) {
+        } catch (\InvalidArgumentException $e) {
             return false;
         }
     }
@@ -102,7 +101,7 @@ class ReverseProxySettings
      * 
      * @param bool $trust
      */
-    public function withTrustAllProxies(bool $trust): ReverseProxySettings
+    public function withTrustAllProxies(bool $trust): self
     {
         $settings = clone $this;
         $settings->trustAllProxies = $trust;
@@ -115,7 +114,7 @@ class ReverseProxySettings
      * 
      * @param string ...$proxies
      */
-    public function withTrustedProxy(string ...$proxies): ReverseProxySettings
+    public function withTrustedProxy(string ...$proxies): self
     {
         $settings = clone $this;
         
@@ -131,7 +130,7 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function withSchemeHeader(string $name): ReverseProxySettings
+    public function withSchemeHeader(string $name): self
     {
         $settings = clone $this;
         $settings->schemeHeaders[] = $name;
@@ -145,7 +144,7 @@ class ReverseProxySettings
      * @param HttpRequest $request
      * @return string Or null when no proxy header is found.
      */
-    public function getScheme(HttpRequest $request)
+    public function getScheme(HttpRequest $request): ?string
     {
         foreach ($this->schemeHeaders as $name) {
             if ($request->hasHeader($name)) {
@@ -159,7 +158,7 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function withHostHeader(string $name): ReverseProxySettings
+    public function withHostHeader(string $name): self
     {
         $settings = clone $this;
         $settings->hostHeaders[] = $name;
@@ -173,7 +172,7 @@ class ReverseProxySettings
      * @param HttpRequest $request
      * @return string Or null when no proxy header is found.
      */
-    public function getHost(HttpRequest $request)
+    public function getHost(HttpRequest $request): ?string
     {
         foreach ($this->hostHeaders as $name) {
             if ($request->hasHeader($name)) {
@@ -187,7 +186,7 @@ class ReverseProxySettings
      * 
      * @param string $name
      */
-    public function withAddressHeader(string $name): ReverseProxySettings
+    public function withAddressHeader(string $name): self
     {
         $settings = clone $this;
         $settings->addressHeaders = $name;

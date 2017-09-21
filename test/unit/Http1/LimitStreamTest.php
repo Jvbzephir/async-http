@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Context;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -20,21 +20,20 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class LimitStreamTest extends AsyncTestCase
 {
-    public function testReadToLimit()
+    public function testReadToLimit(Context $context)
     {
         $input = new ReadableMemoryStream('FOO & BAR');
         $stream = new LimitStream($input, 5);
         
-        $this->assertEquals('FOO &', yield new ReadContents($stream, false));
-        $this->assertnull(yield $stream->read());
+        $this->assertEquals('FOO &', yield $stream->readBuffer($context, 100, false));
+        $this->assertNull(yield $stream->read($context));
         $this->assertFalse($input->isClosed());
         $this->assertEquals(5, $input->getOffset());
         
         $stream->close();
-        $this->assertnull(yield $stream->read());
         $this->assertTrue($input->isClosed());
     }
-    
+
     public function testLimitMustBePositive()
     {
         $this->expectException(\InvalidArgumentException::class);

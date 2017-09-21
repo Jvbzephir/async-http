@@ -32,7 +32,7 @@ class TextResponse extends HttpResponse
      * @param string $type media type of the text payload.
      * @param string $charset Charset to be used (default to UTF-8)..
      */
-    public function __construct(string $contents, string $type = 'text/plain', string $charset = null)
+    public function __construct(string $contents, string $type = 'text/plain', ?string $charset = null)
     {
         $type = new ContentType($type);
         

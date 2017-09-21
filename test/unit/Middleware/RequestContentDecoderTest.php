@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -48,17 +49,17 @@ class RequestContentDecoderTest extends AsyncTestCase
     /**
      * @dataProvider provideEncodingSettings
      */
-    public function testWillDecodeBody(string $name, string $func)
+    public function testWillDecodeBody(Context $context, string $name, string $func)
     {
         $message = 'Hello decoded world! :)';
         
-        $next = NextMiddleware::wrap(new RequestContentDecoder(), function (HttpRequest $request) use ($message, $name) {
+        $next = NextMiddleware::wrap(new RequestContentDecoder(), function (Context $context, HttpRequest $request) use ($message, $name) {
             $this->assertFalse($request->hasHeader('Content-Encoding'));
             $this->assertEquals('text/plain', $request->getHeaderLine('Content-Type'));
             
             return new HttpResponse(Http::OK, [
                 'Content-Type' => 'text/plain'
-            ], new StringBody(yield $request->getBody()->getContents()));
+            ], new StringBody(yield $request->getBody()->getContents($context)));
         });
         
         $request = new HttpRequest('http://localhost/', Http::POST, [
@@ -69,9 +70,9 @@ class RequestContentDecoderTest extends AsyncTestCase
             $request = $request->withHeader('Content-Encoding', $name);
         }
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
-        $this->assertEquals($message, yield $response->getBody()->getContents());
+        $this->assertEquals($message, yield $response->getBody()->getContents($context));
     }
 }

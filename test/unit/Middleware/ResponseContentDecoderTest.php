@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StringBody;
@@ -47,11 +48,11 @@ class ResponseContentDecoderTest extends AsyncTestCase
     /**
      * @dataProvider provideEncodingSettings
      */
-    public function testWillDecodeBody(string $name, string $func)
+    public function testWillDecodeBody(Context $context, string $name, string $func)
     {
         $message = 'Hello decoded world! :)';
         
-        $next = NextMiddleware::wrap(new ResponseContentDecoder(), function (HttpRequest $request) use ($message, $name, $func) {
+        $next = NextMiddleware::wrap(new ResponseContentDecoder(), function (Context $context, HttpRequest $request) use ($message, $name, $func) {
             $this->assertEquals([
                 'gzip',
                 'deflate'
@@ -66,10 +67,10 @@ class ResponseContentDecoderTest extends AsyncTestCase
             return $response->withBody(new StringBody($func($message)));
         });
         
-        $response = yield from $next(new HttpRequest('http://localhost/'));
+        $response = yield from $next($context, new HttpRequest('http://localhost/'));
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertFalse($response->hasHeader('Content-Encoding'));
-        $this->assertEquals($message, yield $response->getBody()->getContents());
+        $this->assertEquals($message, yield $response->getBody()->getContents($context));
     }
 }

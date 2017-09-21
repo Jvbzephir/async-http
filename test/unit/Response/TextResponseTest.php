@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Response;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -19,43 +20,43 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class TextResponseTest extends AsyncTestCase
 {
-    public function testCanCreateDefaultTextResponse()
+    public function testCanCreateDefaultTextResponse(Context $context)
     {
         $response = new TextResponse($text = 'Hello World :)');
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('text/plain', (string) $response->getContentType()->getMediaType());
         $this->assertEquals('utf-8', $response->getContentType()->getParam('charset'));
-        $this->assertEquals($text, yield $response->getBody()->getContents());
+        $this->assertEquals($text, yield $response->getBody()->getContents($context));
     }
 
-    public function testCanCreateResponseWithCustomMediaType()
+    public function testCanCreateResponseWithCustomMediaType(Context $context)
     {
         $response = new TextResponse($text = 'h1 { color: red; }', 'text/css');
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('text/css', (string) $response->getContentType()->getMediaType());
         $this->assertEquals('utf-8', $response->getContentType()->getParam('charset'));
-        $this->assertEquals($text, yield $response->getBody()->getContents());
+        $this->assertEquals($text, yield $response->getBody()->getContents($context));
     }
     
-    public function testCanCreateResponseWithDifferentCharset()
+    public function testCanCreateResponseWithDifferentCharset(Context $context)
     {
         $response = new TextResponse($text = 'Hello ISO :P', 'text/plain', 'iso-8859-1');
     
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('text/plain', (string) $response->getContentType()->getMediaType());
         $this->assertEquals('iso-8859-1', $response->getContentType()->getParam('charset'));
-        $this->assertEquals($text, yield $response->getBody()->getContents());
+        $this->assertEquals($text, yield $response->getBody()->getContents($context));
     }
     
-    public function testCharsetIsOnlyAppliedToTextTypes()
+    public function testCharsetIsOnlyAppliedToTextTypes(Context $context)
     {
         $response = new TextResponse($text = '*DATA*', 'image/png');
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('image/png', (string) $response->getContentType()->getMediaType());
         $this->assertFalse($response->getContentType()->hasParam('charset'));
-        $this->assertEquals($text, yield $response->getBody()->getContents());
+        $this->assertEquals($text, yield $response->getBody()->getContents($context));
     }
 }

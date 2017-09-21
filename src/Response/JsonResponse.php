@@ -31,7 +31,7 @@ class JsonResponse extends HttpResponse
      * @param bool $encode Encode payload as JSON (turn this off for payloads that are already encoded as JSON)?
      * @param int $options Options to be passed to JSON encoder.
      */
-    public function __construct($payload, bool $encode = true, int $options = null)
+    public function __construct($payload, bool $encode = true, ?int $options = null)
     {
         static $defaultOptions = \JSON_UNESCAPED_SLASHES | \JSON_HEX_AMP | \JSON_HEX_APOS | \JSON_HEX_QUOT | \JSON_HEX_TAG;
         

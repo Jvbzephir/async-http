@@ -13,12 +13,12 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\Body\DeferredBody;
 use KoolKode\Async\Http\Body\StreamBody;
-use KoolKode\Async\Stream\ReadableDeflateStream;
+use KoolKode\Async\Stream\DeflateStream;
 use KoolKode\Util\InvalidMediaTypeException;
 
 /**
@@ -126,11 +126,11 @@ class ResponseContentEncoder implements Middleware
      * 
      * Will set a content encoding header if the body has been compressed.
      */
-    public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
+    public function __invoke(Context $context, HttpRequest $request, NextMiddleware $next): \Generator
     {
         static $zlib;
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         if (($zlib ?? ($zlib = \function_exists('deflate_init'))) && $this->isCompressable($request, $response)) {
             $compress = null;
@@ -149,7 +149,7 @@ class ResponseContentEncoder implements Middleware
                     continue;
                 }
                 
-                $stream = new ReadableDeflateStream(yield $response->getBody()->getReadableStream(), $compress);
+                $stream = new DeflateStream(yield $response->getBody()->getReadableStream($context), $compress);
                 
                 $response = $response->withHeader('Content-Encoding', $encoding);
                 $response = $response->withBody(new StreamBody($stream));
@@ -174,7 +174,7 @@ class ResponseContentEncoder implements Middleware
             return false;
         }
         
-        if ($response->getBody() instanceof DeferredBody || Http::isResponseWithoutBody($response->getStatusCode())) {
+        if (Http::isResponseWithoutBody($response->getStatusCode())) {
             return false;
         }
         

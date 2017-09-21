@@ -13,9 +13,10 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\Body\StreamBody;
-use KoolKode\Async\Stream\ReadableInflateStream;
+use KoolKode\Async\Stream\InflateStream;
 
 /**
  * HTTP server-side middeware that decompresses HTTP request bodies.
@@ -41,7 +42,7 @@ class RequestContentDecoder implements Middleware
      * 
      * The content encoding header will be removed if the middleware was able to decompress the body.
      */
-    public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator
+    public function __invoke(Context $context, HttpRequest $request, NextMiddleware $next): \Generator
     {
         static $zlib;
         
@@ -58,13 +59,13 @@ class RequestContentDecoder implements Middleware
             }
             
             if ($encoding !== null) {
-                $stream = new ReadableInflateStream(yield $request->getBody()->getReadableStream(), $encoding);
+                $stream = new InflateStream(yield $request->getBody()->getReadableStream($context), $encoding);
                 
                 $request = $request->withoutHeader('Content-Encoding');
                 $request = $request->withBody(new StreamBody($stream));
             }
         }
         
-        return yield from $next($request);
+        return yield from $next($context, $request);
     }
 }

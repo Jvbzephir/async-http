@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Context;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 use KoolKode\Async\Stream\StreamException;
 use KoolKode\Async\Test\AsyncTestCase;
@@ -32,75 +32,75 @@ class ChunkDecodedStreamTest extends AsyncTestCase
         return $chunked . "0\r\n\r\n";
     }
     
-    public function testDetectsEmptyInput()
+    public function testDetectsEmptyInput(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream());
         
-        $this->assertnull(yield $stream->read());
+        $this->assertnull(yield $stream->read($context));
     }
     
-    public function testDetectsEmptyChunkedData()
+    public function testDetectsEmptyChunkedData(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("0\r\n\r\n"));
         
-        $this->assertnull(yield $stream->read());
+        $this->assertnull(yield $stream->read($context));
     }
     
-    public function testDetectsInvalidChunkHeader()
+    public function testDetectsInvalidChunkHeader(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream('foo'));
-    
+        
         $this->expectException(StreamException::class);
         
-        yield $stream->read();
+        yield $stream->read($context);
     }
     
-    public function testDetectsChunkLengthOverflow()
+    public function testDetectsChunkLengthOverflow(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream('10000000'));
-    
+        
         $this->expectException(StreamException::class);
-    
-        yield $stream->read();
+        
+        yield $stream->read($context);
     }
     
-    public function testDetectsMissingBreakAfterLastChunk()
+    public function testDetectsMissingBreakAfterLastChunk(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("0\r\n"));
-    
+        
         $this->expectException(StreamException::class);
-    
-        yield $stream->read();
+        
+        yield $stream->read($context);
     }
     
-    public function testCanReadSingleChunk()
+    public function testCanReadSingleChunk(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("3\r\nFOO\r\n0\r\n\r\n"));
         
-        $this->assertEquals('FOO', yield $stream->read());
-        $this->assertnull(yield $stream->read());
+        $this->assertEquals('FOO', yield $stream->read($context));
+        $this->assertnull(yield $stream->read($context));
     }
     
-    public function testDetectsMissingBreakAfterChunk()
+    public function testDetectsMissingBreakAfterChunk(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("3\r\nFOO\n0\r\n\r\n"));
         
-        $this->assertEquals('FOO', yield $stream->read());
+        $this->assertEquals('FOO', yield $stream->read($context));
         
         $this->expectException(StreamException::class);
         
-        yield $stream->read();
+        yield $stream->read($context);
     }
     
-    public function testDetectsInvalidBreakAfterChunk()
+    public function testDetectsInvalidBreakAfterChunk(Context $context)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream("3\r\nFOOBAR"));
-    
-        $this->assertEquals('FOO', yield $stream->read());
-    
+        
+        $this->assertEquals('FOO', yield $stream->read($context));
+        
         $this->expectException(StreamException::class);
-    
-        yield $stream->read();
+        
+        yield $stream->read($context);
     }
     
     public function provideChunkedContents()
@@ -115,15 +115,20 @@ class ChunkDecodedStreamTest extends AsyncTestCase
         yield [random_bytes(10000), 8192];
         yield [random_bytes(100000), 8192];
     }
-
+    
     /**
      * @dataProvider provideChunkedContents
      */
-    public function testCanDecodeChunkedData(string $data, int $len)
+    public function testCanDecodeChunkedData(Context $context, string $data, int $len)
     {
         $stream = new ChunkDecodedStream(new ReadableMemoryStream($this->chunkEncode($data, $len)));
+        $buffer = '';
         
-        $this->assertEquals($data, yield new ReadContents($stream));
-        $this->assertnull(yield $stream->read());
+        while (null !== ($chunk = yield $stream->read($context))) {
+            $buffer .= $chunk;
+        }
+        
+        $this->assertEquals($data, $buffer);
+        $this->assertNull(yield $stream->read($context));
     }
 }

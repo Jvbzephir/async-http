@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 
@@ -50,13 +51,15 @@ class LimitStream extends ReadableStreamDecorator
             throw new \InvalidArgumentException('Limit must not be negative');
         }
         
-        parent::__construct($stream);
+        parent::__construct($stream, $cascadeClose);
         
         $this->limit = $limit;
-        $this->cascadeClose = $cascadeClose;
     }
 
-    protected function readNextChunk(): \Generator
+    /**
+     * {@inheritdoc}
+     */
+    protected function readNextChunk(Context $context): \Generator
     {
         $len = $this->limit - $this->offset;
         
@@ -64,9 +67,12 @@ class LimitStream extends ReadableStreamDecorator
             return;
         }
         
-        return yield $this->stream->read(\min($this->bufferSize, $len));
+        return yield $this->stream->read($context, \min(8192, $len));
     }
 
+    /**
+     * {@inheritdoc}
+     */
     protected function processChunk(string $chunk): string
     {
         $this->offset += \strlen($chunk);

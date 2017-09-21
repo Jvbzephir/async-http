@@ -11,7 +11,7 @@
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\ReadContents;
+use KoolKode\Async\Context;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
@@ -19,30 +19,29 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class StringBodyTest extends AsyncTestCase
 {
-    public function testCanAccessBodyContents()
+    public function testCanAccessBodyContents(Context $context)
     {
         $body = new StringBody($contents = 'Hello World');
         
         $this->assertEquals($contents, (string) $body);
-        $this->assertEquals($contents, yield $body->getContents());
-        $this->assertEquals($contents, yield new ReadContents(yield $body->getReadableStream()));
+        $this->assertEquals($contents, yield $body->getContents($context));
     }
     
-    public function testCanAccessMetaData()
+    public function testCanAccessMetaData(Context $context)
     {
         $body = new StringBody($contents = 'Hello World');
         
         $this->assertTrue($body->isCached());
-        $this->assertEquals(strlen($contents), yield $body->getSize());
+        $this->assertEquals(strlen($contents), yield $body->getSize($context));
     }
     
-    public function testCanDiscardBody()
+    public function testCanDiscardBody(Context $context)
     {
         $body = new StringBody($contents = 'Test 1');
         
-        $this->assertEquals(0, yield $body->discard());
-        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals(0, yield $body->discard($context));
+        $this->assertEquals(0, yield $body->discard($context));
         
-        $this->assertEquals($contents, yield $body->getContents());
+        $this->assertEquals($contents, yield $body->getContents($context));
     }
 }

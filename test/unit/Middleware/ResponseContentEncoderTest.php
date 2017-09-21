@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -49,13 +50,13 @@ class ResponseContentEncoderTest extends AsyncTestCase
     /**
      * @dataProvider provideEncodingSettings
      */
-    public function testWillEncodeResponseBodies(string $name, string $func)
+    public function testWillEncodeResponseBodies(Context $context, string $name, string $func)
     {
         $message = 'Hello decoded world! :)';
         
         $next = NextMiddleware::wrap(new ResponseContentEncoder([
             'text/plain'
-        ]), function (HttpRequest $request) use ($message, $name, $func) {
+        ]), function (Context $context, HttpRequest $request) use ($message, $name, $func) {
             return new HttpResponse(Http::OK, [
                 'Content-Type' => 'text/plain'
             ], new StringBody($message));
@@ -65,7 +66,7 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => $name
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         
@@ -74,12 +75,12 @@ class ResponseContentEncoderTest extends AsyncTestCase
         }
         
         $this->assertEquals('Accept-Encoding', $response->getHeaderLine('Vary'));
-        $this->assertEquals($message, $func(yield $response->getBody()->getContents()));
+        $this->assertEquals($message, $func(yield $response->getBody()->getContents($context)));
     }
     
-    public function testWillNotEncodeResponseToHeadRequest()
+    public function testWillNotEncodeResponseToHeadRequest(Context $context)
     {
-        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (Context $context, HttpRequest $request) {
             return new HttpResponse(Http::OK, [], new StringBody('Foo'));
         });
         
@@ -87,7 +88,7 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => 'gzip, deflate'
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertFalse($response->hasHeader('Content-Encoding'));
@@ -104,9 +105,9 @@ class ResponseContentEncoderTest extends AsyncTestCase
     /**
      * @dataProvider provideUncompressableResponses
      */
-    public function testWillNotEncodeUmcompressableResponse(HttpResponse $response)
+    public function testWillNotEncodeUmcompressableResponse(Context $context, HttpResponse $response)
     {
-        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) use ($response) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (Context $context, HttpRequest $request) use ($response) {
             return $response;
         });
         
@@ -114,15 +115,15 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => 'gzip, deflate'
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertFalse($response->hasHeader('Content-Encoding'));
     }
     
-    public function testWillNotDoubleEncodeResponse()
+    public function testWillNotDoubleEncodeResponse(Context $context)
     {
-        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (HttpRequest $request) {
+        $next = NextMiddleware::wrap(new ResponseContentEncoder(), function (Context $context, HttpRequest $request) {
             return new HttpResponse(Http::OK, [
                 'Content-Encoding' => 'foo'
             ]);
@@ -132,18 +133,18 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => 'gzip, deflate'
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertEquals('foo', $response->getHeaderLine('Content-Encoding'));
     }
     
-    public function testCanAddCompressableType()
+    public function testCanAddCompressableType(Context $context)
     {
         $encoder = new ResponseContentEncoder();
         $encoder->addType('foo/bar');
         
-        $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap($encoder, function (Context $context, HttpRequest $request) {
             return new HttpResponse(Http::OK, [
                 'Content-Type' => 'foo/bar'
             ]);
@@ -153,20 +154,20 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => 'gzip, deflate'
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertTrue($response->hasHeader('Content-Encoding'));
     }
 
-    public function testCanAddCompressableSubType()
+    public function testCanAddCompressableSubType(Context $context)
     {
         $encoder = new ResponseContentEncoder(null, [
             'foo'
         ]);
         $encoder->addSubType('bar');
         
-        $next = NextMiddleware::wrap($encoder, function (HttpRequest $request) {
+        $next = NextMiddleware::wrap($encoder, function (Context $context, HttpRequest $request) {
             return new HttpResponse(Http::OK, [
                 'Content-Type' => 'foo/bar'
             ]);
@@ -176,7 +177,7 @@ class ResponseContentEncoderTest extends AsyncTestCase
             'Accept-Encoding' => 'gzip, deflate'
         ]);
         
-        $response = yield from $next($request);
+        $response = yield from $next($context, $request);
         
         $this->assertTrue($response instanceof HttpResponse);
         $this->assertTrue($response->hasHeader('Content-Encoding'));

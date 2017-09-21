@@ -13,22 +13,18 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
-use KoolKode\Async\Http\Logger;
-use Psr\Log\LoggerAwareInterface;
-use Psr\Log\LoggerAwareTrait;
 
 /**
  * HTTP middleware dispatcher.
  * 
  * @author Martin Schröder
  */
-class NextMiddleware implements LoggerAwareInterface
+class NextMiddleware
 {
-    use LoggerAwareTrait;
-    
     /**
      * Registered middlewares sorted by priority.
      * 
@@ -60,7 +56,6 @@ class NextMiddleware implements LoggerAwareInterface
     {
         $this->middlewares = $middlewares;
         $this->target = $target;
-        $this->logger = new Logger(static::class);
     }
 
     /**
@@ -82,13 +77,13 @@ class NextMiddleware implements LoggerAwareInterface
      * 
      * @throws \RuntimeException When the middleware / action does not return / resolve into an HTTP response.
      */
-    public function __invoke(HttpRequest $request): \Generator
+    public function __invoke(Context $context, HttpRequest $request): \Generator
     {
         try {
             if (isset($this->middlewares[$this->index])) {
-                $response = ($this->middlewares[$this->index++]->callback)($request, $this);
+                $response = ($this->middlewares[$this->index++]->callback)($context, $request, $this);
             } else {
-                $response = ($this->target)($request);
+                $response = ($this->target)($context, $request);
             }
             
             if ($response instanceof \Generator) {
@@ -99,7 +94,7 @@ class NextMiddleware implements LoggerAwareInterface
                 throw new \RuntimeException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
             }
         } catch (\Throwable $e) {
-            $response = Http::respondToError($e, $this->logger);
+            $response = Http::respondToError($e);
         }
         
         return $response;

@@ -13,7 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
-use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Context;
 use KoolKode\Async\Stream\ReadableStreamDecorator;
 use KoolKode\Async\Stream\StreamException;
 
@@ -32,33 +32,18 @@ class ChunkDecodedStream extends ReadableStreamDecorator
     protected $remainder;
 
     /**
-     * Create a stream that will decode HTTP chunk-encoded data.
-     * 
-     * @param ReadableStream $stream Stream that provides chunk-encoded data.
-     * @param bool $cascadeClose Cascade the close operation to the wrapped stream?
+     * {@inheritdoc}
      */
-    public function __construct(ReadableStream $stream, bool $cascadeClose = true)
-    {
-        parent::__construct($stream);
-        
-        $this->cascadeClose = $cascadeClose;
-    }
-
-    /**
-     * Read header of next chunk into buffer.
-     * 
-     * This method will likely start to read and buffer contents of the next chunk.
-     */
-    protected function readNextChunk(): \Generator
+    protected function readNextChunk(Context $context): \Generator
     {
         if ($this->remainder === 0) {
-            if ("\r\n" !== yield $this->stream->readBuffer(2)) {
+            if ("\r\n" !== yield $this->stream->readBuffer($context, 2, false)) {
                 throw new StreamException('Missing CRLF after chunk');
             }
         }
         
         if (empty($this->remainder)) {
-            if (null === ($header = yield $this->stream->readLine())) {
+            if (null === ($header = yield $this->stream->readLine($context))) {
                 return;
             }
             
@@ -71,7 +56,7 @@ class ChunkDecodedStream extends ReadableStreamDecorator
             $this->remainder = \hexdec($header);
             
             if ($this->remainder === 0) {
-                if ("\r\n" !== yield $this->stream->readBuffer(2)) {
+                if ("\r\n" !== yield $this->stream->readBuffer($context, 2, false)) {
                     throw new StreamException('Missing CRLF after last chunk');
                 }
                 
@@ -79,9 +64,12 @@ class ChunkDecodedStream extends ReadableStreamDecorator
             }
         }
         
-        return yield $this->stream->read(\min($this->bufferSize, $this->remainder));
+        return yield $this->stream->read($context, \min(8192, $this->remainder));
     }
 
+    /**
+     * {@inheritdoc}
+     */
     protected function processChunk(string $chunk): string
     {
         $this->remainder -= \strlen($chunk);

@@ -11,9 +11,7 @@
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\ReadContents;
-use KoolKode\Async\Success;
-use KoolKode\Async\Filesystem\Filesystem;
+use KoolKode\Async\Context;
 use KoolKode\Async\Test\AsyncTestCase;
 
 /**
@@ -21,48 +19,44 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class FileBodyTest extends AsyncTestCase
 {
-    public function testCanAccessBodyContents()
+    public function testCanAccessBodyContents(Context $context)
     {
         $body = new FileBody(__FILE__);
         
-        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents());
+        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents($context));
     }
 
-    public function testCanInjectFilesystem()
-    {
-        $filesystem = $this->createMock(Filesystem::class);
-        $filesystem->expects($this->once())->method('size')->with(__FILE__)->will($this->returnValue(new Success(1337)));
-        
-        $body = new FileBody(__FILE__);
-        $body->setFilesystem($filesystem);
-        
-        $this->assertEquals(1337, yield $body->getSize());
-    }
-
-    public function testCanAccessBodyStream()
+    public function testCanInjectFilesystem(Context $context)
     {
         $body = new FileBody(__FILE__);
-        $stream = yield $body->getReadableStream();
         
-        $this->assertEquals(file_get_contents(__FILE__), yield new ReadContents($stream));
+        $this->assertEquals(filesize(__FILE__), yield $body->getSize($context));
     }
 
-    public function testCanAccessMetaData()
+    public function testCanAccessBodyStream(Context $context)
+    {
+        $body = new FileBody(__FILE__);
+        $stream = yield $body->getReadableStream($context);
+        
+        $this->assertEquals(file_get_contents(__FILE__, false, null, 0, 500), yield $stream->readBuffer($context, 500));
+    }
+
+    public function testCanAccessMetaData(Context $context)
     {
         $body = new FileBody(__FILE__);
         
         $this->assertEquals(__FILE__, $body->getFile());
         $this->assertTrue($body->isCached());
-        $this->assertEquals(filesize(__FILE__), yield $body->getSize());
+        $this->assertEquals(filesize(__FILE__), yield $body->getSize($context));
     }
     
-    public function testCanDiscardBody()
+    public function testCanDiscardBody(Context $context)
     {
         $body = new FileBody(__FILE__);
         
-        $this->assertEquals(0, yield $body->discard());
-        $this->assertEquals(0, yield $body->discard());
+        $this->assertEquals(0, yield $body->discard($context));
+        $this->assertEquals(0, yield $body->discard($context));
         
-        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents());
+        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents($context));
     }
 }

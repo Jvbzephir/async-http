@@ -1,8 +1,10 @@
-.git/
-.externalToolBuilders/
-.settings/
-.project
 .buildpath
+.externalToolBuilders
+.git
+.project
+.settings
+.vagrant
 composer.lock
-/vendor/
-/.vagrant/
+composer.phar
+coverage
+vendor

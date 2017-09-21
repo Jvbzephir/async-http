@@ -13,7 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http;
 
-use KoolKode\Async\Awaitable;
+use KoolKode\Async\Context;
+use KoolKode\Async\Promise;
 use KoolKode\Async\Stream\ReadableStream;
 
 /**
@@ -38,30 +39,34 @@ interface HttpBody
      * 
      * This method must return null when body size is unknown!
      * 
+     * @param Context $context Async execution context.
      * @return int Body size in bytes or null when size is unknown.
      */
-    public function getSize(): Awaitable;
+    public function getSize(Context $context): Promise;
     
     /**
      * Provides an input stream that can be used to read HTTP body contents.
      * 
+     * @param Context $context Async execution context.
      * @return ReadableStream
      */
-    public function getReadableStream(): Awaitable;
+    public function getReadableStream(Context $context): Promise;
     
     /**
      * Assemble HTTP body contents into a string.
      * 
      * This method should not be used on large HTTP bodies because it loads all data into memory!
      * 
+     * @param Context $context Async execution context.
      * @return string
      */
-    public function getContents(): Awaitable;
+    public function getContents(Context $context): Promise;
     
     /**
      * Discard remaining body contents.
      * 
+     * @param Context $context Async execution context.
      * @return int The number of body bytes that have been discarded.
      */
-    public function discard(): Awaitable;
+    public function discard(Context $context): Promise;
 }

@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Response;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -19,16 +20,16 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class XmlResponseTest extends AsyncTestCase
 {
-    public function testResponseFromString()
+    public function testResponseFromString(Context $context)
     {
         $response = new XmlResponse($payload = 'Hello World!');
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/xml', $response->getHeaderLine('Content-Type'));
-        $this->assertEquals($payload, yield $response->getBody()->getContents());
+        $this->assertEquals($payload, yield $response->getBody()->getContents($context));
     }
     
-    public function testResponseFromSimpleXml()
+    public function testResponseFromSimpleXml(Context $context)
     {
         $xml = simplexml_load_string('<?xml version="1.0"?><foo><bar /></foo>');
         
@@ -36,10 +37,10 @@ class XmlResponseTest extends AsyncTestCase
     
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/xml', $response->getHeaderLine('Content-Type'));
-        $this->assertEquals($xml->asXML(), yield $response->getBody()->getContents());
+        $this->assertEquals($xml->asXML(), yield $response->getBody()->getContents($context));
     }
     
-    public function testResponseFromDomDocument()
+    public function testResponseFromDomDocument(Context $context)
     {
         $xml = new \DOMDocument();
         $xml->loadXML('<?xml version="1.0"?><foo><bar /></foo>');
@@ -48,10 +49,10 @@ class XmlResponseTest extends AsyncTestCase
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/xml', $response->getHeaderLine('Content-Type'));
-        $this->assertEquals($xml->saveXML(), yield $response->getBody()->getContents());
+        $this->assertEquals($xml->saveXML(), yield $response->getBody()->getContents($context));
     }
     
-    public function testResponseFromDomNode()
+    public function testResponseFromDomNode(Context $context)
     {
         $xml = new \DOMDocument();
         $xml->loadXML('<?xml version="1.0"?><foo><bar /></foo>');
@@ -62,6 +63,6 @@ class XmlResponseTest extends AsyncTestCase
     
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/xml', $response->getHeaderLine('Content-Type'));
-        $this->assertEquals($xml->saveXML($node), yield $response->getBody()->getContents());
+        $this->assertEquals($xml->saveXML($node), yield $response->getBody()->getContents($context));
     }
 }

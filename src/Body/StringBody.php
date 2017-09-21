@@ -13,7 +13,8 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Body;
 
-use KoolKode\Async\Awaitable;
+use KoolKode\Async\Context;
+use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Stream\ReadableMemoryStream;
@@ -63,32 +64,32 @@ class StringBody implements HttpBody
     /**
      * {@inheritdoc}
      */
-    public function getSize(): Awaitable
+    public function getSize(Context $context): Promise
     {
-        return new Success(\strlen($this->contents));
+        return new Success($context, \strlen($this->contents));
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getReadableStream(): Awaitable
+    public function getReadableStream(Context $context): Promise
     {
-        return new Success(new ReadableMemoryStream($this->contents));
+        return new Success($context, new ReadableMemoryStream($this->contents));
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getContents(): Awaitable
+    public function getContents(Context $context): Promise
     {
-        return new Success($this->contents);
+        return new Success($context, $this->contents);
     }
-    
+
     /**
      * {@inheritdoc}
      */
-    public function discard(): Awaitable
+    public function discard(Context $context): Promise
     {
-        return new Success(0);
+        return new Success($context, 0);
     }
 }

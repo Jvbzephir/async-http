@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Middleware;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 
@@ -41,5 +42,5 @@ interface Middleware
      * @param NextMiddleware $next Provides delegation of the dispatch process.
      * @return HttpResponse HTTP response assembled by middleware or nested application.
      */
-    public function __invoke(HttpRequest $request, NextMiddleware $next): \Generator;
+    public function __invoke(Context $context, HttpRequest $request, NextMiddleware $next): \Generator;
 }

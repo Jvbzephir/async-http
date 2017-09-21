@@ -28,53 +28,46 @@ use Psr\Log\LoggerInterface;
 abstract class Http
 {
     /**
-     * Additional log channel being used to group HTTP logs.
-     * 
-     * @var string
-     */
-    const LOG_CHANNEL = 'koolkode/async-http';
-    
-    /**
      * Format of DateTime fields in HTTP headers.
      * 
      * @var string
      */
-    const DATE_RFC1123 = 'D, d M Y H:i:s \G\M\T';
+    public const DATE_RFC1123 = 'D, d M Y H:i:s \G\M\T';
 
     /**
      * Format of expires directive in HTTP cookies.
      * 
      * @var string
      */
-    const DATE_COOKIE = 'D, d-M-Y H:i:s \G\M\T';
+    public const DATE_COOKIE = 'D, d-M-Y H:i:s \G\M\T';
 
     /**
      * Default port used by HTTP connections.
      * 
      * @var int
      */
-    const PORT = 80;
+    public const PORT = 80;
 
     /**
      * Default port used by HTTPS connections.
      * 
      * @var int
      */
-    const PORT_SECURE = 443;
+    public const PORT_SECURE = 443;
 
     /**
      * MIME type of a urlencoded form entity.
      * 
      * @var string
      */
-    const FORM_ENCODED = 'application/x-www-form-urlencoded';
+    public const FORM_ENCODED = 'application/x-www-form-urlencoded';
 
     /**
      * MIME type of multipart encoded entity that may contain uploaded files.
      * 
      * @var string
      */
-    const FORM_MULTIPART_ENCODED = 'multipart/form-data';
+    public const FORM_MULTIPART_ENCODED = 'multipart/form-data';
 
     /**
      * The HEAD method is identical to GET except that the server MUST NOT return a message-body in
@@ -86,7 +79,7 @@ abstract class Http
      * 
      * @var string
      */
-    const HEAD = 'HEAD';
+    public const HEAD = 'HEAD';
 
     /**
      * The GET method means retrieve whatever information (in the form of an entity) is identified
@@ -96,7 +89,7 @@ abstract class Http
      * 
      * @var string
      */
-    const GET = 'GET';
+    public const GET = 'GET';
 
     /**
      * The POST method is used to request that the origin server accept the entity enclosed in the
@@ -104,7 +97,7 @@ abstract class Http
      * 
      * @var string
      */
-    const POST = 'POST';
+    public const POST = 'POST';
 
     /**
      * The PUT method requests that the enclosed entity be stored under the supplied Request-URI.
@@ -122,7 +115,7 @@ abstract class Http
      * 
      * @var string
      */
-    const PUT = 'PUT';
+    public const PUT = 'PUT';
 
     /**
      * The DELETE method requests that the origin server delete the resource identified by the
@@ -134,7 +127,7 @@ abstract class Http
      * 
      * @var string
      */
-    const DELETE = 'DELETE';
+    public const DELETE = 'DELETE';
 
     /**
      * The TRACE method is used to invoke a remote, application-layer loop- back of the request
@@ -145,7 +138,7 @@ abstract class Http
      * 
      * @var string
      */
-    const TRACE = 'TRACE';
+    public const TRACE = 'TRACE';
 
     /**
      * The OPTIONS method represents a request for information about the communication options
@@ -155,7 +148,7 @@ abstract class Http
      * 
      * @var string
      */
-    const OPTIONS = 'OPTIONS';
+    public const OPTIONS = 'OPTIONS';
 
     /**
      * This specification reserves the method name CONNECT for use with a proxy that can dynamically
@@ -163,7 +156,7 @@ abstract class Http
      * 
      * @var string
      */
-    const CONNECT = 'CONNECT';
+    public const CONNECT = 'CONNECT';
 
     /**
      * The PATCH method requests that a set of changes described in the request entity be applied to
@@ -174,7 +167,7 @@ abstract class Http
      * 
      * @var string
      */
-    const PATCH = 'PATCH';
+    public const PATCH = 'PATCH';
 
     /**
      * The client SHOULD continue with its request. This interim response is used to
@@ -187,7 +180,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CONTINUE = 100;
+    public const CONTINUE = 100;
 
     /**
      * The server understands and is willing to comply with the client's request, via
@@ -198,7 +191,7 @@ abstract class Http
      * 
      * @var int
      */
-    const SWITCHING_PROTOCOLS = 101;
+    public const SWITCHING_PROTOCOLS = 101;
 
     /**
      * The request has succeeded. The information returned with the response is dependent
@@ -206,7 +199,7 @@ abstract class Http
      * 
      * @var int
      */
-    const OK = 200;
+    public const OK = 200;
 
     /**
      * The request has been fulfilled and resulted in a new resource being created. The newly
@@ -220,7 +213,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CREATED = 201;
+    public const CREATED = 201;
 
     /**
      * The request has been accepted for processing, but the processing has not been completed.
@@ -230,7 +223,7 @@ abstract class Http
      * 
      * @var int
      */
-    const ACCEPTED = 202;
+    public const ACCEPTED = 202;
 
     /**
      * The returned metainformation in the entity-header is not the definitive set as available
@@ -242,7 +235,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NON_AUTHORITATIVE_INFORMATION = 203;
+    public const NON_AUTHORITATIVE_INFORMATION = 203;
 
     /**
      * The server has fulfilled the request but does not need to return an entity-body, and might
@@ -251,7 +244,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NO_CONTENT = 204;
+    public const NO_CONTENT = 204;
 
     /**
      * The server has fulfilled the request and the user agent SHOULD reset the document view which
@@ -261,7 +254,7 @@ abstract class Http
      * 
      * @var int
      */
-    const RESET_CONTENT = 205;
+    public const RESET_CONTENT = 205;
 
     /**
      * The server has fulfilled the partial GET request for the resource. The request MUST have
@@ -270,7 +263,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PARTIAL_CONTENT = 206;
+    public const PARTIAL_CONTENT = 206;
 
     /**
      * The requested resource corresponds to any one of a set of representations, each with its own
@@ -280,7 +273,7 @@ abstract class Http
      * 
      * @var int
      */
-    const MULTIPLE_CHOICES = 300;
+    public const MULTIPLE_CHOICES = 300;
 
     /**
      * The requested resource has been assigned a new permanent URI and any future references to
@@ -291,7 +284,7 @@ abstract class Http
      * 
      * @var int
      */
-    const MOVED_PERMANENTLY = 301;
+    public const MOVED_PERMANENTLY = 301;
 
     /**
      * The requested resource resides temporarily under a different URI. Since the redirection
@@ -300,7 +293,7 @@ abstract class Http
      * 
      * @var int
      */
-    const FOUND = 302;
+    public const FOUND = 302;
 
     /**
      * The response to the request can be found under a different URI and SHOULD be retrieved using
@@ -311,7 +304,7 @@ abstract class Http
      * 
      * @var int
      */
-    const SEE_OTHER = 303;
+    public const SEE_OTHER = 303;
 
     /**
      * If the client has performed a conditional GET request and access is allowed, but the document
@@ -321,7 +314,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NOT_MODIFIED = 304;
+    public const NOT_MODIFIED = 304;
 
     /**
      * The requested resource MUST be accessed through the proxy given by the Location field.
@@ -330,7 +323,7 @@ abstract class Http
      * 
      * @var int
      */
-    const USE_PROXY = 305;
+    public const USE_PROXY = 305;
 
     /**
      * The requested resource resides temporarily under a different URI. Since the redirection
@@ -340,7 +333,7 @@ abstract class Http
      * 
      * @var int
      */
-    const TEMPORARY_REDIRECT = 307;
+    public const TEMPORARY_REDIRECT = 307;
     
     /**
      * The request and all future requests should be repeated using another URI. 307 and 308 parallel the
@@ -349,7 +342,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PERMANENT_REDIRECT = 308;
+    public const PERMANENT_REDIRECT = 308;
 
     /**
      * The request could not be understood by the server due to malformed syntax. The client
@@ -357,7 +350,7 @@ abstract class Http
      * 
      * @var int
      */
-    const BAD_REQUEST = 400;
+    public const BAD_REQUEST = 400;
 
     /**
      * The request requires user authentication. The response MUST include a WWW-Authenticate
@@ -372,14 +365,14 @@ abstract class Http
      * 
      * @var int
      */
-    const UNAUTHORIZED = 401;
+    public const UNAUTHORIZED = 401;
 
     /**
      * This code is reserved for future use.
      * 
      * @var int
      */
-    const PAYMENT_REQUIRED = 402;
+    public const PAYMENT_REQUIRED = 402;
 
     /**
      * The server understood the request, but is refusing to fulfill it. Authorization will not
@@ -390,7 +383,7 @@ abstract class Http
      * 
      * @var int
      */
-    const FORBIDDEN = 403;
+    public const FORBIDDEN = 403;
 
     /**
      * The server has not found anything matching the Request-URI. No indication is given of
@@ -402,7 +395,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NOT_FOUND = 404;
+    public const NOT_FOUND = 404;
 
     /**
      * The method specified in the Request-Line is not allowed for the resource identified by the
@@ -411,7 +404,7 @@ abstract class Http
      * 
      * @var int
      */
-    const METHOD_NOT_ALLOWED = 405;
+    public const METHOD_NOT_ALLOWED = 405;
 
     /**
      * The resource identified by the request is only capable of generating response entities which
@@ -419,7 +412,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NOT_ACCEPTABLE = 406;
+    public const NOT_ACCEPTABLE = 406;
 
     /**
      * This code is similar to 401 (Unauthorized), but indicates that the client must first
@@ -431,7 +424,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PROXY_AUTHENTICATION_REQUIRED = 407;
+    public const PROXY_AUTHENTICATION_REQUIRED = 407;
 
     /**
      * The client did not produce a request within the time that the server was prepared to
@@ -439,7 +432,7 @@ abstract class Http
      * 
      * @var int
      */
-    const REQUEST_TIMEOUT = 408;
+    public const REQUEST_TIMEOUT = 408;
 
     /**
      * The request could not be completed due to a conflict with the current state of the resource.
@@ -451,7 +444,7 @@ abstract class Http
      * 
      * @var int
      */
-    const CONFLICT = 409;
+    public const CONFLICT = 409;
 
     /**
      * The requested resource is no longer available at the server and no forwarding address is
@@ -463,7 +456,7 @@ abstract class Http
      * 
      * @var int
      */
-    const GONE = 410;
+    public const GONE = 410;
 
     /**
      * The server refuses to accept the request without a defined Content-Length. The client
@@ -472,7 +465,7 @@ abstract class Http
      * 
      * @var int
      */
-    const LENGTH_REQUIRED = 411;
+    public const LENGTH_REQUIRED = 411;
 
     /**
      * The precondition given in one or more of the request-header fields evaluated to false when
@@ -482,7 +475,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PRECONDITION_FAILED = 412;
+    public const PRECONDITION_FAILED = 412;
 
     /**
      * The server is refusing to process a request because the request entity is larger than the
@@ -491,7 +484,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PAYLOAD_TOO_LARGE = 413;
+    public const PAYLOAD_TOO_LARGE = 413;
 
     /**
      * The server is refusing to service the request because the Request-URI is longer than the
@@ -504,7 +497,7 @@ abstract class Http
      * 
      * @var int
      */
-    const REQUEST_URI_TOO_LONG = 414;
+    public const REQUEST_URI_TOO_LONG = 414;
 
     /**
      * The server is refusing to service the request because the entity of the request is in a format
@@ -512,7 +505,7 @@ abstract class Http
      * 
      * @var int
      */
-    const UNSUPPORTED_MEDIA_TYPE = 415;
+    public const UNSUPPORTED_MEDIA_TYPE = 415;
 
     /**
      * A server SHOULD return a response with this status code if a request included a Range
@@ -523,7 +516,7 @@ abstract class Http
      * 
      * @var int
      */
-    const REQUEST_RANGE_NOT_SATISFIABLE = 416;
+    public const REQUEST_RANGE_NOT_SATISFIABLE = 416;
 
     /**
      * The expectation given in an Expect request-header field (see section 14.20) could not be met
@@ -532,21 +525,21 @@ abstract class Http
      * 
      * @var int
      */
-    const EXPECTATION_FAILED = 417;
+    public const EXPECTATION_FAILED = 417;
     
     /**
      * The request was directed at a server that is not able to produce a response (for example because a connection reuse).
      * 
      * @var int
      */
-    const MISDIRECTED_REQUEST = 421;
+    public const MISDIRECTED_REQUEST = 421;
     
     /**
      * The client should switch to a different protocol such as TLS/1.0, given in the Upgrade header field.
      * 
      * @var int
      */
-    const UPGRADE_REQUIRED = 426;
+    public const UPGRADE_REQUIRED = 426;
 
     /**
      * The 428 status code indicates that the origin server requires the request to be conditional. Its
@@ -559,7 +552,7 @@ abstract class Http
      * 
      * @var int
      */
-    const PRECONDITION_REQUIRED = 428;
+    public const PRECONDITION_REQUIRED = 428;
 
     /**
      * The 429 status code indicates that the user has sent too many requests in a given amount of
@@ -571,7 +564,7 @@ abstract class Http
      * 
      * @var int
      */
-    const TOO_MANY_REQUESTS = 429;
+    public const TOO_MANY_REQUESTS = 429;
 
     /**
      * The 431 status code indicates that the server is unwilling to process the request because its
@@ -584,14 +577,14 @@ abstract class Http
      * 
      * @var int
      */
-    const REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
+    public const REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
 
     /**
      * The server encountered an unexpected condition which prevented it from fulfilling the request.
      * 
      * @var int
      */
-    const INTERNAL_SERVER_ERROR = 500;
+    public const INTERNAL_SERVER_ERROR = 500;
 
     /**
      * The server does not support the functionality required to fulfill the request. This is the
@@ -600,7 +593,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NOT_IMPLEMENTED = 501;
+    public const NOT_IMPLEMENTED = 501;
 
     /**
      * The server, while acting as a gateway or proxy, received an invalid response from the
@@ -608,7 +601,7 @@ abstract class Http
      * 
      * @var int
      */
-    const BAD_GATEWAY = 502;
+    public const BAD_GATEWAY = 502;
 
     /**
      * The server is currently unable to handle the request due to a temporary overloading or
@@ -619,7 +612,7 @@ abstract class Http
      * 
      * @var int
      */
-    const SERVICE_UNAVAILABLE = 503;
+    public const SERVICE_UNAVAILABLE = 503;
 
     /**
      * The server, while acting as a gateway or proxy, did not receive a timely response from the
@@ -628,7 +621,7 @@ abstract class Http
      * 
      * @var int
      */
-    const GATEWAY_TIMEOUT = 504;
+    public const GATEWAY_TIMEOUT = 504;
 
     /**
      * The server does not support, or refuses to support, the HTTP protocol version that was
@@ -640,7 +633,7 @@ abstract class Http
      * 
      * @var int
      */
-    const HTTP_VERSION_NOT_SUPPORTED = 505;
+    public const HTTP_VERSION_NOT_SUPPORTED = 505;
 
     /**
      * The 506 status code indicates that the server has an internal configuration error: the
@@ -651,14 +644,14 @@ abstract class Http
      * 
      * @var int
      */
-    const VARIANT_ALSO_NEGOTIATES = 506;
+    public const VARIANT_ALSO_NEGOTIATES = 506;
 
     /**
      * This status code, while used by many servers, is not specified in any RFCs.
      * 
      * @var int
      */
-    const BANDWIDTH_LIMIT_EXCEEDED = 509;
+    public const BANDWIDTH_LIMIT_EXCEEDED = 509;
 
     /**
      * The policy for accessing the resource has not been met in the request. The server should
@@ -669,7 +662,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NOT_EXTENDED = 510;
+    public const NOT_EXTENDED = 510;
 
     /**
      * The 511 status code indicates that the client needs to authenticate to gain network access. The
@@ -682,7 +675,7 @@ abstract class Http
      * 
      * @var int
      */
-    const NETWORK_AUTHENTICATION_REQUIRED = 511;
+    public const NETWORK_AUTHENTICATION_REQUIRED = 511;
 
     /**
      * Array of response codes and their status messages.
@@ -788,11 +781,7 @@ abstract class Http
                 return true;
         }
         
-        if ($code >= 100 && $code < 200) {
-            return true;
-        }
-        
-        return false;
+        return ($code >= 100 && $code < 200);
     }
 
     /**

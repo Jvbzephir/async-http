@@ -11,6 +11,7 @@
 
 namespace KoolKode\Async\Http\Response;
 
+use KoolKode\Async\Context;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Test\AsyncTestCase;
 
@@ -19,7 +20,7 @@ use KoolKode\Async\Test\AsyncTestCase;
  */
 class JsonResponseTest extends AsyncTestCase
 {
-    public function testResponseConstruction()
+    public function testResponseConstruction(Context $context)
     {
         $payload = [
             'foo' => 'bar'
@@ -30,10 +31,10 @@ class JsonResponseTest extends AsyncTestCase
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/json', (string) $response->getContentType()->getMediaType());
         $this->assertEquals('utf-8', $response->getContentType()->getParam('charset'));
-        $this->assertEquals($payload, json_decode(yield $response->getBody()->getContents(), true));
+        $this->assertEquals($payload, json_decode(yield $response->getBody()->getContents($context), true));
     }
 
-    public function testCanTransferPreEncodedJson()
+    public function testCanTransferPreEncodedJson(Context $context)
     {
         $response = new JsonResponse('["foo", "bar"]', false);
         
@@ -43,16 +44,16 @@ class JsonResponseTest extends AsyncTestCase
         $this->assertEquals([
             'foo',
             'bar'
-        ], json_decode(yield $response->getBody()->getContents(), true));
+        ], json_decode(yield $response->getBody()->getContents($context), true));
     }
     
-    public function testCanChangeEncoderOptions()
+    public function testCanChangeEncoderOptions(Context $context)
     {
         $response = new JsonResponse([], true, JSON_FORCE_OBJECT);
         
         $this->assertEquals(Http::OK, $response->getStatusCode());
         $this->assertEquals('application/json', (string) $response->getContentType()->getMediaType());
         $this->assertEquals('utf-8', $response->getContentType()->getParam('charset'));
-        $this->assertEquals('{}', yield $response->getBody()->getContents());
+        $this->assertEquals('{}', yield $response->getBody()->getContents($context));
     }
 }

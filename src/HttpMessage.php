@@ -32,7 +32,7 @@ abstract class HttpMessage
 
     protected $attributes = [];
 
-    public function __construct(array $headers = [], HttpBody $body = null, string $protocolVersion = '2.0')
+    public function __construct(array $headers = [], ?HttpBody $body = null, string $protocolVersion = '2.0')
     {
         $this->protocolVersion = (string) $protocolVersion;
         $this->body = $body ?? new StringBody();
@@ -59,7 +59,7 @@ abstract class HttpMessage
         return $this->protocolVersion;
     }
 
-    public function withProtocolVersion(string $version): HttpMessage
+    public function withProtocolVersion(string $version): self
     {
         $message = clone $this;
         $message->protocolVersion = (string) $version;
@@ -120,7 +120,7 @@ abstract class HttpMessage
         }, $this->getHeaderTokens($name, $separator));
     }
 
-    public function withHeader(string $name, string ...$values): HttpMessage
+    public function withHeader(string $name, string ...$values): self
     {
         $name = \trim($name);
         
@@ -139,7 +139,7 @@ abstract class HttpMessage
         return $message ?? clone $this;
     }
 
-    public function withAddedHeader(string $name, string ...$values): HttpMessage
+    public function withAddedHeader(string $name, string ...$values): self
     {
         $name = \trim($name);
         
@@ -160,7 +160,7 @@ abstract class HttpMessage
         return $message ?? clone $this;
     }
 
-    public function withoutHeader(string $name): HttpMessage
+    public function withoutHeader(string $name): self
     {
         $message = clone $this;
         unset($message->headers[\strtolower(\trim($name))]);
@@ -173,7 +173,7 @@ abstract class HttpMessage
         return $this->body;
     }
 
-    public function withBody(HttpBody $body): HttpMessage
+    public function withBody(HttpBody $body): self
     {
         $message = clone $this;
         $message->body = $body;
@@ -186,7 +186,7 @@ abstract class HttpMessage
         return \array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
     }
 
-    public function withAttribute(string $name, $value): HttpMessage
+    public function withAttribute(string $name, $value): self
     {
         $message = clone $this;
         $message->attributes[$name] = $value;
@@ -194,7 +194,7 @@ abstract class HttpMessage
         return $message;
     }
 
-    public function withoutAttribute(string $name): HttpMessage
+    public function withoutAttribute(string $name): self
     {
         $message = clone $this;
         unset($message->attributes[$name]);
@@ -207,7 +207,7 @@ abstract class HttpMessage
         return $this->attributes;
     }
 
-    public function withAttributes(array $attributes): HttpMessage
+    public function withAttributes(array $attributes): self
     {
         $message = clone $this;
         $message->attributes = $attributes;
