@@ -16,8 +16,7 @@ namespace KoolKode\Async\Http\Body;
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
-use KoolKode\Async\Concurrent\Filesystem\PoolFilesystem;
-use KoolKode\Async\Concurrent\Pool\SyncPool;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\HttpBody;
 
 /**
@@ -43,10 +42,8 @@ class FileBody implements HttpBody
      */
     public function __construct(string $file)
     {
-        // FIXME: Re-implement filesystem proxy!
-        
         $this->file = $file;
-        $this->filesystem = new PoolFilesystem(new SyncPool());
+        $this->filesystem = new FilesystemProxy();
     }
 
     /**
