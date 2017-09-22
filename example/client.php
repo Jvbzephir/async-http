@@ -31,9 +31,9 @@ $context->run(function (Context $context) {
         'User-Agent' => 'PHP/' . PHP_VERSION
     ], new StringBody('{"message":"Hello Server :)"}'));
     
-    $response = $client->send($context, $request);
+    $response = yield $client->send($context, $request);
     
-    print_r($response = yield $response);
+    print_r($response);
     
     $body = yield $response->getBody()->getContents($context);
     $json = json_decode($body, true);

@@ -81,20 +81,18 @@ class Connector
         $response = $response->withoutHeader('Transfer-Encoding');
         $response = $response->withBody($body = new StreamBody(new EntityStream($stream, true, $defer)));
         
-        $context = $context->shield()->unreference();
-        
         $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $socket) {
             if ($done) {
-                $this->releaseSocket($socket);
-            } else {
-                $context->task(function (Context $context) use ($body, $socket) {
-                    try {
-                        yield $body->discard($context);
-                    } finally {
-                        $this->releaseSocket($socket);
-                    }
-                });
+                return $this->releaseSocket($socket);
             }
+            
+            $context->unreference()->task(function (Context $context) use ($body, $socket) {
+                try {
+                    yield $body->discard($context);
+                } finally {
+                    $this->releaseSocket($socket);
+                }
+            });
         });
         
         return $response;
