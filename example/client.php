@@ -13,9 +13,11 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http1\Connector;
 
 error_reporting(-1);
+ini_set('display_errors', false);
 
 require_once '../vendor/autoload.php';
 
@@ -24,13 +26,14 @@ $context = (new ContextFactory())->createContext();
 $context->run(function (Context $context) {
     $client = new Connector();
     
-    $request = new HttpRequest('https://httpbin.org/anything', Http::GET, [
+    $request = new HttpRequest('http://httpbin.org/anything', Http::PUT, [
+        'Content-Type' => 'application/json',
         'User-Agent' => 'PHP/' . PHP_VERSION
-    ]);
+    ], new StringBody('{"message":"Hello Server :)"}'));
     
-    $response = yield $client->send($context, $request);
+    $response = $client->send($context, $request);
     
-    print_r($response->getHeaders());
+    print_r($response = yield $response);
     
     $body = yield $response->getBody()->getContents($context);
     $json = json_decode($body, true);

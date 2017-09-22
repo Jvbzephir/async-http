@@ -13,7 +13,9 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\CancellationToken;
 use KoolKode\Async\Context;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
@@ -21,6 +23,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Socket\ClientEncryption;
 use KoolKode\Async\Socket\ClientFactory;
+use KoolKode\Async\Socket\Socket;
 
 class Connector
 {
@@ -28,10 +31,15 @@ class Connector
     
     public function send(Context $context, HttpRequest $request): Promise
     {
-        return $context->task($this->sendRequest($context, $request));
+        $request = $this->normalizeRequest($request);
+        
+        $token = $context->cancellationToken();
+        $context = $context->shield();
+        
+        return $context->task($this->processRequest($context, $request, $token));
     }
 
-    protected function sendRequest(Context $context, HttpRequest $request): \Generator
+    protected function processRequest(Context $context, HttpRequest $request, CancellationToken $token): \Generator
     {
         $uri = $request->getUri();
         $tls = null;
@@ -46,33 +54,94 @@ class Connector
         $socket = yield $factory->connect($context);
         
         try {
-            $request = $this->normalizeRequest($request);
+            $token->throwIfCancelled();
+            $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $socket));
             
-            $body = $request->getBody();
-            $size = yield $body->getSize($context);
-            
-            $buffer = $this->serializeHeaders($request, $size);
-            
-            yield $socket->write($context, $buffer . "\r\n");
-            
-            $response = $this->parseResponseHeaders(yield $socket->readTo($context, "\r\n\r\n"));
-            
-            if ('' !== ($len = $response->getHeaderLine('Content-Length'))) {
-                $response = $response->withoutHeader('Content-Length');
-                $response = $response->withBody(new StreamBody(new LimitStream($socket, (int) $len)));
-            } elseif ('chunked' == $response->getHeaderLine('Transfer-Encoding')) {
-                $response = $response->withoutHeader('Transfer-Encoding');
-                $response = $response->withBody(new StreamBody(new ChunkDecodedStream($socket)));
-            } elseif (!$this->keepAlive) {
-                $response = $response->withBody(new StreamBody($socket));
-            }
+            $buffer = $token->throwIfCancelled(yield $socket->readTo($context, "\r\n\r\n"));
+            $response = $this->parseResponseHeaders($buffer);
         } catch (\Throwable $e) {
             $socket->close();
             
             throw $e;
         }
         
+        if ('' !== ($len = $response->getHeaderLine('Content-Length'))) {
+            $stream = new LimitStream($socket, (int) $len);
+        } elseif ('chunked' == $response->getHeaderLine('Transfer-Encoding')) {
+            $stream = new ChunkDecodedStream($socket);
+        } elseif (!$this->keepAlive) {
+            $stream = new StreamBody($socket);
+        } else {
+            $stream = $socket;
+        }
+        
+        $defer = new Deferred($context);
+        
+        $response = $response->withoutHeader('Content-Length');
+        $response = $response->withoutHeader('Transfer-Encoding');
+        $response = $response->withBody($body = new StreamBody(new EntityStream($stream, true, $defer)));
+        
+        $context = $context->shield()->unreference();
+        
+        $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $socket) {
+            if ($done) {
+                $this->releaseSocket($socket);
+            } else {
+                $context->task(function (Context $context) use ($body, $socket) {
+                    try {
+                        yield $body->discard($context);
+                    } finally {
+                        $this->releaseSocket($socket);
+                    }
+                });
+            }
+        });
+        
         return $response;
+    }
+    
+    protected function sendRequest(Context $context, HttpRequest $request, Socket $socket): \Generator
+    {
+        $body = $request->getBody();
+        $size = yield $body->getSize($context);
+        
+        $stream = yield $body->getReadableStream($context);
+        
+        try {
+            $buffer = $this->serializeHeaders($request, $size);
+            
+            $chunk = yield $stream->readBuffer($context, 8192, false);
+            $len = \strlen($chunk ?? '');
+            
+            if ($chunk === null) {
+                $size = 0;
+            } elseif ($len < 8192) {
+                $size = $len;
+            }
+            
+            $sent = yield $socket->write($context, $buffer . "\r\n");
+            
+            if ($size === null) {
+                do {
+                    $sent += yield $socket->write($context, \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n");
+                } while (null !== ($chunk = yield $stream->read($context)));
+                
+                yield $socket->write($context, "0\r\n\r\n");
+            } elseif ($size > 0) {
+                do {
+                    $sent += yield $socket->write($context, $chunk);
+                } while (null !== ($chunk = yield $stream->read($context)));
+            }
+        } finally {
+            $stream->close();
+        }
+        
+        return $sent;
+    }
+    
+    protected function releaseSocket(Socket $socket)
+    {
+        // TODO: Release socket to keep-alive pool.
     }
 
     protected function normalizeRequest(HttpRequest $request): HttpRequest

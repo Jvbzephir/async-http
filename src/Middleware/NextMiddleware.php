@@ -94,7 +94,7 @@ class NextMiddleware
                 throw new \RuntimeException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
             }
         } catch (\Throwable $e) {
-            $response = Http::respondToError($e);
+            $response = Http::respondToError($e, $context);
         }
         
         return $response;

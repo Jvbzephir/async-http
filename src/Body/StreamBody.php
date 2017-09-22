@@ -18,6 +18,7 @@ use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 /**
  * HTTP message body based on an input stream.
@@ -99,6 +100,8 @@ class StreamBody implements HttpBody
                 while (null !== ($chunk = yield $this->stream->read($context))) {
                     $len += \strlen($chunk);
                 }
+            } catch (StreamClosedException $e) {
+                // Ignore closed stream during discard.
             } finally {
                 $this->stream->close();
             }
