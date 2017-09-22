@@ -86,18 +86,19 @@ class Connector
                 return $this->releaseSocket($socket);
             }
             
-            $context->unreference()->task(function (Context $context) use ($body, $socket) {
-                try {
-                    yield $body->discard($context);
-                } finally {
-                    $this->releaseSocket($socket);
-                }
+            $body->discard($context->unreference())->when(function () use ($socket) {
+                $this->releaseSocket($socket);
             });
         });
         
         return $response;
     }
-    
+
+    protected function releaseSocket(Socket $socket)
+    {
+        // TODO: Release socket to keep-alive pool.
+    }
+
     protected function sendRequest(Context $context, HttpRequest $request, Socket $socket): \Generator
     {
         $body = $request->getBody();
@@ -137,11 +138,6 @@ class Connector
         return $sent;
     }
     
-    protected function releaseSocket(Socket $socket)
-    {
-        // TODO: Release socket to keep-alive pool.
-    }
-
     protected function normalizeRequest(HttpRequest $request): HttpRequest
     {
         static $remove = [
