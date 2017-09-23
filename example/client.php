@@ -14,29 +14,31 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
 use KoolKode\Async\Http\Body\StringBody;
-use KoolKode\Async\Http\Http1\Connector;
+use KoolKode\Async\Log\PipeLogHandler;
 
 error_reporting(-1);
 ini_set('display_errors', false);
 
 require_once '../vendor/autoload.php';
 
-$context = (new ContextFactory())->createContext();
+$factory = new ContextFactory();
+$factory->registerLogger(new PipeLogHandler());
 
-$context->run(function (Context $context) {
-    $client = new Connector();
+$factory->createContext()->run(function (Context $context) {
+    $client = new HttpClient();
     
     $request = new HttpRequest('http://httpbin.org/anything', Http::PUT, [
         'Content-Type' => 'application/json',
         'User-Agent' => 'PHP/' . PHP_VERSION
     ], new StringBody('{"message":"Hello Server :)"}'));
     
-    $response = yield $client->send($context, $request);
+    $response1 = yield $client->send($context, $request);
     
-    print_r($response);
+    list ($response1, $response2) = yield $context->all([
+        $client->send($context, $request),
+        $client->send($context, new HttpRequest('http://httpbin.org/anything'))
+    ]);
     
-    $body = yield $response->getBody()->getContents($context);
-    $json = json_decode($body, true);
-    
-    print_r($json);
+    echo yield $response1->getBody()->getContents($context), "\n";
+    echo yield $response2->getBody()->getContents($context), "\n";
 });

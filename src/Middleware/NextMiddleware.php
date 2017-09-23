@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Middleware;
 
 use KoolKode\Async\Context;
-use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 
@@ -79,22 +78,18 @@ class NextMiddleware
      */
     public function __invoke(Context $context, HttpRequest $request): \Generator
     {
-        try {
-            if (isset($this->middlewares[$this->index])) {
-                $response = ($this->middlewares[$this->index++]->callback)($context, $request, $this);
-            } else {
-                $response = ($this->target)($context, $request);
-            }
-            
-            if ($response instanceof \Generator) {
-                $response = yield from $response;
-            }
-            
-            if (!$response instanceof HttpResponse) {
-                throw new \RuntimeException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
-            }
-        } catch (\Throwable $e) {
-            $response = Http::respondToError($e, $context);
+        if (isset($this->middlewares[$this->index])) {
+            $response = ($this->middlewares[$this->index++]->callback)($context, $request, $this);
+        } else {
+            $response = ($this->target)($context, $request);
+        }
+        
+        if ($response instanceof \Generator) {
+            $response = yield from $response;
+        }
+        
+        if (!$response instanceof HttpResponse) {
+            throw new \UnexpectedValueException(\sprintf('Middleware must return an HTTP response, given %s', \is_object($response) ? \get_class($response) : \gettype($response)));
         }
         
         return $response;

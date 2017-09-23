@@ -86,9 +86,8 @@ class NextMiddlewareTest extends AsyncTestCase
     {
         $next = new NextMiddleware([], function () {});
         
-        $response = yield from $next($context, new HttpRequest('http://localhost/'));
+        $this->expectException(\UnexpectedValueException::class);
         
-        $this->assertTrue($response instanceof HttpResponse);
-        $this->assertEquals(Http::INTERNAL_SERVER_ERROR, $response->getStatusCode());
+        yield from $next($context, new HttpRequest('http://localhost/'));
     }
 }
