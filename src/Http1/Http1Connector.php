@@ -17,14 +17,11 @@ use KoolKode\Async\CancellationToken;
 use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
-use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StreamBody;
-use KoolKode\Async\Socket\ClientEncryption;
-use KoolKode\Async\Socket\ClientFactory;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableMemoryStream;
 
@@ -33,10 +30,8 @@ class Http1Connector implements HttpConnector
     protected $keepAlive = true;
     
     protected $maxLifetime = 30;
-    
-    protected $connections = [];
-    
-    protected $pending = [];
+ 
+    protected $managers = [];
     
     public function getPriority(): int
     {
@@ -56,7 +51,7 @@ class Http1Connector implements HttpConnector
 
     public function isConnected(string $key): bool
     {
-        return isset($this->pending[$key]);
+        return isset($this->managers[$key]);
     }
 
     public function getProtocols(): array
@@ -85,48 +80,18 @@ class Http1Connector implements HttpConnector
         $uri = $request->getUri();
         $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
         
-        if ($stream) {
-            $conn = new ClientConnection($key, $stream);
-        } elseif (isset($this->connections[$key])) {
-            $conn = $this->connections[$key]->dequeue();
-            
-            if ($this->connections[$key]->isEmpty()) {
-                unset($this->connections[$key]);
-            }
-        } else {
-            $conn = null;
+        if (empty($this->managers[$key])) {
+            $this->managers[$key] = new ConnectionManager(8, $stream ? new ClientConnection($key, $stream) : null);
         }
         
-        if (empty($this->pending[$key])) {
-            $this->pending[$key] = new Executor(8);
-        }
-        
-        return $this->pending[$key]->submit($context, $this->processRequest($context, $request, $conn, $token));
-    }
-    
-    protected function connect(Context $context, HttpRequest $request): \Generator
-    {
-        $uri = $request->getUri();
-        $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
-        
-        $tls = null;
-        
-        if ($uri->getScheme() == 'https') {
-            $tls = new ClientEncryption();
-            $tls = $tls->withPeerName($uri->getHostWithPort());
-            $tls = $tls->withAlpnProtocols(...$this->getProtocols());
-        }
-        
-        $factory = new ClientFactory('tcp://' . $uri->getHostWithPort(true), $tls);
-        
-        return new ClientConnection($key, yield $factory->connect($context));
+        return $context->task($this->processRequest($context, $request, $this->managers[$key], $token));
     }
 
-    protected function processRequest(Context $context, HttpRequest $request, ?ClientConnection $conn, CancellationToken $token): \Generator
+    protected function processRequest(Context $context, HttpRequest $request, ConnectionManager $manager, CancellationToken $token): \Generator
     {
-        if ($conn === null) {
-            $conn = yield from $this->connect($context, $request);
-        }
+        do {
+            $conn = yield $manager->aquire($context, $request->getUri(), $this->getProtocols());
+        } while ($conn === null);
         
         try {
             $request = $this->normalizeRequest($request);
@@ -153,21 +118,21 @@ class Http1Connector implements HttpConnector
             $response = $response->withoutHeader('Content-Length');
             $response = $response->withoutHeader('Transfer-Encoding');
             $response = $response->withBody($body);
-            
-            $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $conn, $close) {
-                if ($done) {
-                    return $this->release($conn, $close);
-                }
-                
-                $body->discard($context->unreference())->when(function () use ($conn, $close) {
-                    $this->release($conn, $close);
-                });
-            });
         } catch (\Throwable $e) {
-            $this->release($conn, true);
+            $manager->release($conn, true);
             
             throw $e;
         }
+        
+        $defer->promise()->when(static function ($e, ?bool $done) use ($context, $body, $manager, $conn, $close) {
+            if ($done) {
+                return $manager->release($conn, $close);
+            }
+            
+            $body->discard($context->unreference())->when(static function () use ($manager, $conn, $close) {
+                $manager->release($conn, $close);
+            });
+        });
         
         return $response;
     }
@@ -187,22 +152,6 @@ class Http1Connector implements HttpConnector
         }
         
         return false;
-    }
-
-    protected function release(ClientConnection $conn, bool $dispose)
-    {
-        $conn->remaining--;
-        $conn->expires = \time() + 30;
-        
-        if ($dispose) {
-            return $conn->close();
-        }
-        
-        if (empty($this->connections[$conn->key])) {
-            $this->connections[$conn->key] = new \SplQueue();
-        }
-        
-        $this->connections[$conn->key]->enqueue($conn);
     }
 
     protected function sendRequest(Context $context, HttpRequest $request, DuplexStream $stream): \Generator

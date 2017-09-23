@@ -32,13 +32,17 @@ $factory->createContext()->run(function (Context $context) {
         'User-Agent' => 'PHP/' . PHP_VERSION
     ], new StringBody('{"message":"Hello Server :)"}'));
     
-    $response1 = yield $client->send($context, $request);
+    $count = yield $client->sendAll($context, [
+        $request,
+        new HttpRequest('http://httpbin.org/anything'),
+        new HttpRequest('http://httpbin.org/anything')
+    ], function (Context $context, ?\Throwable $e, ?HttpResponse $response = null) {
+        if ($response) {
+            echo yield $response->getBody()->getContents($context);
+        } else {
+            fwrite(STDERR, "\n$e\n");
+        }
+    });
     
-    list ($response1, $response2) = yield $context->all([
-        $client->send($context, $request),
-        $client->send($context, new HttpRequest('http://httpbin.org/anything'))
-    ]);
-    
-    echo yield $response1->getBody()->getContents($context), "\n";
-    echo yield $response2->getBody()->getContents($context), "\n";
+    var_dump($count);
 });

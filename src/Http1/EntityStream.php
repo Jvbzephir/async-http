@@ -45,11 +45,10 @@ class EntityStream extends ReadableStreamDecorator
     public function close(): void
     {
         if ($this->defer) {
-            try {
-                $this->defer->resolve(false);
-            } finally {
-                $this->defer = null;
-            }
+            $defer = $this->defer;
+            $this->defer = null;
+            
+            $defer->resolve(false);
         }
         
         parent::close();
@@ -77,11 +76,10 @@ class EntityStream extends ReadableStreamDecorator
     protected function processChunk(string $chunk): string
     {
         if ($chunk === '' && $this->defer) {
-            try {
-                $this->defer->resolve(true);
-            } finally {
-                $this->defer = null;
-            }
+            $defer = $this->defer;
+            $this->defer = null;
+            
+            $defer->resolve(true);
         }
         
         return $chunk;

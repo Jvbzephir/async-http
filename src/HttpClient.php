@@ -14,7 +14,9 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
+use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
@@ -101,6 +103,32 @@ class HttpClient
         });
         
         return $context->task($next($context, $request));
+    }
+    
+    public function sendAll(Context $context, array $requests, callable $callback): Promise
+    {
+        $cancel = $context->cancellationHandler();
+        
+        $defer = new Placeholder($context, function (Placeholder $p, string $reason, ?\Throwable $e = null) use ($cancel) {
+            $cancel($reason, $e);
+        });
+        
+        $pending = $count = \count($requests);
+        $context = $context->cancellable($cancel);
+        
+        foreach ($requests as $request) {
+            $this->send($context, $request)->when(static function ($e, $v = null) use ($context, $defer, $count, & $pending, $callback) {
+                $generator = Coroutine::generate($callback, $context, $e, $v);
+                
+                $context->task($generator)->when(static function () use ($defer, $count, & $pending) {
+                    if (--$pending === 0) {
+                        $defer->resolve($count);
+                    }
+                });
+            });
+        }
+        
+        return $defer->promise();
     }
 
     protected function connectSocket(Context $context, Uri $uri, array $protocols): \Generator
