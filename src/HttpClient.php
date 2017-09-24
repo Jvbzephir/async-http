@@ -62,14 +62,12 @@ class HttpClient
             
             foreach ($this->connectors as $connector) {
                 if ($connector->isRequestSupported($request)) {
-                    continue;
+                    if ($connector->isConnected($key)) {
+                        return yield $connector->send($context, $request);
+                    }
+                    
+                    $supported[] = $connector;
                 }
-                
-                if ($connector->isConnected($key)) {
-                    return yield $connector->send($context, $request);
-                }
-                
-                $supported[] = $connector;
             }
             
             if (empty($supported)) {

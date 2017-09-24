@@ -40,13 +40,7 @@ class Http1Connector implements HttpConnector
 
     public function isRequestSupported(HttpRequest $request): bool
     {
-        switch ($request->getProtocolVersion()) {
-            case '1.0':
-            case '1.1':
-                return true;
-        }
-        
-        return false;
+        return true;
     }
 
     public function isConnected(string $key): bool
@@ -106,10 +100,11 @@ class Http1Connector implements HttpConnector
                 $stream = new LimitStream($conn->stream, (int) $len, $close);
             } elseif ('chunked' == $response->getHeaderLine('Transfer-Encoding')) {
                 $stream = new ChunkDecodedStream($conn->stream, $close);
-            } elseif (!$this->keepAlive) {
+            } elseif ($close) {
                 $stream = $conn->stream;
             } else {
                 $stream = new ReadableMemoryStream();
+                $close = true;
             }
             
             $defer = new Deferred($context);
@@ -153,6 +148,51 @@ class Http1Connector implements HttpConnector
         
         return false;
     }
+    
+    protected function normalizeRequest(HttpRequest $request): HttpRequest
+    {
+        static $remove = [
+            'Content-Length',
+            'Expect',
+            'Keep-Alive',
+            'TE',
+            'Trailer',
+            'Transfer-Encoding'
+        ];
+        
+        $version = $request->getProtocolVersion();
+        
+        switch ($version) {
+            case '1.0':
+            case '1.1':
+                // Everything fine, version is supported.
+                break;
+            default:
+                $request = $request->withProtocolVersion('1.1');
+        }
+        
+        foreach ($remove as $name) {
+            $request = $request->withoutHeader($name);
+        }
+        
+        $tokens = [
+            $this->keepAlive ? 'keep-alive' : 'close'
+        ];
+        
+        foreach ($request->getHeaderTokenValues('Connection') as $token) {
+            if ($token !== 'close' && $token !== 'keep-alive') {
+                $tokens[] = $token;
+            }
+        }
+        
+        $request = $request->withHeader('Connection', \implode(', ', $tokens));
+        
+        if ($this->keepAlive) {
+            $request = $request->withHeader('Keep-Alive', \sprintf("Keep-Alive: timeout=%u\r\n", $this->maxLifetime));
+        }
+        
+        return $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
+    }
 
     protected function sendRequest(Context $context, HttpRequest $request, DuplexStream $stream): \Generator
     {
@@ -192,63 +232,10 @@ class Http1Connector implements HttpConnector
         
         return $sent;
     }
-    
-    protected function normalizeRequest(HttpRequest $request): HttpRequest
-    {
-        static $remove = [
-            'Content-Length',
-            'Expect',
-            'Keep-Alive',
-            'TE',
-            'Trailer',
-            'Transfer-Encoding'
-        ];
-        
-        $version = $request->getProtocolVersion();
-        
-        switch ($version) {
-            case '1.0':
-            case '1.1':
-                // Everything fine, version is supported.
-                break;
-            default:
-                $request = $request->withProtocolVersion('1.1');
-        }
-        
-        $tokens = [];
-        
-        foreach ($request->getHeaderTokenValues('Connection') as $token) {
-            if ($token !== 'close' && $token !== 'keep-alive') {
-                $tokens[] = $token;
-            }
-        }
-        
-        if (empty($tokens)) {
-            $request = $request->withoutHeader('Connection');
-        } else {
-            $request = $request->withHeader('Connection', \implode(', ', $tokens));
-        }
-        
-        foreach ($remove as $name) {
-            $request = $request->withoutHeader($name);
-        }
-        
-        return $request->withHeader('Date', \gmdate(Http::DATE_RFC1123));
-    }
 
     protected function serializeHeaders(HttpRequest $request, ?int $size): string
     {
-        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'))) {
-            $request = $request->withHeader('Connection', 'upgrade');
-        } else {
-            $request = $request->withHeader('Connection', $this->keepAlive ? 'keep-alive' : 'close');
-        }
-        
         $buffer = \sprintf("%s %s HTTP/%s\r\n", $request->getMethod(), $request->getRequestTarget(), $request->getProtocolVersion());
-        
-        if ($this->keepAlive) {
-            $buffer .= \sprintf("Keep-Alive: timeout=%u\r\n", $this->maxLifetime);
-        }
         
         if ($size === null) {
             $buffer .= "Transfer-Encoding: chunked\r\n";
