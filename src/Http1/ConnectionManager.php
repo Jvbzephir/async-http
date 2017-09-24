@@ -11,95 +11,63 @@
 
 declare(strict_types = 1);
 
+// TODO: Use event loop to implement connection timeouts and cleanup.
+
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Context;
-use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
-use KoolKode\Async\Success;
 use KoolKode\Async\Http\Uri;
-use KoolKode\Async\Socket\ClientEncryption;
-use KoolKode\Async\Socket\ClientFactory;
+use KoolKode\Async\Loop\Loop;
 
-class ConnectionManager
-{
+class ConnectionManager implements \Countable
+{    
     protected $concurrency;
 
-    protected $size = 0;
+    protected $loop;
 
-    protected $connections;
+    protected $pools = [];
 
-    protected $connecting;
-
-    public function __construct(int $concurrency, ?ClientConnection $conn = null)
+    public function __construct(Loop $loop, int $concurrency = 8)
     {
+        $this->loop = $loop;
         $this->concurrency = $concurrency;
-        
-        $this->connections = new \SplQueue();
-        $this->connecting = new \SplQueue();
-        
-        if ($conn) {
-            $this->size = 1;
-            $this->connections->enqueue($conn);
-        }
+    }
+    
+    public function count()
+    {
+        return \array_sum(\array_map('count', $this->pools));
     }
 
-    public function aquire(Context $context, Uri $uri, array $protocols): Promise
+    public function isConnected(string $key): bool
     {
-        if (!$this->connections->isEmpty()) {
-            return new Success($context, $this->connections->dequeue());
+        return isset($this->pools[$key]);
+    }
+
+    public function aquire(Context $context, string $key, Uri $uri, array $protocols): Promise
+    {
+        if (empty($this->pools[$key])) {
+            $this->pools[$key] = new ConnectionPool($this->concurrency);
         }
         
-        if ($this->size >= $this->concurrency) {
-            $this->connecting->enqueue($defer = new Deferred($context));
-            
-            return $defer->promise();
-        }
-        
-        $this->size++;
-        
-        return $context->task($this->connect($context, $uri, $protocols));
+        return $this->pools[$key]->aquire($context, $key, $uri, $protocols);
     }
 
     public function release(ClientConnection $conn, bool $close = false): void
     {
-        if (--$conn->remaining < 1) {
-            $close = true;
+        if (empty($this->pools[$conn->key])) {
+            $this->pools[$conn->key] = new ConnectionPool($this->concurrency);
         }
         
-        if ($close) {
-            $this->size--;
-            
-            while (!$this->connecting->isEmpty()) {
-                $this->connecting->dequeue()->resolve();
-            }
-        } elseif (!$this->connecting->isEmpty()) {
-            $this->connecting->dequeue()->resolve($conn);
-        } else {
-            $this->connections->enqueue($conn);
-        }
+        $this->pools[$conn->key]->release($conn, $close);
     }
 
-    protected function connect(Context $context, Uri $uri, array $protocols): \Generator
+    public function checkin(ClientConnection $conn): void
     {
-        try {
-            $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
-            $tls = null;
-            
-            if ($uri->getScheme() == 'https') {
-                $tls = new ClientEncryption();
-                $tls = $tls->withPeerName($uri->getHostWithPort());
-                $tls = $tls->withAlpnProtocols(...$protocols);
-            }
-            
-            $factory = new ClientFactory('tcp://' . $uri->getHostWithPort(true), $tls);
-            $conn = new ClientConnection($key, yield $factory->connect($context));
-        } catch (\Throwable $e) {
-            $this->size--;
-            
-            return null;
+        if (empty($this->pools[$conn->key])) {
+            $this->pools[$conn->key] = new ConnectionPool($this->concurrency);
         }
         
-        return $conn;
+        $this->pools[$conn->key]->checkin($conn);
     }
 }

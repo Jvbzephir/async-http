@@ -14,6 +14,8 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
 use KoolKode\Async\Http\Body\StringBody;
+use KoolKode\Async\Http\Http1\ConnectionManager;
+use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Log\PipeLogHandler;
 
 error_reporting(-1);
@@ -25,7 +27,8 @@ $factory = new ContextFactory();
 $factory->registerLogger(new PipeLogHandler());
 
 $factory->createContext()->run(function (Context $context) {
-    $client = new HttpClient();
+    $manager = new ConnectionManager($context->getLoop());
+    $client = new HttpClient(new Http1Connector($manager));
     
     $request = new HttpRequest('http://httpbin.org/anything', Http::PUT, [
         'Content-Type' => 'application/json',
@@ -44,5 +47,5 @@ $factory->createContext()->run(function (Context $context) {
         }
     });
     
-    var_dump($count);
+    var_dump($count, count($manager));
 });

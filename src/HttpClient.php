@@ -18,7 +18,6 @@ use KoolKode\Async\Coroutine;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
-use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\ClientEncryption;
@@ -32,20 +31,17 @@ class HttpClient
     
     protected $connecting = [];
 
-    public function __construct()
+    public function __construct(HttpConnector ...$connectors)
     {
-        $this->connectors = [
-            new Http1Connector()
-        ];
+        if (empty($connectors)) {
+            throw new \InvalidArgumentException('At least one HTTP connector is required');
+        }
+        
+        $this->connectors = $connectors;
         
         \usort($this->connectors, function (HttpConnector $a, HttpConnector $b) {
             return $a->getPriority() <=> $b->getPriority();
         });
-    }
-    
-    public function close(): void
-    {
-        
     }
     
     public function send(Context $context, HttpRequest $request): Promise
@@ -83,21 +79,23 @@ class HttpClient
             
             try {
                 $socket = yield from $this->connectSocket($context, $uri, $protocols);
+                
+                try {
+                    $connector = $this->chooseConnector($supported, $socket->getAlpnProtocol() ?? '');
+                } catch (\Throwable $e) {
+                    $socket->close();
+                    
+                    throw $e;
+                }
+                
+                $promise = $connector->send($context, $request, $socket);
             } finally {
                 unset($this->connecting[$key]);
                 
                 $defer->resolve();
             }
             
-            try {
-                $connector = $this->chooseConnector($supported, $socket->getAlpnProtocol() ?? '');
-            } catch (\Throwable $e) {
-                $socket->close();
-                
-                throw $e;
-            }
-            
-            return yield $connector->send($context, $request, $socket);
+            return yield $promise;
         });
         
         return $context->task($next($context, $request));

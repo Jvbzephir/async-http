@@ -31,7 +31,12 @@ class Http1Connector implements HttpConnector
     
     protected $maxLifetime = 30;
  
-    protected $managers = [];
+    protected $manager;
+    
+    public function __construct(ConnectionManager $manager)
+    {
+        $this->manager = $manager;
+    }
     
     public function getPriority(): int
     {
@@ -45,7 +50,7 @@ class Http1Connector implements HttpConnector
 
     public function isConnected(string $key): bool
     {
-        return isset($this->managers[$key]);
+        return $this->manager->isConnected($key);
     }
 
     public function getProtocols(): array
@@ -74,17 +79,17 @@ class Http1Connector implements HttpConnector
         $uri = $request->getUri();
         $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
         
-        if (empty($this->managers[$key])) {
-            $this->managers[$key] = new ConnectionManager(8, $stream ? new ClientConnection($key, $stream) : null);
+        if ($stream) {
+            $this->manager->checkin(new ClientConnection($key, $stream));
         }
         
-        return $context->task($this->processRequest($context, $request, $this->managers[$key], $token));
+        return $context->task($this->processRequest($context, $request, $key, $token));
     }
 
-    protected function processRequest(Context $context, HttpRequest $request, ConnectionManager $manager, CancellationToken $token): \Generator
+    protected function processRequest(Context $context, HttpRequest $request, string $key, CancellationToken $token): \Generator
     {
         do {
-            $conn = yield $manager->aquire($context, $request->getUri(), $this->getProtocols());
+            $conn = yield $this->manager->aquire($context, $key, $request->getUri(), $this->getProtocols());
         } while ($conn === null);
         
         try {
@@ -119,13 +124,13 @@ class Http1Connector implements HttpConnector
             throw $e;
         }
         
-        $defer->promise()->when(static function ($e, ?bool $done) use ($context, $body, $manager, $conn, $close) {
+        $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $conn, $close) {
             if ($done) {
-                return $manager->release($conn, $close);
+                return $this->manager->release($conn, $close);
             }
             
-            $body->discard($context->unreference())->when(static function () use ($manager, $conn, $close) {
-                $manager->release($conn, $close);
+            $body->discard($context->unreference())->when(function () use ($conn, $close) {
+                $this->manager->release($conn, $close);
             });
         });
         
