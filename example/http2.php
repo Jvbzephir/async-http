@@ -18,6 +18,7 @@ use KoolKode\Async\Http\Http2\ClientConnectionFactory;
 use KoolKode\Async\Log\PipeLogHandler;
 use KoolKode\Async\Socket\ClientEncryption;
 use KoolKode\Async\Socket\ClientFactory;
+use KoolKode\Async\Socket\Connect;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -33,7 +34,7 @@ $factory->createContext()->run(function (Context $context) {
     $tls = $tls->withAlpnProtocols('h2');
     
     $factory = new ClientFactory('tcp://http2.golang.org:443', $tls);
-    $stream = yield $factory->connect($context);
+    $stream = yield $factory->connect($context, (new Connect())->withTcpNodelay(true));
     
     $factory = new ClientConnectionFactory();
     $conn = yield $factory->connectClient($context, $stream);
