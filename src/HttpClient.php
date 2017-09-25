@@ -15,7 +15,6 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
-use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
@@ -50,8 +49,10 @@ class HttpClient
             $uri = $request->getUri();
             $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
             
-            if (isset($this->connecting[$key])) {
-                yield $this->connecting[$key];
+            while (isset($this->connecting[$key])) {
+                $this->connecting[$key][] = $placeholder = new Placeholder($context);
+                
+                yield $placeholder->promise();
             }
             
             $supported = [];
@@ -74,8 +75,7 @@ class HttpClient
                 return $connector->getProtocols();
             }, $supported));
             
-            $defer = new Deferred($context);
-            $this->connecting[$key] = $defer->promise();
+            $this->connecting[$key] = [];
             
             try {
                 $socket = yield from $this->connectSocket($context, $uri, $protocols);
@@ -90,9 +90,12 @@ class HttpClient
                 
                 $promise = $connector->send($context, $request, $socket);
             } finally {
+                $connecting = $this->connecting[$key];
                 unset($this->connecting[$key]);
                 
-                $defer->resolve();
+                foreach ($connecting as $placeholder) {
+                    $placeholder->resolve();
+                }
             }
             
             return yield $promise;
