@@ -54,11 +54,15 @@ class FramedStream
             $frame = new Frame(\ord($header[3]), $stream, '', \ord($header[4]));
         }
         
+        $context->debug('IN: ' . $frame);
+        
         return $frame;
     }
 
     public function writeFrame(Context $context, Frame $frame): Promise
     {
+        $context->debug('OUT: ' . $frame);
+        
         return $this->writeStream->write($context, $frame->encode());
     }
 
@@ -67,6 +71,7 @@ class FramedStream
         $buffer = '';
         
         foreach ($frames as $frame) {
+            $context->debug('OUT: ' . $frame);
             $buffer .= $frame->encode();
         }
         

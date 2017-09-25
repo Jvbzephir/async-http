@@ -18,7 +18,6 @@ use KoolKode\Async\Context;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\HttpRequest;
-use KoolKode\Async\Loop\Loop;
 
 
 class Connection
@@ -61,9 +60,9 @@ class Connection
 
     protected $hpack;
     
-    protected $context;
+    protected $background;
     
-    protected $task;
+    protected $cancel;
     
     protected $streams = [];
     
@@ -71,32 +70,24 @@ class Connection
     
     protected $nextStreamId;
     
-    protected $busyCount = 0;
-    
-    protected $busyWatcher;
-    
-    public function __construct(Loop $loop, int $mode, FramedStream $stream, HPack $hpack)
+    public function __construct(Context $context, int $mode, FramedStream $stream, HPack $hpack)
     {
         $this->mode = $mode;
         $this->stream = $stream;
         $this->hpack = $hpack;
         
+        $context = $context->background();
+        $context = $context->cancellable($this->cancel = $context->cancellationHandler());
+        
+        $this->background = $context;
         $this->nextStreamId = ($this->mode == self::CLIENT) ? 1 : 2;
         
-        $this->context = (new Context($loop))->unreference();
-        $this->task = Context::rethrow($this->context->task($this->processFrames($this->context)));
-    }
-
-    public function __destruct()
-    {
-        if ($this->busyWatcher) {
-            $this->context->getLoop()->cancel($this->busyWatcher);
-        }
+        Context::rethrow($context->task($this->processFrames($context)));
     }
     
     public function close(): void
     {
-        
+        ($this->cancel)('Connection closed');
     }
     
     public function closeStream(int $id): void
@@ -108,32 +99,16 @@ class Connection
     
     public function windowUpdate(int $size, int $stream = 0): void
     {
-        $this->stream->writeFrame($this->context, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', $size)));
-        
-        if ($stream) {
-            $this->stream->writeFrame($this->context, new Frame(Frame::WINDOW_UPDATE, $stream, \pack('N', $size)));
-        }
-    }
-    
-    public function busyWait(Context $context, Promise $promise): \Generator
-    {
-        if (++$this->busyCount === 1) {
-            if ($this->busyWatcher === null) {
-                $this->busyWatcher = $this->context->getLoop()->repeat(100000000, static function () {});
+        if ($size > 0) {
+            if ($stream) {
+                Context::rethrow($this->stream->writeFrames($this->background, [
+                    new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', $size)),
+                    new Frame(Frame::WINDOW_UPDATE, $stream, \pack('N', $size))
+                ]));
             } else {
-                $this->context->getLoop()->enable($this->busyWatcher);
+                Context::rethrow($this->stream->writeFrame($this->background, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', $size))));
             }
         }
-        
-        try {
-            $result = yield $promise;
-        } finally {
-            if (--$this->busyCount === 0) {
-                $this->context->getLoop()->disable($this->busyWatcher);
-            }
-        }
-        
-        return $result;
     }
     
     public function send(Context $context, HttpRequest $request): Promise
@@ -153,13 +128,17 @@ class Connection
     {
         $payload = \random_bytes(8);
         
-        $placeholder = new Placeholder(function (Placeholder $p, string $reason, ?\Throwable $e = null) use ($payload) {
+        $placeholder = new Placeholder($context, function (Placeholder $p, string $reason, ?\Throwable $e = null) use ($payload) {
             unset($this->pings[$payload]);
             
-            $placeholder->fail(new CancellationException($reason, $e));
+            $p->fail(new CancellationException($reason, $e));
         });
         
-        $this->stream->writeFrame(new Frame(Frame::PING, 0, $payload))->when(function (\Throwable $e = null) use ($placeholder, $payload) {
+        $this->pings[$payload] = $placeholder;
+        
+        $promise = $this->stream->writeFrame($context, new Frame(Frame::PING, 0, $payload));
+        
+        $promise->when(function (\Throwable $e = null) use ($placeholder, $payload) {
             if ($e) {
                 $placeholder->fail($e);
             } else {
@@ -167,16 +146,18 @@ class Connection
             }
         });
         
-        return $placeholder;
+        $start = \microtime(true);
+        
+        return $context->transform($context->keepBusy($placeholder->promise()), static function () use ($start) {
+            return (int) \ceil(1000 * (\microtime(true) - $start));
+        });
     }
 
     protected function processFrames(Context $context): \Generator
     {
-        yield null;
-        
         while (true) {
             $frame = yield $this->stream->readFrame($context);
-            echo $frame, "\n";
+            
             if ($frame->stream === 0) {
                 switch ($frame->type) {
                     case Frame::CONTINUATION:
@@ -213,28 +194,28 @@ class Connection
                     continue 2;
             }
             
-            if (empty($this->streams[$frame->stream])) {
+            if (null === ($stream = $this->streams[$frame->stream] ?? null)) {
                 throw new ConnectionException("Stream {$frame->stream} does not exist");
             }
             
             switch ($frame->type) {
                 case Frame::HEADERS:
-                    $this->streams[$frame->stream]->processHeadersFrame($frame);
+                    $stream->processHeadersFrame($frame);
                     break;
                 case Frame::CONTINUATION:
-                    $this->streams[$frame->stream]->processContinuationFrame($frame);
+                    $stream->processContinuationFrame($frame);
                     break;
                 case Frame::DATA:
-                    $this->streams[$frame->stream]->processDataFrame($frame);
+                    $stream->processDataFrame($frame);
                     break;
                 case Frame::WINDOW_UPDATE:
-                    $this->streams[$frame->stream]->processWindowUpdateFrame($frame);
+                    $stream->processWindowUpdateFrame($frame);
                     break;
             }
         }
     }
 
-    protected function processPingFrame(Context $context, Frame $frame): \Generator
+    protected function processPingFrame(Context $context, Frame $frame): void
     {
         if (\strlen($frame->data) !== 8) {
             throw new ConnectionException('PING frame payload must consist of 8 octets', Frame::FRAME_SIZE_ERROR);
@@ -242,13 +223,14 @@ class Connection
         
         if ($frame->flags & Frame::ACK) {
             if (isset($this->pings[$frame->data])) {
-                $ping = $this->pings[$frame->data];
-                unset($this->pings[$frame->data]);
-                
-                $ping->resolve(true);
+                try {
+                    $this->pings[$frame->data]->resolve();
+                } finally {
+                    unset($this->pings[$frame->data]);
+                }
             }
         } else {
-            yield $this->stream->writeFrame($context, new Frame(Frame::PING, 0, $frame->data, Frame::ACK));
+            Context::rethrow($this->stream->writeFrame($context, new Frame(Frame::PING, 0, $frame->data, Frame::ACK)));
         }
     }
 }

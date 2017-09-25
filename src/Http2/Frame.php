@@ -293,7 +293,9 @@ class Frame
      */
     public function __toString(): string
     {
-        return \sprintf("%s [%b] <%u> %u bytes", $this->getTypeName(), $this->flags, $this->stream, \strlen($this->data));
+        $info = ($this->type == self::WINDOW_UPDATE) ? \unpack('N', $this->data)[1] : (\strlen($this->data) . ' bytes');
+        
+        return \sprintf("%s [%b] <%u> %s", $this->getTypeName(), $this->flags, $this->stream, $info);
     }
     
     /**

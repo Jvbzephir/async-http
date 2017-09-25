@@ -14,7 +14,6 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Context;
-use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
@@ -83,7 +82,7 @@ class Stream
                 
                 $sent = yield from $this->sendBody($context, yield $request->getBody()->getReadableStream($context));
                 
-                $headers = $this->hpack->decode(yield from $this->connection->busyWait($context, $this->placeholder->promise()));
+                $headers = $this->hpack->decode(yield $context->keepBusy($this->placeholder->promise()));
             } finally {
                 $this->placeholder = null;
             }
@@ -193,25 +192,27 @@ class Stream
             while (null !== ($chunk = yield $body->read($context))) {
                 $len = \strlen($chunk);
                 
-                while (true) {
-                    if ($this->outputWindow < $len) {
-                        try {
-                            yield $this->outputDefer = new Deferred();
-                        } finally {
-                            $this->outputDefer = null;
-                        }
+                // FIXME: Implement flow control!
+                
+//                 while (true) {
+//                     if ($this->outputWindow < $len) {
+//                         try {
+//                             yield $this->outputDefer = new Deferred();
+//                         } finally {
+//                             $this->outputDefer = null;
+//                         }
                         
-                        continue;
-                    }
+//                         continue;
+//                     }
                     
-                    if ($this->conn->getOutputWindow() < $len) {
-                        yield $this->conn->awaitWindowUpdate();
+//                     if ($this->conn->getOutputWindow() < $len) {
+//                         yield $this->conn->awaitWindowUpdate();
                         
-                        continue;
-                    }
+//                         continue;
+//                     }
                     
-                    break;
-                }
+//                     break;
+//                 }
                 
                 if ($len < $chunkSize) {
                     $done = true;
@@ -223,7 +224,7 @@ class Stream
                 $written = yield $this->stream->writeFrame($context, $frame);
                 
                 $sent += $written;
-                $this->outputWindow -= $written;
+//                 $this->outputWindow -= $written;
             }
             
             if (!$done) {

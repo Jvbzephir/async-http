@@ -72,7 +72,9 @@ class ClientConnectionFactory
                 throw $e;
             }
             
-            return new Connection($context->getLoop(), Connection::CLIENT, $stream, new HPack($this->hpack));
+            $context->info('HTTP/2 client handshake succeeded');
+            
+            return new Connection($context, Connection::CLIENT, $stream, new HPack($this->hpack));
         });
     }
 }

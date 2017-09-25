@@ -58,7 +58,7 @@ class EntityStream extends AbstractReadableStream
         $this->placeholder = new Placeholder($context);
         
         try {
-            $chunk = yield from $this->connection->busyWait($context, $this->placeholder->promise());
+            $chunk = yield $context->keepBusy($this->placeholder->promise());
         } finally {
             $this->placeholder = null;
         }
