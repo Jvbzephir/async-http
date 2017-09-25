@@ -23,7 +23,7 @@ interface HttpConnector
     
     public function isRequestSupported(HttpRequest $request): bool;
     
-    public function isConnected(string $key): bool;
+    public function isConnected(Context $context, string $key): Promise;
     
     public function getProtocols(): array;
     

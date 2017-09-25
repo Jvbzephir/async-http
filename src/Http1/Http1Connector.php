@@ -17,6 +17,7 @@ use KoolKode\Async\CancellationToken;
 use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Success;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpRequest;
@@ -48,9 +49,9 @@ class Http1Connector implements HttpConnector
         return true;
     }
 
-    public function isConnected(string $key): bool
+    public function isConnected(Context $context, string $key): Promise
     {
-        return $this->manager->isConnected($key);
+        return new Success($context, $this->manager->isConnected($key));
     }
 
     public function getProtocols(): array

@@ -59,7 +59,7 @@ class HttpClient
             
             foreach ($this->connectors as $connector) {
                 if ($connector->isRequestSupported($request)) {
-                    if ($connector->isConnected($key)) {
+                    if (yield $connector->isConnected($context, $key)) {
                         return yield $connector->send($context, $request);
                     }
                     
