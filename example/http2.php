@@ -17,6 +17,7 @@ use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http1\ConnectionManager;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
+use KoolKode\Async\Http\Middleware\ResponseContentDecoder;
 use KoolKode\Async\Log\PipeLogHandler;
 
 error_reporting(-1);
@@ -29,7 +30,9 @@ $factory->registerLogger(new PipeLogHandler(PipeLogHandler::STDOUT), PipeLogHand
 
 $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
+    
     $client = new HttpClient(new Http1Connector($manager), new Http2Connector());
+    $client->addMiddleware(new ResponseContentDecoder());
     
     $response = yield $client->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [], new StringBody('Hello World!')));
     
@@ -42,10 +45,7 @@ $factory->createContext()->run(function (Context $context) {
         'body' => yield $response->getBody()->getContents($context)
     ]);
     
-    $response = yield $client->send($context, new HttpRequest('https://httpbin.org/anything', Http::POST, [
-        'Content-Type' => 'application/json',
-        'User-Agent' => 'PHP/' . PHP_VERSION
-    ], new StringBody('{"message":"Hello Server :)"}')));
+    $response = yield $client->get($context, 'https://httpbin.org/gzip');
     
     $context->info('HTTP/{version} response received', [
         'version' => $response->getProtocolVersion(),
@@ -54,5 +54,9 @@ $factory->createContext()->run(function (Context $context) {
             return implode(', ', $h);
         }, $response->getHeaders()),
         'body' => json_decode(yield $response->getBody()->getContents($context), true)
+    ]);
+    
+    $context->info('Request JSON from the server', [
+        'result' => yield $client->getJson($context, 'http://httpbin.org/deflate')
     ]);
 });

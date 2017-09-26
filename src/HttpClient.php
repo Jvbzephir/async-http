@@ -17,6 +17,7 @@ use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\ClientEncryption;
@@ -129,6 +130,29 @@ class HttpClient
         }
         
         return $defer->promise();
+    }
+    
+    public function get(Context $context, $uri): Promise
+    {
+        return $this->send($context, new HttpRequest($uri));
+    }
+    
+    public function getJson(Context $context, $uri): Promise
+    {
+        return $context->task(function (Context $context) use ($uri) {
+            $response = yield $this->send($context, new HttpRequest($uri, Http::GET, [
+                'Accept' => 'application/json, */*;q=0.5'
+            ]));
+            
+            return \json_decode(yield $response->getBody()->getContents($context), true);
+        });
+    }
+    
+    public function postForm(Context $context, $uri, array $fields): Promise
+    {
+        return $this->send($context, new HttpRequest($uri, Http::POST, [
+            'Content-Type' => Http::FORM_ENCODED
+        ], new StringBody(\http_build_query($fields, '', '&', \PHP_QUERY_RFC3986))));
     }
 
     protected function connectSocket(Context $context, Uri $uri, array $protocols): \Generator
