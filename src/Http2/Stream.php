@@ -21,6 +21,7 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 class Stream
 {
@@ -38,7 +39,11 @@ class Stream
     
     protected $entity;
     
-    protected $inputWindow;
+    protected $inputWindow = Connection::INITIAL_WINDOW_SIZE;
+    
+    protected $outputWindow;
+    
+    protected $outputDefer;
     
     public function __construct(int $id, Connection $connection, FramedStream $stream, HPack $hpack, int $window = Connection::INITIAL_WINDOW_SIZE)
     {
@@ -46,13 +51,17 @@ class Stream
         $this->connection = $connection;
         $this->stream = $stream;
         $this->hpack = $hpack;
-        $this->inputWindow = $window;
+        $this->outputWindow = $window;
         
         $this->entity = new EntityStream($this->connection, $this->id);
     }
     
     public function close(): void
     {
+        if ($this->outputDefer) {
+            $this->outputDefer->fail(new StreamClosedException('Stream has been closed'));
+        }
+        
         $this->connection->closeStream($this->id);
     }
     
@@ -192,27 +201,19 @@ class Stream
             while (null !== ($chunk = yield $body->read($context))) {
                 $len = \strlen($chunk);
                 
-                // FIXME: Implement flow control!
+                while ($this->outputWindow < $len) {
+                    $this->outputDefer = new Placeholder($context);
+                    
+                    try {
+                        yield $this->outputDefer->promise();
+                    } finally {
+                        $this->outputDefer = null;
+                    }
+                }
                 
-//                 while (true) {
-//                     if ($this->outputWindow < $len) {
-//                         try {
-//                             yield $this->outputDefer = new Deferred();
-//                         } finally {
-//                             $this->outputDefer = null;
-//                         }
-                        
-//                         continue;
-//                     }
-                    
-//                     if ($this->conn->getOutputWindow() < $len) {
-//                         yield $this->conn->awaitWindowUpdate();
-                        
-//                         continue;
-//                     }
-                    
-//                     break;
-//                 }
+                while ($this->connection->getOutputWindow() < $len) {
+                    yield $this->connection->waitForWindowUpdate();
+                }
                 
                 if ($len < $chunkSize) {
                     $done = true;
@@ -224,7 +225,7 @@ class Stream
                 $written = yield $this->stream->writeFrame($context, $frame);
                 
                 $sent += $written;
-//                 $this->outputWindow -= $written;
+                $this->outputWindow -= $written;
             }
             
             if (!$done) {
@@ -279,6 +280,21 @@ class Stream
         
         if ($frame->flags & Frame::END_STREAM) {
             $this->entity->finish();
+        }
+    }
+
+    public function processWindowUpdateFrame(Frame $frame): void
+    {
+        $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
+        
+        if ($increment < 1) {
+            throw new ConnectionException('WINDOW_UPDATE increment must be positive and bigger than 0', Frame::PROTOCOL_ERROR);
+        }
+        
+        $this->outputWindow += $increment;
+        
+        if ($this->outputDefer) {
+            $this->outputDefer->resolve($increment);
         }
     }
 }

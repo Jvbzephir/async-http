@@ -15,9 +15,11 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\HttpRequest;
+use KoolKode\Async\Stream\StreamClosedException;
 
 
 class Connection
@@ -70,6 +72,10 @@ class Connection
     
     protected $nextStreamId;
     
+    protected $outputWindow = self::INITIAL_WINDOW_SIZE;
+    
+    protected $outputDefer;
+    
     public function __construct(Context $context, int $mode, FramedStream $stream, HPack $hpack)
     {
         $this->mode = $mode;
@@ -88,6 +94,10 @@ class Connection
     public function close(): void
     {
         ($this->cancel)('Connection closed');
+        
+        if ($this->outputDefer) {
+            $this->outputDefer->fail(new StreamClosedException('Connection has been closed'));
+        }
     }
     
     public function closeStream(int $id): void
@@ -175,6 +185,7 @@ class Connection
                     case Frame::SETTINGS:
                         break;
                     case Frame::WINDOW_UPDATE:
+                        $this->processWindowUpdateFrame($frame);
                         break;
                 }
                 
@@ -231,6 +242,38 @@ class Connection
             }
         } else {
             Context::rethrow($this->stream->writeFrame($context, new Frame(Frame::PING, 0, $frame->data, Frame::ACK)));
+        }
+    }
+
+    public function getOutputWindow(): int
+    {
+        return $this->outputWindow;
+    }
+
+    public function waitForWindowUpdate(): Promise
+    {
+        if ($this->outputDefer === null) {
+            $this->outputDefer = new Deferred($this->background);
+        }
+        
+        return $this->outputDefer->promise();
+    }
+
+    protected function processWindowUpdateFrame(Frame $frame)
+    {
+        $increment = unpack('N', "\x7F\xFF\xFF\xFF" & $frame->data)[1];
+        
+        if ($increment < 1) {
+            throw new ConnectionException('WINDOW_UPDATE increment must be positive and bigger than 0', Frame::PROTOCOL_ERROR);
+        }
+        
+        $this->outputWindow += $increment;
+        
+        if ($this->outputDefer) {
+            $defer = $this->outputDefer;
+            $this->outputDefer = null;
+            
+            $defer->resolve($increment);
         }
     }
 }

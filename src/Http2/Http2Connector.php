@@ -102,7 +102,17 @@ class Http2Connector implements HttpConnector
             $conn = $this->connections[$key];
         }
         
-        return yield $conn->send($context, $request);
+        try {
+            $response = yield $conn->send($context, $request);
+        } catch (\Throwable $e) {
+            unset($this->connections[$key]);
+            
+            $conn->close();
+            
+            throw $e;
+        }
+        
+        return $response;
     }
 
     protected $localSettings = [
