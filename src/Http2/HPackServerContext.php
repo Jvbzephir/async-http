@@ -49,7 +49,9 @@ class HPackServerContext extends HPackContext
     {
         parent::__construct($indexing, $compression);
         
-        $this->encodings += \array_fill_keys(self::NEVER_INDEXED_ENTRIES, self::NEVER_INDEXED);
-        $this->encodings = \array_fill_keys(self::INDEXED_ENTRIES, self::INDEXED);
+        $indexed = \array_fill_keys(self::INDEXED_ENTRIES, self::INDEXED);
+        $never = \array_fill_keys(self::NEVER_INDEXED_ENTRIES, self::NEVER_INDEXED);
+        
+        $this->encodings = \array_merge($indexed, $never);
     }
 }

@@ -21,6 +21,7 @@ use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\ClientEncryption;
 use KoolKode\Async\Socket\ClientFactory;
+use KoolKode\Async\Socket\Connect;
 
 class HttpClient
 {
@@ -144,8 +145,9 @@ class HttpClient
         }
         
         $factory = new ClientFactory('tcp://' . $uri->getHostWithPort(true), $tls);
+        $connect = (new Connect())->withTcpNodelay(true);
         
-        return yield $factory->connect($context);
+        return yield $factory->connect($context, $connect);
     }
     
     protected function chooseConnector(array $connectors, string $alpn): HttpConnector

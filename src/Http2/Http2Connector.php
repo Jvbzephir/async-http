@@ -23,9 +23,16 @@ use KoolKode\Async\Stream\DuplexStream;
 
 class Http2Connector implements HttpConnector
 {
+    protected $hpack;
+    
     protected $connecting = [];
     
     protected $connections = [];
+    
+    public function __construct(?HPackContext $hpack = null)
+    {
+        $this->hpack = $hpack ?? new HPackClientContext();
+    }
     
     public function getPriority(): int
     {
@@ -64,9 +71,85 @@ class Http2Connector implements HttpConnector
     {
         return $protocol == 'h2';
     }
-    
+
     public function send(Context $context, HttpRequest $request, ?DuplexStream $stream = null): Promise
     {
-        // TODO: Implement HTTP/2 request handling.
+        return $context->task($this->processRequest($context, $request, $stream));
+    }
+
+    protected function processRequest(Context $context, HttpRequest $request, ?DuplexStream $stream = null): \Generator
+    {
+        $uri = $request->getUri();
+        $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
+        
+        if ($stream) {
+            $this->connecting[$key] = $placeholder = new Placeholder($context);
+            
+            try {
+                try {
+                    $conn = yield from $this->connectClient($context, $stream);
+                } finally {
+                    unset($this->connecting[$key]);
+                }
+            } catch (\Throwable $e) {
+                $placeholder->resolve(false);
+                
+                throw $e;
+            }
+            
+            $placeholder->resolve(true);
+        } else {
+            $conn = $this->connections[$key];
+        }
+        
+        return yield $conn->send($context, $request);
+    }
+
+    protected $localSettings = [
+        Connection::SETTING_ENABLE_PUSH => 0,
+        Connection::SETTING_MAX_CONCURRENT_STREAMS => 256,
+        Connection::SETTING_INITIAL_WINDOW_SIZE => 0xFFFF,
+        Connection::SETTING_MAX_FRAME_SIZE => 16384
+    ];
+    
+    protected $remoteSettings = [
+        Connection::SETTING_HEADER_TABLE_SIZE => 4096,
+        Connection::SETTING_ENABLE_PUSH => 1,
+        Connection::SETTING_MAX_CONCURRENT_STREAMS => 100,
+        Connection::SETTING_INITIAL_WINDOW_SIZE => 0xFFFF,
+        Connection::SETTING_MAX_FRAME_SIZE => 16384,
+        Connection::SETTING_MAX_HEADER_LIST_SIZE => 16777216
+    ];
+    
+    protected function connectClient(Context $context, DuplexStream $stream): \Generator
+    {
+        try {
+            yield $stream->write($context, Connection::PREFACE);
+            
+            $stream = new FramedStream($stream, $stream);
+            
+            $settings = '';
+            
+            foreach ($this->localSettings as $k => $v) {
+                $settings .= \pack('nN', $k, $v);
+            }
+            
+            yield $stream->writeFrame($context, new Frame(Frame::SETTINGS, 0, $settings));
+            yield $stream->writeFrame($context, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', 0x0FFFFFFF)));
+            
+            $frame = yield $stream->readFrame($context);
+            
+            if ($frame->stream !== 0 || $frame->type !== Frame::SETTINGS) {
+                throw new ConnectionException('Failed to establish HTTP/2 connection');
+            }
+            
+            // TODO: Implement and apply settings.
+        } catch (\Throwable $e) {
+            $stream->close();
+            
+            throw $e;
+        }
+        
+        return new Connection($context, Connection::CLIENT, $stream, new HPack($this->hpack));
     }
 }

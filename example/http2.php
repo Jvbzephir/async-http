@@ -14,11 +14,10 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
 use KoolKode\Async\Http\Body\StringBody;
-use KoolKode\Async\Http\Http2\ClientConnectionFactory;
+use KoolKode\Async\Http\Http1\ConnectionManager;
+use KoolKode\Async\Http\Http1\Http1Connector;
+use KoolKode\Async\Http\Http2\Http2Connector;
 use KoolKode\Async\Log\PipeLogHandler;
-use KoolKode\Async\Socket\ClientEncryption;
-use KoolKode\Async\Socket\ClientFactory;
-use KoolKode\Async\Socket\Connect;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -26,31 +25,34 @@ ini_set('display_errors', false);
 require_once '../vendor/autoload.php';
 
 $factory = new ContextFactory();
-$factory->registerLogger(new PipeLogHandler());
+$factory->registerLogger(new PipeLogHandler(PipeLogHandler::STDOUT), PipeLogHandler::INFO);
 
 $factory->createContext()->run(function (Context $context) {
-    $tls = new ClientEncryption(ClientEncryption::TLS_1_2);
-    $tls = $tls->withPeerName('http2.golang.org');
-    $tls = $tls->withAlpnProtocols('h2');
+    $manager = new ConnectionManager($context->getLoop());
+    $client = new HttpClient(new Http1Connector($manager), new Http2Connector());
     
-    $factory = new ClientFactory('tcp://http2.golang.org:443', $tls);
-    $stream = yield $factory->connect($context, (new Connect())->withTcpNodelay(true));
+    $response = yield $client->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [], new StringBody('Hello World!')));
     
-    $factory = new ClientConnectionFactory();
-    $conn = yield $factory->connectClient($context, $stream);
+    $context->info('HTTP/{version} response received', [
+        'version' => $response->getProtocolVersion(),
+        'status' => $response->getStatusCode(),
+        'headers' => array_map(function (array $h) {
+            return implode(', ', $h);
+        }, $response->getHeaders()),
+        'body' => yield $response->getBody()->getContents($context)
+    ]);
     
-    try {
-        $context->info('Pink took {time} milliseconds', [
-            'time' => yield $conn->ping($context)
-        ]);
-        
-        $response = yield $conn->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [], new StringBody('Hello World!')));
-        
-        $context->info('HTTP/2 response received', [
-            'status' => $response->getStatusCode(),
-            'body' => yield $response->getBody()->getContents($context)
-        ]);
-    } finally {
-        $conn->close();
-    }
+    $response = yield $client->send($context, new HttpRequest('https://httpbin.org/anything', Http::POST, [
+        'Content-Type' => 'application/json',
+        'User-Agent' => 'PHP/' . PHP_VERSION
+    ], new StringBody('{"message":"Hello Server :)"}')));
+    
+    $context->info('HTTP/{version} response received', [
+        'version' => $response->getProtocolVersion(),
+        'status' => $response->getStatusCode(),
+        'headers' => array_map(function (array $h) {
+            return implode(', ', $h);
+        }, $response->getHeaders()),
+        'body' => json_decode(yield $response->getBody()->getContents($context), true)
+    ]);
 });

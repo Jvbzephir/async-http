@@ -20,6 +20,7 @@ use KoolKode\Async\Success;
 use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Socket\ClientEncryption;
 use KoolKode\Async\Socket\ClientFactory;
+use KoolKode\Async\Socket\Connect;
 
 class ConnectionPool implements \Countable
 {
@@ -110,8 +111,10 @@ class ConnectionPool implements \Countable
                 $tls = $tls->withAlpnProtocols(...$protocols);
             }
             
+            $connect = (new Connect())->withTcpNodelay(true);
+            
             $factory = new ClientFactory('tcp://' . $uri->getHostWithPort(true), $tls);
-            $conn = new ClientConnection($key, yield $factory->connect($context));
+            $conn = new ClientConnection($key, yield $factory->connect($context, $connect));
         } catch (\Throwable $e) {
             $this->size--;
             
