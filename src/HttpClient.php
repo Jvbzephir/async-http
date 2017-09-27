@@ -15,6 +15,7 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Coroutine;
+use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\Body\StringBody;
@@ -108,14 +109,8 @@ class HttpClient
     
     public function sendAll(Context $context, array $requests, callable $callback): Promise
     {
-        $cancel = $context->cancellationHandler();
-        
-        $defer = new Placeholder($context, function (Placeholder $p, string $reason, ?\Throwable $e = null) use ($cancel) {
-            $cancel($reason, $e);
-        });
-        
+        $defer = new Deferred($context);
         $pending = $count = \count($requests);
-        $context = $context->cancellable($cancel);
         
         foreach ($requests as $request) {
             $this->send($context, $request)->when(static function ($e, $v = null) use ($context, $defer, $count, & $pending, $callback) {

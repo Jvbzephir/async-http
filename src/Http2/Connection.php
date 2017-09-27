@@ -93,7 +93,7 @@ class Connection
     
     public function close(): void
     {
-        ($this->cancel)('Connection closed');
+        $this->cancel->cancel('Connection closed');
         
         if ($this->outputDefer) {
             $this->outputDefer->fail(new StreamClosedException('Connection has been closed'));

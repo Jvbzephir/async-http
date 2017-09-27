@@ -29,32 +29,35 @@ $factory = new ContextFactory();
 $factory->registerLogger(new PipeLogHandler(PipeLogHandler::STDOUT), PipeLogHandler::INFO);
 
 $factory->createContext()->run(function (Context $context) {
+    $log = function (Context $context, HttpResponse $response) {
+        $body = yield $response->getBody()->getContents($context);
+        
+        if ($response->getContentType()->getMediaType()->is('*/json')) {
+            $body = json_decode($body, true);
+        }
+        
+        $context->info('HTTP/{version} response received', [
+            'version' => $response->getProtocolVersion(),
+            'status' => $response->getStatusCode(),
+            'headers' => array_map(function (array $h) {
+                return implode(', ', $h);
+            }, $response->getHeaders()),
+            'body' => $body
+        ]);
+    };
+    
     $manager = new ConnectionManager($context->getLoop());
     
     $client = new HttpClient(new Http1Connector($manager), new Http2Connector());
     $client->addMiddleware(new ResponseContentDecoder());
     
-    $response = yield $client->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [], new StringBody('Hello World!')));
+    yield from $log($context, yield $client->get($context, 'https://http2.golang.org/reqinfo'));
     
-    $context->info('HTTP/{version} response received', [
-        'version' => $response->getProtocolVersion(),
-        'status' => $response->getStatusCode(),
-        'headers' => array_map(function (array $h) {
-            return implode(', ', $h);
-        }, $response->getHeaders()),
-        'body' => yield $response->getBody()->getContents($context)
-    ]);
+    yield from $log($context, yield $client->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [
+        'Content-Type' => 'text/plain'
+    ], new StringBody('Hello World!'))));
     
-    $response = yield $client->get($context, 'https://httpbin.org/gzip');
-    
-    $context->info('HTTP/{version} response received', [
-        'version' => $response->getProtocolVersion(),
-        'status' => $response->getStatusCode(),
-        'headers' => array_map(function (array $h) {
-            return implode(', ', $h);
-        }, $response->getHeaders()),
-        'body' => json_decode(yield $response->getBody()->getContents($context), true)
-    ]);
+    yield from $log($context, yield $client->get($context, 'https://httpbin.org/gzip'));
     
     $context->info('Request JSON from the server', [
         'result' => yield $client->getJson($context, 'http://httpbin.org/deflate')
