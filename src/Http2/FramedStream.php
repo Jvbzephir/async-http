@@ -18,8 +18,9 @@ use KoolKode\Async\Promise;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\SyncWriter;
 use KoolKode\Async\Stream\WritableStream;
+use KoolKode\Async\Disposable;
 
-class FramedStream
+class FramedStream implements Disposable
 {
     protected $readStream;
     
@@ -31,9 +32,9 @@ class FramedStream
         $this->writeStream = new SyncWriter($writeStream);
     }
 
-    public function close(): void
+    public function close(?\Throwable $e = null): void
     {
-        $this->stream->close();
+        $this->stream->close($e);
     }
 
     public function readFrame(Context $context): Promise

@@ -42,7 +42,7 @@ class EntityStream extends ReadableStreamDecorator
     /**
      * {@inheritdoc}
      */
-    public function close(): void
+    public function close(?\Throwable $e = null): void
     {
         if ($this->defer) {
             $defer = $this->defer;
@@ -51,7 +51,7 @@ class EntityStream extends ReadableStreamDecorator
             $defer->resolve(false);
         }
         
-        parent::close();
+        parent::close($e);
     }
 
     /**

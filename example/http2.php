@@ -34,6 +34,8 @@ $factory->createContext()->run(function (Context $context) {
         
         if ($response->getContentType()->getMediaType()->is('*/json')) {
             $body = json_decode($body, true);
+        } else {
+            $body = array_map('trim', explode("\n", trim($body)));
         }
         
         $context->info('HTTP/{version} response received', [

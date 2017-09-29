@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Context;
+use KoolKode\Async\Disposable;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
@@ -23,7 +24,7 @@ use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
-class Stream
+class Stream implements Disposable
 {
     protected $id;
     
@@ -56,10 +57,10 @@ class Stream
         $this->entity = new EntityStream($this->connection, $this->id);
     }
     
-    public function close(): void
+    public function close(?\Throwable $e = null): void
     {
         if ($this->outputDefer) {
-            $this->outputDefer->fail(new StreamClosedException('Stream has been closed'));
+            $this->outputDefer->fail(new StreamClosedException('Stream has been closed', 0, $e));
         }
         
         $this->connection->closeStream($this->id);

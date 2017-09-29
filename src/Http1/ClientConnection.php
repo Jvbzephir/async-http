@@ -13,9 +13,10 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\Disposable;
 use KoolKode\Async\Stream\DuplexStream;
 
-class ClientConnection
+class ClientConnection implements Disposable
 {
     public $key;
     
@@ -33,8 +34,8 @@ class ClientConnection
         $this->expires = \time() + 30;
     }
     
-    public function close(): void
+    public function close(?\Throwable $e = null): void
     {
-        $this->stream->close();
+        $this->stream->close($e);
     }
 }

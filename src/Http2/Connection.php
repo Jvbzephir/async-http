@@ -16,13 +16,13 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
+use KoolKode\Async\Disposable;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Stream\StreamClosedException;
 
-
-class Connection
+class Connection implements Disposable
 {
     public const CLIENT = 1;
     
@@ -91,12 +91,12 @@ class Connection
         Context::rethrow($context->task($this->processFrames($context)));
     }
     
-    public function close(): void
+    public function close(?\Throwable $e = null): void
     {
-        $this->cancel->cancel('Connection closed');
+        $this->cancel->cancel('Connection closed', $e);
         
         if ($this->outputDefer) {
-            $this->outputDefer->fail(new StreamClosedException('Connection has been closed'));
+            $this->outputDefer->fail(new StreamClosedException('Connection has been closed', 0, $e));
         }
     }
     
