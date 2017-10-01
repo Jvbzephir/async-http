@@ -70,4 +70,13 @@ class ConnectionManager implements \Countable
         
         $this->pools[$conn->key]->checkin($conn);
     }
+    
+    public function checkout(ClientConnection $conn): void
+    {
+        if (empty($this->pools[$conn->key])) {
+            $this->pools[$conn->key] = new ConnectionPool($this->concurrency);
+        }
+        
+        $this->pools[$conn->key]->checkout($conn);
+    }
 }

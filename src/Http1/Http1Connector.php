@@ -39,21 +39,33 @@ class Http1Connector implements HttpConnector
         $this->manager = $manager;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function getPriority(): int
     {
         return 11;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isRequestSupported(HttpRequest $request): bool
     {
         return true;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isConnected(Context $context, string $key): Promise
     {
         return new Success($context, $this->manager->isConnected($key));
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function getProtocols(): array
     {
         return [
@@ -61,6 +73,9 @@ class Http1Connector implements HttpConnector
         ];
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function isSupported(string $protocol): bool
     {
         switch ($protocol) {
@@ -72,6 +87,9 @@ class Http1Connector implements HttpConnector
         return false;
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function send(Context $context, HttpRequest $request, ?DuplexStream $stream = null): Promise
     {
         $token = $context->cancellationToken();
@@ -100,7 +118,8 @@ class Http1Connector implements HttpConnector
             $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $conn->stream));
             
             $response = $this->parseResponseHeaders($token->throwIfCancelled(yield $conn->stream->readTo($context, "\r\n\r\n")));
-            $close = $this->shouldConnectionBeClosed($response);
+            $upgrade = ($response->getStatusCode() == Http::SWITCHING_PROTOCOLS);
+            $close = (!$upgrade && $this->shouldConnectionBeClosed($response));
             
             if ('' !== ($len = $response->getHeaderLine('Content-Length'))) {
                 $stream = new LimitStream($conn->stream, (int) $len, $close);
@@ -125,15 +144,39 @@ class Http1Connector implements HttpConnector
             throw $e;
         }
         
-        $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $conn, $close) {
-            if ($done) {
-                return $this->manager->release($conn, $close);
+        if ($upgrade) {
+            try {
+                if (!\in_array('upgrade', $response->getHeaderTokenValues('Connection'), true)) {
+                    throw new \RuntimeException('Cannot switch protocols without upgrade in connection header');
+                }
+                
+                $protocols = $response->getHeaderTokenValues('Upgrade', true);
+                
+                if (empty($protocols)) {
+                    throw new \RuntimeException('Missing Upgrade header needed to switch protocols');
+                }
+                
+                yield $body->discard($context);
+            } catch (\Throwable $e) {
+                $conn->stream->close($e);
+                
+                throw $e;
+            } finally {
+                $this->manager->checkout($conn);
             }
             
-            $body->discard($context->unreference())->when(function () use ($conn, $close) {
-                $this->manager->release($conn, $close);
+            $response = $response->withAttribute(Upgrade::class, new Upgrade($conn->stream, ...$protocols));
+        } else {
+            $defer->promise()->when(function ($e, ?bool $done) use ($context, $body, $conn, $close) {
+                if ($done) {
+                    return $this->manager->release($conn, $close);
+                }
+                
+                $body->discard($context->unreference())->when(function () use ($conn, $close) {
+                    $this->manager->release($conn, $close);
+                });
             });
-        });
+        }
         
         return $response;
     }

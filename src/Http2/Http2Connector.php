@@ -34,11 +34,17 @@ class Http2Connector implements HttpConnector
         $this->hpack = $hpack ?? new HPackClientContext();
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function getPriority(): int
     {
         return 20;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isRequestSupported(HttpRequest $request): bool
     {
         if ($request->getUri()->getScheme() != 'https') {
@@ -48,6 +54,9 @@ class Http2Connector implements HttpConnector
         return (float) $request->getProtocolVersion() >= 2;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isConnected(Context $context, string $key): Promise
     {
         if (isset($this->connecting[$key])) {
@@ -60,6 +69,9 @@ class Http2Connector implements HttpConnector
         return new Success($context, isset($this->connections[$key]));
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function getProtocols(): array
     {
         return [
@@ -67,11 +79,17 @@ class Http2Connector implements HttpConnector
         ];
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function isSupported(string $protocol): bool
     {
         return $protocol == 'h2';
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function send(Context $context, HttpRequest $request, ?DuplexStream $stream = null): Promise
     {
         return $context->task($this->processRequest($context, $request, $stream));

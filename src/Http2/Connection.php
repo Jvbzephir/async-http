@@ -91,6 +91,9 @@ class Connection implements Disposable
         Context::rethrow($context->task($this->processFrames($context)));
     }
     
+    /**
+     * {@inheritdoc}
+     */
     public function close(?\Throwable $e = null): void
     {
         $this->cancel->cancel('Connection closed', $e);

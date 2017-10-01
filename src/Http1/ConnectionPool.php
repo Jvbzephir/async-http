@@ -99,6 +99,15 @@ class ConnectionPool implements \Countable
             $this->connecting->dequeue()->resolve($conn);
         }
     }
+    
+    public function checkout(ClientConnection $conn): void
+    {
+        $this->size--;
+        
+        if (!$this->connecting->isEmpty()) {
+            $this->connecting->dequeue()->resolve();
+        }
+    }
 
     protected function connect(Context $context, string $key, Uri $uri, array $protocols): \Generator
     {

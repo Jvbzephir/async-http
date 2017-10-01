@@ -53,6 +53,9 @@ class EntityStream extends AbstractReadableStream
         }
     }
 
+    /**
+     * {@inheritdoc}
+     */
     protected function readNextChunk(Context $context): \Generator
     {
         $this->placeholder = new Placeholder($context);
