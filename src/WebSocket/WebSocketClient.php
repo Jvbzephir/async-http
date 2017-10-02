@@ -102,7 +102,7 @@ class WebSocketClient
                 }
             }
             
-            $conn = new Connection($upgrade->stream, true, $response->getHeaderLine('Sec-WebSocket-Protocol'));
+            $conn = new Connection($context, true, $upgrade->stream, $response->getHeaderLine('Sec-WebSocket-Protocol'));
             
             $context->debug('Established WebSocket connection to {uri}', [
                 'uri' => $location
@@ -177,13 +177,13 @@ class WebSocketClient
         }
         
         if ($extension === null) {
-            return;
+            return null;
         }
         
         try {
             return PerMessageDeflate::fromHeaderToken($extension);
         } catch (\OutOfRangeException $e) {
-            return;
+            return null;
         }
     }
 }

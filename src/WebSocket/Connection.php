@@ -13,11 +13,12 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Concurrent\Executor;
-use KoolKode\Async\Concurrent\Synchronized;
+use KoolKode\Async\Concurrent\Synchronizer;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStream;
 
@@ -85,7 +86,7 @@ class Connection implements Disposable
     
     protected $reader;
     
-    protected $sync;
+    protected $messages;
     
     protected $cancel;
     
@@ -98,7 +99,7 @@ class Connection implements Disposable
         $this->protocol = $protocol;
         
         $this->reader = new MessageReader($this->maxTextMessageSize);
-        $this->sync = new Synchronized();
+        $this->messages = new Synchronizer();
         
         $context = $context->background();
         $context = $context->cancellable($this->cancel = $context->cancellationHandler());
@@ -197,12 +198,14 @@ class Connection implements Disposable
     
     protected function writeFrame(Context $context, Frame $frame): Promise
     {
+        $context->debug('OUT: ' . $frame);
+        
         return $this->stream->write($context, $frame->encode($this->client ? \random_bytes(4) : null));
     }
     
     public function receive(Context $context): Promise
     {
-        return $this->sync->get($context);
+        return $this->messages->receive($context);
     }
     
     /**
@@ -210,33 +213,39 @@ class Connection implements Disposable
      */
     protected function processFrames(Context $context): \Generator
     {
-        while (true) {
-            $frame = yield from $this->readNextFrame($context);
-            $message = null;
-            
-            switch ($frame->opcode) {
-                case Frame::TEXT:
-                    $message = $this->reader->appendTextFrame($frame);
-                    break;
-                case Frame::BINARY:
-                    $message = $this->reader->appendBinaryFrame($frame);
-                    break;
-                case Frame::CONTINUATION:
-                    $message = yield from $this->reader->appendContinuationFrame($context, $frame);
-                    break;
-                case Frame::PING:
-                    $this->executor->submit($context, $this->writeFrame($context, new Frame(Frame::PONG, $frame->data), 1000));
-                    break;
-                case Frame::PONG:
-                    // TODO: Re-implement pings...
-                    break;
-                case Frame::CONNECTION_CLOSE:
-                    throw new ConnectionException('Remote peer closes connection', Frame::CONNECTION_CLOSE);
+        try {
+            while (true) {
+                $frame = yield from $this->readNextFrame($context);
+                $message = null;
+                
+                $context->debug('IN: ' . $frame);
+                
+                switch ($frame->opcode) {
+                    case Frame::TEXT:
+                        $message = $this->reader->appendTextFrame($frame);
+                        break;
+                    case Frame::BINARY:
+                        $message = $this->reader->appendBinaryFrame($frame);
+                        break;
+                    case Frame::CONTINUATION:
+                        $message = yield from $this->reader->appendContinuationFrame($context, $frame);
+                        break;
+                    case Frame::PING:
+                        $this->executor->submit($context, $this->writeFrame($context, new Frame(Frame::PONG, $frame->data), 1000));
+                        break;
+                    case Frame::PONG:
+                        // TODO: Re-implement pings...
+                        break;
+                    case Frame::CONNECTION_CLOSE:
+                        throw new ConnectionException('Remote peer closes connection', Frame::CONNECTION_CLOSE);
+                }
+                
+                if ($message !== null) {
+                    yield $this->messages->send($context, $message);
+                }
             }
-            
-            if ($message !== null) {
-                yield $this->sync->set($context, $message);
-            }
+        } catch (CancellationException $e) {
+            $this->stream->close($e);
         }
     }
     

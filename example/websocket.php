@@ -15,7 +15,7 @@ use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
 use KoolKode\Async\Http\Http1\ConnectionManager;
 use KoolKode\Async\Http\Http1\Http1Connector;
-use KoolKode\Async\Http\Http1\Upgrade;
+use KoolKode\Async\Http\WebSocket\WebSocketClient;
 use KoolKode\Async\Log\PipeLogHandler;
 
 error_reporting(-1);
@@ -28,19 +28,17 @@ $factory->registerLogger(new PipeLogHandler());
 
 $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
-    $client = new HttpClient(new Http1Connector($manager));
+    $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)));
     
-    $request = new HttpRequest('https://echo.websocket.org/', Http::GET, [
-        'Connection' => 'upgrade',
-        'Upgrade' => 'websocket',
-        'Sec-WebSocket-Version' => '13',
-        'Sec-WebSocket-Key' => base64_encode(random_bytes(16))
-    ], null, '1.1');
+    $conn = yield $client->connect($context, 'https://echo.websocket.org/');
     
-    $response = yield $client->send($context, $request);
-    
-    print_r($response);
-    print_r($response->getAttribute(Upgrade::class));
-    
-    var_dump(count($manager));
+    try {
+        yield $conn->sendText($context, 'Hello World :)');
+        
+        $context->info('Received: {message}', [
+            'message' => yield $conn->receive($context)
+        ]);
+    } finally {
+        $conn->close();
+    }
 });

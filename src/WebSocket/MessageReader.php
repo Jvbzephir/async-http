@@ -15,7 +15,8 @@ namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
-use KoolKode\Async\Concurrent\Synchronized;
+use KoolKode\Async\Concurrent\ChannelClosedException;
+use KoolKode\Async\Concurrent\Synchronizer;
 
 /**
  * Buffers a single WebSocket text message.
@@ -39,7 +40,7 @@ class MessageReader implements Disposable
     protected $compressed = false;
     
     /**
-     * Buffered message or stream.
+     * Buffered message or stream synchronizer.
      *
      * @var mixed
      */
@@ -61,8 +62,6 @@ class MessageReader implements Disposable
     
     protected $flushMode;
     
-    protected $sync;
-    
     /**
      * Create a new text message reader with buffering.
      *
@@ -78,8 +77,6 @@ class MessageReader implements Disposable
             $this->compression = $deflate->getDecompressionContext();
             $this->flushMode = $deflate->getDecompressionFlushMode();
         }
-        
-        $this->sync = new Synchronized();
     }
     
     /**
@@ -89,7 +86,7 @@ class MessageReader implements Disposable
      */
     public function close(?\Throwable $e = null): void
     {
-        if ($this->buffer instanceof BinaryStream) {
+        if ($this->buffer instanceof Synchronizer) {
             $this->buffer->close($e);
         } else {
             $this->buffer = '';
@@ -110,7 +107,7 @@ class MessageReader implements Disposable
             $this->buffer = $frame->data;
             $this->compressed = $this->deflate && (($frame->reserved & Frame::RESERVED1) ? true : false);
             
-            return;
+            return null;
         }
         
         if ($this->deflate && $frame->reserved & Frame::RESERVED1) {
@@ -143,11 +140,15 @@ class MessageReader implements Disposable
             }
         }
         
+        $sync = new Synchronizer();
+        
         if ($frame->finished) {
-            return new BinaryStream($this->sync, $frame->data, true);
+            $sync->close();
+            
+            return new BinaryStream($sync, $frame->data);
         }
         
-        return $this->buffer = new BinaryStream($this->sync, $frame->data);
+        return new BinaryStream($this->buffer = $sync, $frame->data);
     }
 
     public function appendContinuationFrame(Context $context, Frame $frame): \Generator
@@ -160,7 +161,7 @@ class MessageReader implements Disposable
             throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
         }
         
-        if ($this->buffer instanceof BinaryStream) {
+        if ($this->buffer instanceof Synchronizer) {
             if ($this->compressed) {
                 if ($frame->finished) {
                     $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
@@ -169,10 +170,20 @@ class MessageReader implements Disposable
                 }
             }
             
-            yield $this->sync->set($context, $frame->data);
+            if (!$this->buffer->isClosed()) {
+                try {
+                    yield $this->buffer->send($context, $frame->data);
+                } catch (ChannelClosedException $e) {
+                    return;
+                }
+            }
             
             if ($frame->finished) {
-                yield $this->sync->set($context, null);
+                try {
+                    $this->buffer->close();
+                } finally {
+                    $this->buffer = null;
+                }
             }
             
             return;

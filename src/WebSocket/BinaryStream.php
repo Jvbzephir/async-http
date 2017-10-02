@@ -14,7 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Context;
-use KoolKode\Async\Concurrent\Synchronized;
+use KoolKode\Async\Concurrent\Synchronizer;
 use KoolKode\Async\Stream\AbstractReadableStream;
 
 /**
@@ -26,16 +26,27 @@ class BinaryStream extends AbstractReadableStream
 {
     protected $sync;
     
-    public function __construct(Synchronized $sync)
+    public function __construct(Synchronizer $sync, string $buffer)
     {
         $this->sync = $sync;
+        $this->buffer = $buffer;
     }
 
     /**
      * {@inheritdoc}
      */
+    public function close(?\Throwable $e = null): void
+    {
+        parent::close($e);
+        
+        $this->sync->close($e);
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
     protected function readNextChunk(Context $context): \Generator
     {
-        return yield $this->sync->get($context);
+        return yield $this->sync->receive($context);
     }
 }
