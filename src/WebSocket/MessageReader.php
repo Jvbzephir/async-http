@@ -15,8 +15,8 @@ namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
-use KoolKode\Async\Concurrent\ChannelClosedException;
-use KoolKode\Async\Concurrent\Synchronizer;
+use KoolKode\Async\Channel\Channel;
+use KoolKode\Async\Channel\ChannelClosedException;
 
 /**
  * Buffers a single WebSocket text message.
@@ -86,10 +86,12 @@ class MessageReader implements Disposable
      */
     public function close(?\Throwable $e = null): void
     {
-        if ($this->buffer instanceof Synchronizer) {
-            $this->buffer->close($e);
-        } else {
-            $this->buffer = '';
+        try {
+            if ($this->buffer instanceof Channel) {
+                $this->buffer->close($e);
+            }
+        } finally {
+            $this->buffer = null;
         }
     }
     
@@ -140,15 +142,15 @@ class MessageReader implements Disposable
             }
         }
         
-        $sync = new Synchronizer();
+        $channel = new Channel();
         
         if ($frame->finished) {
-            $sync->close();
+            $channel->close();
             
-            return new BinaryStream($sync, $frame->data);
+            return new BinaryStream($channel, $frame->data);
         }
         
-        return new BinaryStream($this->buffer = $sync, $frame->data);
+        return new BinaryStream($this->buffer = $channel, $frame->data);
     }
 
     public function appendContinuationFrame(Context $context, Frame $frame): \Generator
@@ -161,7 +163,7 @@ class MessageReader implements Disposable
             throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
         }
         
-        if ($this->buffer instanceof Synchronizer) {
+        if ($this->buffer instanceof Channel) {
             if ($this->compressed) {
                 if ($frame->finished) {
                     $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);

@@ -17,8 +17,8 @@ use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Channel\Channel;
 use KoolKode\Async\Concurrent\Executor;
-use KoolKode\Async\Concurrent\Synchronizer;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStream;
 
@@ -99,7 +99,7 @@ class Connection implements Disposable
         $this->protocol = $protocol;
         
         $this->reader = new MessageReader($this->maxTextMessageSize);
-        $this->messages = new Synchronizer();
+        $this->messages = new Channel();
         
         $context = $context->background();
         $context = $context->cancellable($this->cancel = $context->cancellationHandler());
