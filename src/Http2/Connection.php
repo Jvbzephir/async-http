@@ -16,13 +16,14 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
-use KoolKode\Async\Disposable;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Channel\Channel;
+use KoolKode\Async\Channel\InputChannel;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Stream\StreamClosedException;
 
-class Connection implements Disposable
+class Connection implements InputChannel
 {
     public const CLIENT = 1;
     
@@ -76,6 +77,8 @@ class Connection implements Disposable
     
     protected $outputDefer;
     
+    protected $channel;
+    
     public function __construct(Context $context, int $mode, FramedStream $stream, HPack $hpack)
     {
         $this->mode = $mode;
@@ -87,6 +90,10 @@ class Connection implements Disposable
         
         $this->background = $context;
         $this->nextStreamId = ($this->mode == self::CLIENT) ? 1 : 2;
+        
+        if ($this->mode == self::SERVER) {
+            $this->channel = new Channel();
+        }
         
         Context::rethrow($context->task($this->processFrames($context)));
     }
@@ -110,6 +117,11 @@ class Connection implements Disposable
         }
     }
     
+    public function isServer(): bool
+    {
+        return $this->mode == self::SERVER;
+    }
+    
     public function windowUpdate(int $size, int $stream = 0): void
     {
         if ($size > 0) {
@@ -126,15 +138,20 @@ class Connection implements Disposable
     
     public function send(Context $context, HttpRequest $request): Promise
     {
-        $this->streams[$this->nextStreamId] = $stream = new Stream($this->nextStreamId, $this, $this->stream, $this->hpack);
+        $stream = new Stream($context, $this->nextStreamId, $this, $this->stream, $this->hpack, self::INITIAL_WINDOW_SIZE);
+        
+        $this->streams[$this->nextStreamId] = $stream;
         $this->nextStreamId += 2;
         
         return $context->task($stream->sendRequest($context, $request));
     }
     
-    public function acceptStream(Context $context): Promise
+    /**
+     * {@inheritdoc}
+     */
+    public function receive(Context $context, $eof = null): Promise
     {
-        
+        return $this->channel->receive($context, $eof);
     }
     
     public function ping(Context $context): Promise
@@ -209,15 +226,44 @@ class Connection implements Disposable
             }
             
             if (null === ($stream = $this->streams[$frame->stream] ?? null)) {
-                throw new ConnectionException("Stream {$frame->stream} does not exist");
+                switch ($frame->type) {
+                    case Frame::RST_STREAM:
+                    case Frame::WINDOW_UPDATE:
+                        continue 2;
+                }
+                
+                if ($this->mode == self::SERVER) {
+                    switch ($frame->type) {
+                        case Frame::HEADERS:
+                        case Frame::PRIORITY:
+                            if (!($frame->stream & 1)) {
+                                throw new ConnectionException('Invalid stream id provided by client', Frame::PROTOCOL_ERROR);
+                            }
+                            
+                            $stream = new Stream($context, $frame->stream, $this, $this->stream, $this->hpack, self::INITIAL_WINDOW_SIZE);
+                            
+                            $this->streams[$frame->stream] = $stream;
+                            break;
+                        default:
+                            throw new ConnectionException("Stream {$frame->stream} does not exist");
+                    }
+                } else {
+                    throw new ConnectionException("Stream {$frame->stream} does not exist");
+                }
             }
+            
+            $done = null;
             
             switch ($frame->type) {
                 case Frame::HEADERS:
                     $stream->processHeadersFrame($frame);
+                    $done = $frame->flags & Frame::END_HEADERS;
+                    
                     break;
                 case Frame::CONTINUATION:
                     $stream->processContinuationFrame($frame);
+                    $done = $frame->flags & Frame::END_HEADERS;
+                    
                     break;
                 case Frame::DATA:
                     $stream->processDataFrame($frame);
@@ -225,6 +271,10 @@ class Connection implements Disposable
                 case Frame::WINDOW_UPDATE:
                     $stream->processWindowUpdateFrame($frame);
                     break;
+            }
+            
+            if ($done && $this->mode == self::SERVER) {
+                yield $this->channel->send($context, $stream);
             }
         }
     }

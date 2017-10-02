@@ -15,9 +15,9 @@ namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
-use KoolKode\Async\Disposable;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Channel\Channel;
+use KoolKode\Async\Channel\InputChannel;
 use KoolKode\Async\Concurrent\Executor;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStream;
@@ -29,7 +29,7 @@ use KoolKode\Async\Stream\ReadableStream;
  *
  * @author Martin Schröder
  */
-class Connection implements Disposable
+class Connection implements InputChannel
 {
     /**
      * WebSocket GUID needed during handshake.
@@ -115,7 +115,6 @@ class Connection implements Disposable
      */
     public function close(?\Throwable $e = null): void
     {
-        $this->reader->close($e);
         $this->cancel->cancel('Connection closed', $e);
     }
     
@@ -203,9 +202,12 @@ class Connection implements Disposable
         return $this->stream->write($context, $frame->encode($this->client ? \random_bytes(4) : null));
     }
     
-    public function receive(Context $context): Promise
+    /**
+     * {@inheritdoc}
+     */
+    public function receive(Context $context, $eof = null): Promise
     {
-        return $this->messages->receive($context);
+        return $this->messages->receive($context, $eof);
     }
     
     /**
@@ -246,6 +248,8 @@ class Connection implements Disposable
             }
         } catch (CancellationException $e) {
             $this->stream->close($e);
+            $this->reader->close($e);
+            $this->messages->close($e);
         }
     }
     

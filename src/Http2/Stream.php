@@ -20,6 +20,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Uri;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
@@ -46,7 +47,7 @@ class Stream implements Disposable
     
     protected $outputDefer;
     
-    public function __construct(int $id, Connection $connection, FramedStream $stream, HPack $hpack, int $window = Connection::INITIAL_WINDOW_SIZE)
+    public function __construct(Context $context, int $id, Connection $connection, FramedStream $stream, HPack $hpack, int $window)
     {
         $this->id = $id;
         $this->connection = $connection;
@@ -55,6 +56,10 @@ class Stream implements Disposable
         $this->outputWindow = $window;
         
         $this->entity = new EntityStream($this->connection, $this->id);
+        
+        if ($connection->isServer()) {
+            $this->placeholder = new Placeholder($context);
+        }
     }
     
     public function close(?\Throwable $e = null): void
@@ -64,6 +69,46 @@ class Stream implements Disposable
         }
         
         $this->connection->closeStream($this->id);
+    }
+    
+    public function prepareForReceive(Context $context): void
+    {
+        $this->placeholder = new Placeholder($context);
+    }
+
+    public function receiveRequest(Context $context): \Generator
+    {
+        try {
+            $headers = $this->hpack->decode(yield $context->keepBusy($this->placeholder->promise()));
+            
+            $scheme = $this->getFirstHeader(':scheme', $headers, 'http');
+            $authority = $this->getFirstHeader(':authority', $headers);
+            $method = $this->getFirstHeader(':method', $headers, Http::GET);
+            $path = $this->getFirstHeader(':path', $headers, '/');
+            
+            if (\ltrim($path, '/') === '*') {
+                $uri = Uri::parse(\sprintf('%s://%s/', $scheme, $authority));
+            } else {
+                $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
+            }
+            
+            $request = new HttpRequest($uri, $method);
+            $request = $request->withRequestTarget($path);
+            $request = $request->withProtocolVersion('2.0');
+            $request = $request->withBody(new StreamBody($this->entity));
+            
+            foreach ($headers as $header) {
+                if (\substr($header[0], 0, 1) !== ':') {
+                    $request = $request->withAddedHeader(...$header);
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->close();
+            
+            throw $e;
+        }
+        
+        return $request;
     }
     
     public function sendRequest(Context $context, HttpRequest $request): \Generator
@@ -90,7 +135,7 @@ class Stream implements Disposable
                     'host'
                 ]));
                 
-                $sent = yield from $this->sendBody($context, yield $request->getBody()->getReadableStream($context));
+                yield from $this->sendBody($context, yield $request->getBody()->getReadableStream($context));
                 
                 $headers = $this->hpack->decode(yield $context->keepBusy($this->placeholder->promise()));
             } finally {
@@ -116,6 +161,30 @@ class Stream implements Disposable
         }
         
         return $response;
+    }
+    
+    public function sendResponse(Context $context, HttpRequest $request, HttpResponse $response): \Generator
+    {
+        try {
+            $headers = [
+                ':status' => [
+                    (string) $response->getStatusCode()
+                ]
+            ];
+            
+            $head = ($request->getMethod() === Http::HEAD);
+            $nobody = $head || Http::isResponseWithoutBody($response->getStatusCode());
+            
+            yield from $this->sendHeaders($context, $this->encodeHeaders($response, $headers, [
+                'host'
+            ]), $nobody);
+            
+            if (!$nobody) {
+                yield from $this->sendBody($context, yield $response->getBody()->getReadableStream($context));
+            }
+        } catch (\Throwable $e) {
+            $this->close($e);
+        }
     }
     
     protected function getFirstHeader(string $name, array $headers, string $default = ''): string
@@ -167,9 +236,9 @@ class Stream implements Disposable
         return $this->hpack->encode($headerList);
     }
     
-    protected function sendHeaders(Context $context, string $headers, bool $end = false): \Generator
+    protected function sendHeaders(Context $context, string $headers, bool $nobody = false): \Generator
     {
-        $flags = Frame::END_HEADERS | ($end ? Frame::END_STREAM : Frame::NOFLAG);
+        $flags = Frame::END_HEADERS | ($nobody ? Frame::END_STREAM : Frame::NOFLAG);
         
         $chunkSize = 8192;
         
