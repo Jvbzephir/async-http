@@ -51,7 +51,7 @@ $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
     
     $client = new HttpClient(new Http1Connector($manager), new Http2Connector());
-    $client->addMiddleware(new ResponseContentDecoder());
+    $client = $client->withMiddleware(new ResponseContentDecoder());
     
     yield from $log($context, yield $client->get($context, 'https://http2.golang.org/reqinfo'));
     

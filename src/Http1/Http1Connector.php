@@ -117,7 +117,11 @@ class Http1Connector implements HttpConnector
             $token->throwIfCancelled();
             $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $conn->stream));
             
-            $response = $this->parseResponseHeaders($token->throwIfCancelled(yield $conn->stream->readTo($context, "\r\n\r\n")));
+            if (null === ($headers = yield $conn->stream->readTo($context, "\r\n\r\n"))) {
+                throw new \RuntimeException('Connection was closed before HTTP headers have been received');
+            }
+            
+            $response = $this->parseResponseHeaders($token->throwIfCancelled($headers));
             $upgrade = ($response->getStatusCode() == Http::SWITCHING_PROTOCOLS);
             $close = (!$upgrade && $this->shouldConnectionBeClosed($response));
             
@@ -251,8 +255,6 @@ class Http1Connector implements HttpConnector
         $bodyStream = yield $body->getReadableStream($context);
         
         try {
-            $buffer = $this->serializeHeaders($request, $size);
-            
             $chunk = yield $bodyStream->readBuffer($context, 8192, false);
             $len = \strlen($chunk ?? '');
             
@@ -262,7 +264,7 @@ class Http1Connector implements HttpConnector
                 $size = $len;
             }
             
-            $sent = yield $stream->write($context, $buffer . "\r\n");
+            $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");
             
             if ($size === null) {
                 do {
@@ -308,7 +310,7 @@ class Http1Connector implements HttpConnector
         $lines = \explode("\n", $buffer);
         $m = null;
         
-        if (!\preg_match("'^HTTP/(1\\.[01])\s+([0-9]+)(\s+.*)?$'i", \trim($lines[0]), $m)) {
+        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($lines[0]), $m)) {
             throw new \RuntimeException('Invalid HTTP response line received');
         }
         

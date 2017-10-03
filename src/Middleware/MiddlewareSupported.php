@@ -25,15 +25,12 @@ trait MiddlewareSupported
      * 
      * @var array
      */
-    private $middlewares = [];
+    protected $middlewares = [];
 
     /**
      * Register a new HTTP middleware.
-     * 
-     * @param callable $middleware
-     * @param int $priority
      */
-    public function addMiddleware(callable $middleware, int $priority = null)
+    public function withMiddleware(callable $middleware, ?int $priority = null): self
     {
         if ($priority === null) {
             if ($middleware instanceof Middleware) {
@@ -43,16 +40,22 @@ trait MiddlewareSupported
             }
         }
         
-        for ($size = \count($this->middlewares), $i = 0; $i < $size; $i++) {
-            if ($this->middlewares[$i]->priority < $priority) {
-                \array_splice($this->middlewares, $i, 0, [
+        $object = clone $this;
+        
+        for ($inserted = null, $size = \count($object->middlewares), $i = 0; $i < $size; $i++) {
+            if ($object->middlewares[$i]->priority < $priority) {
+                $inserted = \array_splice($object->middlewares, $i, 0, [
                     new RegisteredMiddleware($middleware, $priority)
                 ]);
                 
-                return;
+                break;
             }
         }
         
-        $this->middlewares[] = new RegisteredMiddleware($middleware, $priority);
+        if ($inserted === null) {
+            $object->middlewares[] = new RegisteredMiddleware($middleware, $priority);
+        }
+        
+        return $object;
     }
 }

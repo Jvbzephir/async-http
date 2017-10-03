@@ -13,12 +13,10 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
-use KoolKode\Async\Http\Http2\Http2Driver;
+use KoolKode\Async\Http\Http1\Http1Driver;
 use KoolKode\Async\Http\Response\JsonResponse;
 use KoolKode\Async\Log\PipeLogHandler;
-use KoolKode\Async\Socket\ServerEncryption;
 use KoolKode\Async\Socket\ServerFactory;
-use KoolKode\Async\Test\AsyncTestCase;
 
 error_reporting(-1);
 ini_set('display_errors', false);
@@ -29,23 +27,25 @@ $factory = new ContextFactory();
 $factory->registerLogger(new PipeLogHandler(PipeLogHandler::STDOUT));
 
 $factory->createContext()->run(function (Context $context) {
-    $driver = new Http2Driver();
+    $driver = new Http1Driver();
     
-    $tls = new ServerEncryption(ServerEncryption::TLS_1_2);
-    $tls = $tls->withDefaultCertificate(AsyncTestCase::getLocalhostCertificateFile());
-    $tls = $tls->withPeerName('localhost')->withAlpnProtocols(...$driver->getProtocols());
-    
-    $factory = new ServerFactory('tcp://127.0.0.1:8080', $tls);
+    $factory = new ServerFactory('tcp://127.0.0.1:8080');
     $server = $factory->createServer($context->getLoop());
     
     try {
-        $socket = yield $server->accept($context);
-        
-        yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
-            return new JsonResponse([
-                'dispatcher' => __FILE__
-            ]);
-        });
+        while (true) {
+            $socket = yield $server->accept($context);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
+                if ($request->getUri()->getPath() != '/') {
+                    return new HttpResponse(Http::NOT_FOUND);
+                }
+                
+                return new JsonResponse([
+                    'dispatcher' => __FILE__
+                ]);
+            });
+        }
     } finally {
         $server->close();
     }

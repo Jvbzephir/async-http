@@ -15,9 +15,10 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Stream\DuplexStream;
 
-class Http2Driver
+class Http2Driver implements HttpDriver
 {
     protected $hpack;
     
@@ -25,8 +26,37 @@ class Http2Driver
     {
         $this->hpack = $hpack ?? new HPackServerContext();
     }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getPriority(): int
+    {
+        return 20;
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function getProtocols(): array
+    {
+        return [
+            'h2'
+        ];
+    }
+    
+    /**
+     * {@inheritdoc}
+     */
+    public function isSupported(string $protocol): bool
+    {
+        return $protocol == 'h2';
+    }
 
-    public function handle(Context $context, DuplexStream $stream, callable $action): Promise
+    /**
+     * {@inheritdoc}
+     */
+    public function listen(Context $context, DuplexStream $stream, callable $action): Promise
     {
         return $context->task(function (Context $context) use ($stream, $action) {
             $conn = yield from $this->connectServer($context, $stream);
