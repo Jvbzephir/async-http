@@ -42,7 +42,7 @@ class HttpClient
         $this->connectors = $connectors;
         
         \usort($this->connectors, function (HttpConnector $a, HttpConnector $b) {
-            return $a->getPriority() <=> $b->getPriority();
+            return $b->getPriority() <=> $a->getPriority();
         });
     }
     

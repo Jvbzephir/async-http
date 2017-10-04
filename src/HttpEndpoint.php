@@ -44,7 +44,7 @@ class HttpEndpoint
         $this->drivers = $drivers;
         
         \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
-            return $a->getPriority() <=> $b->getPriority();
+            return $b->getPriority() <=> $a->getPriority();
         });
         
         $this->defaultHost = new HttpHost(static function () {
