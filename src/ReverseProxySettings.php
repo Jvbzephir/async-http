@@ -151,6 +151,8 @@ class ReverseProxySettings
                 return \strtolower($request->getHeaderTokens($name)[0]->getValue());
             }
         }
+        
+        return null;
     }
     
     /**
@@ -179,6 +181,8 @@ class ReverseProxySettings
                 return $request->getHeaderTokens($name)[0]->getValue();
             }
         }
+        
+        return null;
     }
     
     /**

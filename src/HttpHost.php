@@ -40,8 +40,24 @@ class HttpHost
         return $this->encryption;
     }
 
-    public function withEncryption(string $name, string $certFile): self
+    public function withEncryption(string $certFile, ?string $name = null): self
     {
+        if (!\is_file($certFile)) {
+            throw new \InvalidArgumentException(\sprintf('Certificate file not found: "%s"', $certFile));
+        }
+        
+        if ($name === null) {
+            $name = @\openssl_x509_parse(\file_get_contents($certFile))['subject']['CN'] ?? null;
+            
+            if ($name === null || $name === '') {
+                throw new \RuntimeException(\sprintf('Failed to read CN from certificate "%s"', $certFile));
+            }
+            
+            if ($name[0] == '*') {
+                $name = \preg_replace("'^(?:\\*\\.)+'", '', $name);
+            }
+        }
+        
         $host = clone $this;
         $host->encryption = [
             'peer_name' => $name,

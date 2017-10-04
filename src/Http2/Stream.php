@@ -92,10 +92,8 @@ class Stream implements Disposable
                 $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
             }
             
-            $request = new HttpRequest($uri, $method);
+            $request = new HttpRequest($uri, $method, [], new StreamBody($this->entity), '2.0');
             $request = $request->withRequestTarget($path);
-            $request = $request->withProtocolVersion('2.0');
-            $request = $request->withBody(new StreamBody($this->entity));
             
             foreach ($headers as $header) {
                 if (\substr($header[0], 0, 1) !== ':') {
@@ -144,10 +142,8 @@ class Stream implements Disposable
             
             $status = (int) $this->getFirstHeader(':status', $headers);
             
-            $response = new HttpResponse($status);
+            $response = new HttpResponse($status, [], new StreamBody($this->entity), '2.0');
             $response = $response->withReason(Http::getReason($status));
-            $response = $response->withProtocolVersion('2.0');
-            $response = $response->withBody(new StreamBody($this->entity));
             
             foreach ($headers as $header) {
                 if (\substr($header[0], 0, 1) !== ':') {

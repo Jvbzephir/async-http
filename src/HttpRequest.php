@@ -128,11 +128,11 @@ class HttpRequest extends HttpMessage
         return new Accept(...ContentType::parseList($this->getHeaderLine('Accept')));
     }
     
-    public function hasHeader(string $name): bool
+    public function hasHeader(string $name, bool $fakeHost = true): bool
     {
         $name = \strtolower($name);
         
-        if ($name === 'host') {
+        if ($name === 'host' && $fakeHost) {
             return $this->getHeader('Host') ? true : false;
         }
         
@@ -199,6 +199,7 @@ class HttpRequest extends HttpMessage
     public function withAddress(string ...$address): self
     {
         $request = clone $this;
+        $request->addresses = [];
         
         foreach ($address as $ip) {
             $request->addresses[] = (string) new Address($ip);

@@ -33,7 +33,11 @@ class HttpEndpoint
     
     protected $defaultHost;
     
+    protected $defaultEncryptedHost;
+    
     protected $hosts = [];
+    
+    protected $proxy;
 
     public function __construct(HttpDriver ...$drivers)
     {
@@ -46,10 +50,6 @@ class HttpEndpoint
         \usort($this->drivers, function (HttpDriver $a, HttpDriver $b) {
             return $b->getPriority() <=> $a->getPriority();
         });
-        
-        $this->defaultHost = new HttpHost(static function () {
-            return new HttpResponse(Http::SERVICE_UNAVAILABLE);
-        });
     }
 
     public function withAddress(string $address, bool $encrypted = false): self
@@ -60,10 +60,45 @@ class HttpEndpoint
         return $endpoint;
     }
 
-    public function withDefaultHost(HttpHost $host): self
+    public function withDefaultHost(HttpHost $host, ?string $name = null): self
     {
+        if ($host->isEncrypted()) {
+            throw new \InvalidArgumentException('Host must not be encrypted');
+        }
+        
+        if ($name === null) {
+            $hostname = \gethostname();
+            
+            if ($hostname != ($ip = @\gethostbyname($hostname))) {
+                if ($ip != ($name = @\gethostbyaddr($ip))) {
+                    $hostname = $name;
+                }
+            }
+            
+            $name = \strtolower($hostname);
+        }
+        
         $endpoint = clone $this;
-        $endpoint->defaultHost = $host;
+        $endpoint->defaultHost = [
+            $name,
+            $host
+        ];
+        
+        return $endpoint;
+    }
+    
+    public function withDefaultEncryptedHost(HttpHost $host, ?string $certFile = null): self
+    {
+        if ($certFile !== null) {
+            $host = $host->withEncryption($certFile);
+        }
+        
+        if (!$host->isEncrypted()) {
+            throw new \InvalidArgumentException('Host must be encrypted');
+        }
+        
+        $endpoint = clone $this;
+        $endpoint->defaultEncryptedHost = $host;
         
         return $endpoint;
     }
@@ -82,26 +117,30 @@ class HttpEndpoint
         return $endpoint;
     }
 
+    public function withReverseProxy(ReverseProxySettings $proxy): self
+    {
+        $endpoint = clone $this;
+        $endpoint->proxy = $proxy;
+        
+        return $endpoint;
+    }
+
     public function listen(Context $context): Promise
     {
+        if (empty($this->defaultHost) && !$this->defaultEncryptedHost && !$this->hosts) {
+            throw new \RuntimeException('Cannot start HTTP endpoint without a host defined');
+        }
+        
         if (empty($this->bind)) {
-            if ($this->defaultHost->isEncrypted()) {
-                $bind = [
-                    'tcp://0.0.0.0:443' => true
-                ];
-            } else {
-                $bind = [
-                    'tcp://0.0.0.0:80' => false
-                ];
-            }
+            $bind = $this->getDefaultBindAddresses();
         } else {
             $bind = $this->bind;
         }
         
         $tls = new ServerEncryption();
         
-        if ($this->defaultHost->isEncrypted()) {
-            $settings = $this->defaultHost->getEncryptionSettings();
+        if ($this->defaultEncryptedHost) {
+            $settings = $this->defaultEncryptedHost->getEncryptionSettings();
             
             $tls = $tls->withPeerName($settings['peer_name']);
             $tls = $tls->withDefaultCertificate($settings['certificate']);
@@ -137,6 +176,37 @@ class HttpEndpoint
         }
         
         return $context->task($this->run($context, $servers));
+    }
+
+    protected function getDefaultBindAddresses(): array
+    {
+        $bind = [];
+        
+        if (!empty($this->defaultHost)) {
+            $bind['tcp://127.0.0.1:80'] = false;
+        } else {
+            foreach ($this->hosts as $host) {
+                if (!$host->isEncrypted()) {
+                    $bind['tcp://127.0.0.1:80'] = false;
+                    
+                    break;
+                }
+            }
+        }
+        
+        if ($this->defaultEncryptedHost) {
+            $bind['tcp://127.0.0.1:443'] = true;
+        } else {
+            foreach ($this->hosts as $host) {
+                if ($host->isEncrypted()) {
+                    $bind['tcp:/127.0.0.1:80'] = false;
+                    
+                    break;
+                }
+            }
+        }
+        
+        return $bind;
     }
 
     protected function run(Context $context, array $servers): \Generator
@@ -187,39 +257,75 @@ class HttpEndpoint
         }
         
         yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) use ($socket) {
-            $uri = $request->getUri()->withScheme($socket->isEncrypted() ? 'https' : 'http');
+            $secure = $socket->isEncrypted();
+            $uri = $request->getUri()->withScheme($secure ? 'https' : 'http');
             
-            $request = $request->withUri($uri);
-            
-            return yield from $this->handleRequest($context, $request);
-        });
-    }
-
-    protected function handleRequest(Context $context, HttpRequest $request): \Generator
-    {
-        $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) {
-            $secure = ($request->getUri()->getScheme() == 'https');
-            $name = $request->getUri()->getHostWithPort(true);
-            
-            if ($name !== '') {
-                foreach ($this->hosts as $matcher => $host) {
-                    if ($secure && !$host->isEncrypted()) {
-                        continue;
-                    }
-                    
-                    if ($host->isEncrypted()) {
-                        continue;
-                    }
-                    
-                    if (\preg_match($matcher, $name)) {
-                        return yield from $host->handleRequest($context, $request);
-                    }
+            if (!$request->hasHeader('Host', false)) {
+                if ($secure) {
+                    $uri = $uri->withHost($this->defaultEncryptedHost->getEncryptionSettings()['peer_name']);
+                } else {
+                    $uri = $uri->withHost(\array_filter($this->bind) ? $this->defaultHost[0] : 'localhost');
                 }
             }
             
-            return yield from $this->defaultHost->handleRequest($context, $request);
+            $request = $request->withUri($uri);
+            $m = null;
+            
+            if (\preg_match("'^(.+):[1-9][0-9]*$'", $socket->getRemotePeer(), $m)) {
+                $request = $request->withAddress($address = $m[1]);
+            } else {
+                $request = $request->withAddress($address = '127.0.0.1');
+            }
+            
+            if ($this->proxy && $this->proxy->isTrustedProxy($address)) {
+                $request = $this->applyProxySettings($request);
+            }
+            
+            $name = $request->getUri()->getHostWithPort(true);
+            $handler = null;
+            
+            foreach ($this->hosts as $matcher => $host) {
+                if ($secure && !$host->isEncrypted()) {
+                    continue;
+                }
+                
+                if ($host->isEncrypted()) {
+                    continue;
+                }
+                
+                if (\preg_match($matcher, $name)) {
+                    $handler = $host;
+                    
+                    break;
+                }
+            }
+            
+            if ($handler === null) {
+                $handler = $secure ? $this->defaultEncryptedHost : $this->defaultHost[1];
+            }
+            
+            $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($handler) {
+                return yield from $handler->handleRequest($context, $request);
+            });
+            
+            return yield from $next($context, $request);
         });
+    }
+    
+    protected function applyProxySettings(HttpRequest $request): HttpRequest
+    {
+        if (null !== ($scheme = $this->proxy->getScheme($request))) {
+            $request = $request->withUri($request->getUri()->withScheme($scheme));
+        }
         
-        return yield from $next($context, $request);
+        if (null !== ($host = $this->proxy->getHost($request))) {
+            $request = $request->withUri($request->getUri()->withHost($host));
+        }
+        
+        if ($addresses = $this->proxy->getAddresses($request)) {
+            $request = $request->withAddress(...\array_merge($addresses, (array) $request->getClientAddress()));
+        }
+        
+        return $request;
     }
 }
