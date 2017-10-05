@@ -143,7 +143,7 @@ class Http1Connector implements HttpConnector
             $response = $response->withoutHeader('Transfer-Encoding');
             $response = $response->withBody($body);
         } catch (\Throwable $e) {
-            $manager->release($conn, true);
+            $this->manager->release($conn, true);
             
             throw $e;
         }
@@ -316,7 +316,7 @@ class Http1Connector implements HttpConnector
         
         $version = $m[1];
         $status = (int) $m[2];
-        $reason = \trim($m[3]);
+        $reason = \trim($m[3] ?? '');
         $headers = [];
         
         for ($count = \count($lines), $i = 1; $i < $count; $i++) {

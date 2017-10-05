@@ -26,6 +26,13 @@ use KoolKode\Async\Stream\ReadableMemoryStream;
 
 class Http1Driver implements HttpDriver
 {
+    protected $upgradeResultHandlers;
+    
+    public function __construct(array $upgradeHandlers = [])
+    {
+        $this->upgradeResultHandlers = $upgradeHandlers;
+    }
+    
     /**
      * {@inheritdoc}
      */
@@ -83,7 +90,36 @@ class Http1Driver implements HttpDriver
                 $request = $request->withoutHeader('Transfer-Encoding');
                 $request = $request->withBody($body = new StreamBody($body));
                 
-                $response = $action($context, $request);
+                $upgrade = null;
+                
+                $response = $action($context, $request, function (Context $context, $response) use ($request, & $upgrade) {
+                    if ($response instanceof \Generator) {
+                        $response = yield from $response;
+                    }
+                    
+                    if (!$response instanceof HttpResponse) {
+                        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'), true)) {
+                            $protocols = $request->getHeaderTokenValues('Upgrade', true);
+                            
+                            foreach ($protocols as $protocol) {
+                                foreach ($this->upgradeResultHandlers as $handler) {
+                                    if ($handler->isUpgradeSupported($protocol, $request, $response)) {
+                                        $response = $handler->createUpgradeResponse($request, $response);
+                                        $upgrade = $handler;
+                                        
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (!$response instanceof HttpResponse) {
+                            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+                        }
+                    }
+                    
+                    return $response;
+                });
                 
                 if ($response instanceof \Generator) {
                     $response = yield from $response;
@@ -92,9 +128,13 @@ class Http1Driver implements HttpDriver
                 yield $body->discard($context);
                 
                 $response = $this->normalizeResponse($request, $response);
-                $response = $response->withHeader('Connection', 'close');
+                $response = $response->withHeader('Connection', $upgrade ? 'upgrade' : 'close');
                 
                 yield from $this->sendRespone($context, $request, $response, $stream);
+                
+                if ($upgrade) {
+                    yield from $upgrade->upgradeConnection($context, $stream, $request, $response);
+                }
             } finally {
                 $stream->close();
             }
@@ -203,7 +243,7 @@ class Http1Driver implements HttpDriver
     {
         $reason = $response->getReasonPhrase();
         
-        if ($response === '') {
+        if ($reason === '') {
             $reason = Http::getReason($response->getStatusCode());
         }
         

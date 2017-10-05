@@ -67,10 +67,10 @@ class HttpHost
         return $host;
     }
 
-    public function handleRequest(Context $context, HttpRequest $request): \Generator
+    public function handleRequest(Context $context, HttpRequest $request, callable $responder): \Generator
     {
-        $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) {
-            return ($this->action)($context, $request);
+        $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($responder) {
+            return $responder($context, ($this->action)($context, $request));
         });
         
         return yield from $next($context, $request);

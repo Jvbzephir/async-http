@@ -197,8 +197,6 @@ class Connection implements InputChannel
     
     protected function writeFrame(Context $context, Frame $frame): Promise
     {
-        $context->debug('OUT: ' . $frame);
-        
         return $this->stream->write($context, $frame->encode($this->client ? \random_bytes(4) : null));
     }
     
@@ -219,8 +217,6 @@ class Connection implements InputChannel
             while (true) {
                 $frame = yield from $this->readNextFrame($context);
                 $message = null;
-                
-                $context->debug('IN: ' . $frame);
                 
                 switch ($frame->opcode) {
                     case Frame::TEXT:
@@ -311,7 +307,7 @@ class Connection implements InputChannel
             $data = yield $this->stream->readBuffer($context, $len);
         } else {
             $mask = yield $this->stream->readBuffer($context, 4);
-            $data = (yield $this->stream->readBuffer($context, $len)) ^ \str_pad($mask, $len, $keySTR_PAD_RIGHT);
+            $data = (yield $this->stream->readBuffer($context, $len)) ^ \str_pad($mask, $len, $mask, STR_PAD_RIGHT);
         }
         
         return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false, $byte1 & Frame::RESERVED);

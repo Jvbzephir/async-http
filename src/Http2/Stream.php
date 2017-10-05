@@ -167,6 +167,8 @@ class Stream implements Disposable
     public function sendResponse(Context $context, HttpRequest $request, HttpResponse $response): \Generator
     {
         try {
+            yield $request->getBody()->discard($context);
+            
             $headers = [
                 ':status' => [
                     (string) $response->getStatusCode()
@@ -188,6 +190,8 @@ class Stream implements Disposable
             
             throw $e;
         }
+        
+        $this->closed = true;
         
         $this->close();
     }

@@ -269,7 +269,7 @@ class HttpEndpoint
             throw new \RuntimeException(\sprintf('No driver supports ALPN protocol "%s"', $alpn));
         }
         
-        yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) use ($socket) {
+        yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) use ($socket) {
             $secure = $socket->isEncrypted();
             $uri = $request->getUri()->withScheme($secure ? 'https' : 'http');
             
@@ -317,8 +317,8 @@ class HttpEndpoint
                 $handler = $secure ? $this->defaultEncryptedHost : $this->defaultHost[1];
             }
             
-            $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($handler) {
-                return yield from $handler->handleRequest($context, $request);
+            $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($handler, $responder) {
+                return yield from $handler->handleRequest($context, $request, $responder);
             });
             
             return yield from $next($context, $request);

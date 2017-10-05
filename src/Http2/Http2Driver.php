@@ -15,7 +15,9 @@ namespace KoolKode\Async\Http\Http2;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
+use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\DuplexStream;
 
 class Http2Driver implements HttpDriver
@@ -75,7 +77,18 @@ class Http2Driver implements HttpDriver
     {
         try {
             $request = yield from $stream->receiveRequest($context);
-            $response = $action($context, $request);
+            
+            $response = $action($context, $request, function (Context $context, $response) {
+                if ($response instanceof \Generator) {
+                    $response = yield from $response;
+                }
+                
+                if (!$response instanceof HttpResponse) {
+                    $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+                }
+                
+                return $response;
+            });
             
             if ($response instanceof \Generator) {
                 $response = yield from $response;

@@ -83,7 +83,7 @@ class WebSocketClient
         $response = yield $this->httpClient->send($context, $request);
         $upgrade = $response->getAttribute(Upgrade::class);
         
-        if (!$upgrade instanceof Upgrade) {
+        if ($response->getStatusCode() != Http::SWITCHING_PROTOCOLS || !$upgrade instanceof Upgrade) {
             throw new \RuntimeException('Missing HTTP upgrade in response with status ' . $response->getStatusCode());
         }
         
@@ -103,10 +103,6 @@ class WebSocketClient
             }
             
             $conn = new Connection($context, true, $upgrade->stream, $response->getHeaderLine('Sec-WebSocket-Protocol'));
-            
-            $context->debug('Established WebSocket connection to {uri}', [
-                'uri' => $location
-            ]);
             
             if ($deflate = $this->negotiatePerMessageDeflate($response)) {
                 if (!$this->deflateSupported) {
