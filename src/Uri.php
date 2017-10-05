@@ -114,6 +114,8 @@ class Uri implements \JsonSerializable
         
         if (empty($this->host)) {
             $uri .= $this->path;
+        } elseif ($this->path === '*') {
+            $uri .= $this->getHostWithPort() . '/';
         } else {
             $uri .= $this->getHostWithPort() . '/' . \ltrim($this->path, '/');
         }
@@ -227,7 +229,7 @@ class Uri implements \JsonSerializable
     {
         $m = null;
         
-        if (\preg_match("'^([^:]+):([0-9]+)'", $host, $m)) {
+        if (\preg_match("'^(.+):([0-9]+)'", $host, $m)) {
             $uri = clone $this;
             $uri->host = \trim($m[1]);
             $uri->port = (int) $m[2];
@@ -417,6 +419,10 @@ class Uri implements \JsonSerializable
     protected function filterPath(string $path): string
     {
         $path = \trim($path);
+        
+        if ($path == '*') {
+            return $path;
+        }
         
         if (false !== \strpos($path, '?') || false !== \strpos($path, '#')) {
             throw new \InvalidArgumentException('Invalid URI path');

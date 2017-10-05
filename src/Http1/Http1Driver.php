@@ -22,11 +22,18 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
-use KoolKode\Async\Stream\ReadableMemoryStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 class Http1Driver implements HttpDriver
 {
+    protected $parser;
+    
     protected $upgradeResultHandlers = [];
+    
+    public function __construct(?MessageParser $parser = null)
+    {
+        $this->parser = $parser ?? new MessageParser();
+    }
     
     public function withUpgradeResultHandler(UpgradeResultHandler $handler): self
     {
@@ -75,19 +82,13 @@ class Http1Driver implements HttpDriver
     {
         return $context->task(function (Context $context) use ($stream, $action) {
             try {
-                if (null === ($headers = yield $stream->readTo($context, "\r\n\r\n"))) {
+                try {
+                    $request = yield from $this->parser->parseRequest($context, $stream);
+                } catch (StreamClosedException $e) {
                     return;
                 }
                 
-                $request = $this->parseRequestHeaders($headers);
-                
-                if ('' !== ($len = $request->getHeaderLine('Content-Length'))) {
-                    $body = new LimitStream($stream, (int) $len, false);
-                } elseif ('chunked' == $request->getHeaderLine('Transfer-Encoding')) {
-                    $body = new ChunkDecodedStream($stream, false);
-                } else {
-                    $body = new ReadableMemoryStream();
-                }
+                $body = $this->parser->parseBodyStream($request, $stream, false);
                 
                 $request = $request->withoutHeader('Content-Length');
                 $request = $request->withoutHeader('Transfer-Encoding');
@@ -142,41 +143,6 @@ class Http1Driver implements HttpDriver
                 $stream->close();
             }
         });
-    }
-    
-    protected function parseRequestHeaders(string $buffer): HttpRequest
-    {
-        $lines = \explode("\n", $buffer);
-        $m = null;
-        
-        if (!\preg_match("'^(\S+)\s+?(\S+)\s+?HTTP/(1\\.[01])$'iU", \trim($lines[0]), $m)) {
-            throw new \RuntimeException('Invalid HTTP request line received');
-        }
-        
-        $method = $m[1];
-        $target = $m[2];
-        $version = $m[3];
-        $headers = [];
-        
-        for ($count = \count($lines), $i = 1; $i < $count; $i++) {
-            list ($k, $v) = \explode(':', $lines[$i], 2);
-            $k = \trim($k);
-            
-            $headers[$k][] = $v;
-        }
-        
-        if ($target == '*') {
-            $uri = 'http://localhost/';
-        } elseif ('/' === ($target[0] ?? null)) {
-            $uri = 'http://localhost' . $target;
-        } else {
-            $uri = $target;
-        }
-        
-        $request = new HttpRequest($uri, $method, $headers, null, $version);
-        $request = $request->withRequestTarget($target);
-        
-        return $request;
     }
     
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse

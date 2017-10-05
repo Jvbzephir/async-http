@@ -28,7 +28,7 @@ $factory->registerLogger(new PipeLogHandler());
 
 $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
-    $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)));
+    $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)), true);
     
     $conn = yield $client->connect($context, 'wss://echo.websocket.org/');
     

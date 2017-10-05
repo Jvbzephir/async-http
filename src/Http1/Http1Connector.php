@@ -34,9 +34,12 @@ class Http1Connector implements HttpConnector
  
     protected $manager;
     
-    public function __construct(ConnectionManager $manager)
+    protected $parser;
+    
+    public function __construct(ConnectionManager $manager, ?MessageParser $parser = null)
     {
         $this->manager = $manager;
+        $this->parser = $parser ?? new MessageParser();
     }
     
     /**
@@ -117,22 +120,13 @@ class Http1Connector implements HttpConnector
             $token->throwIfCancelled();
             $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $conn->stream));
             
-            if (null === ($headers = yield $conn->stream->readTo($context, "\r\n\r\n"))) {
-                throw new \RuntimeException('Connection was closed before HTTP headers have been received');
-            }
-            
-            $response = $this->parseResponseHeaders($token->throwIfCancelled($headers));
+            $response = $token->throwIfCancelled(yield from $this->parser->parseResponse($context, $conn->stream));
             $upgrade = ($response->getStatusCode() == Http::SWITCHING_PROTOCOLS);
             $close = (!$upgrade && $this->shouldConnectionBeClosed($response));
             
-            if ('' !== ($len = $response->getHeaderLine('Content-Length'))) {
-                $stream = new LimitStream($conn->stream, (int) $len, $close);
-            } elseif ('chunked' == $response->getHeaderLine('Transfer-Encoding')) {
-                $stream = new ChunkDecodedStream($conn->stream, $close);
-            } elseif ($close) {
-                $stream = $conn->stream;
-            } else {
-                $stream = new ReadableMemoryStream();
+            $stream = $this->parser->parseBodyStream($response, $conn->stream, $close);
+            
+            if ($stream instanceof ReadableMemoryStream) {
                 $close = true;
             }
             
@@ -303,32 +297,5 @@ class Http1Connector implements HttpConnector
         }
         
         return $buffer;
-    }
-    
-    protected function parseResponseHeaders(string $buffer): HttpResponse
-    {
-        $lines = \explode("\n", $buffer);
-        $m = null;
-        
-        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($lines[0]), $m)) {
-            throw new \RuntimeException('Invalid HTTP response line received');
-        }
-        
-        $version = $m[1];
-        $status = (int) $m[2];
-        $reason = \trim($m[3] ?? '');
-        $headers = [];
-        
-        for ($count = \count($lines), $i = 1; $i < $count; $i++) {
-            list ($k, $v) = \explode(':', $lines[$i], 2);
-            $k = \trim($k);
-            
-            $headers[$k][] = $v;
-        }
-        
-        $response = new HttpResponse($status, $headers, null, $version);
-        $response = $response->withReason($reason);
-        
-        return $response;
     }
 }

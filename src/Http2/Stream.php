@@ -105,6 +105,8 @@ class Stream implements Disposable
                     $request = $request->withAddedHeader(...$header);
                 }
             }
+            
+            $request = $request->withHeader('Host', $authority);
         } catch (\Throwable $e) {
             $this->close();
             
