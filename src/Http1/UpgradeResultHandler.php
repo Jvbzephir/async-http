@@ -19,7 +19,7 @@ use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\DuplexStream;
 
 /**
- * Contract for handlers that can upgrade an HTTP/1 connection to another protocol.
+ * Contract for handlers that can upgrade an HTTP/1 connection to another protocol based on a value returned from an HTTP handler.
  *
  * @author Martin Schröder
  */
@@ -28,26 +28,28 @@ interface UpgradeResultHandler
     /**
      * Check if the given result can be used to upgrade the HTTP connection to the given protocol.
      *
-     * @param string $protocol
-     * @param HttpRequest $request
-     * @param mixed $result
-     * @return bool
+     * @param string $protocol Name of the protocol the client wishes to enable.
+     * @param HttpRequest $request HTTP request being sent by the client.
+     * @param mixed $result Result returned by an HTTP handler.
+     * @return bool Return true if the connection can be upgraded by this handler.
      */
     public function isUpgradeSupported(string $protocol, HttpRequest $request, $result): bool;
-    
+
     /**
      * Create an HTTP/1 upgrade response that will be sent before switching protocol.
      *
-     * Passing data to the connection upgrade handling can make use of HTTP response attributes.
+     * Passing data to the connection upgrade method shoud use HTTP response attributes.
+     * 
+     * The driver will automatically set the status code to 101 and add an appropriate Connection header.
      *
-     * @param HttpRequest $request
-     * @param mixed $result
-     * @return HttpResponse
+     * @param HttpRequest $request HTTP request that triggered the connection upgrade.
+     * @param mixed $result The value returned by an HTTP handler that triggered the connection upgrade.
+     * @return HttpResponse An HTTP response to be sent to the client.
      */
     public function createUpgradeResponse(HttpRequest $request, $result): HttpResponse;
-    
+
     /**
-     * Take control of the given connection upgrading it to a different protocol.
+     * Take full control of the given connection upgrading it to a different protocol.
      *
      * @param Context $context Async execution context.
      * @param DuplexStream $stream The stream to be ugraded.

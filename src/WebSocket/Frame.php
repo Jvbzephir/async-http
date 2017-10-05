@@ -22,143 +22,103 @@ class Frame
 {
     /**
      * Frame that carries fragmented data belonging to the most-recent text or binary frame.
-     *
-     * @var int
      */
     public const CONTINUATION = 0x00;
     
     /**
      * Data frame that transfers a UTF-8 encoded text payload.
-     *
-     * @var int
      */
     public const TEXT = 0x01;
     
     /**
      * Data frame that transfers arbitrary binary data.
-     *
-     * @var int
      */
     public const BINARY = 0x02;
     
     /**
      * Control frame indicating that a connection is about to be closed.
-     *
-     * @var int
      */
     public const CONNECTION_CLOSE = 0x08;
     
     /**
      * Control frame that instructs a peer to replay with a pong frame.
-     *
-     * @var int
      */
     public const PING = 0x09;
     
     /**
      * Control frame that is received in response to a ping frame.
-     *
-     * @var int
      */
     public const PONG = 0x0A;
     
     /**
      * Finished bit that indicates the end of a message.
-     *
-     * @var int
      */
     public const FINISHED = 0b10000000;
     
     /**
      * Reserved bits to be used by extensions.
-     *
-     * @var int
      */
     public const RESERVED = 0b01110000;
     
     /**
      * Mask being used to access reserved bit 1.
-     *
-     * @var int
      */
     public const RESERVED1 = 0b01000000;
     
     /**
      * Mask being used to access reserved bit 2.
-     *
-     * @var int
      */
     public const RESERVED2 = 0b00100000;
     
     /**
      * Mask being used to access reserved bit 3.
-     *
-     * @var int
      */
     public const RESERVED3 = 0b00010000;
     
     /**
      * Mask being used to read the opcode of a frame.
-     *
-     * @var int
      */
     public const OPCODE = 0b00001111;
     
     /**
      * Masked bit being used to indicate a masked frame sent by a client.
-     *
-     * @var int
      */
     public const MASKED = 0b10000000;
     
     /**
      * Mask being used to read the first length byte.
-     *
-     * @var int
      */
     public const LENGTH = 0b01111111;
     
     /**
      * Indicates a normal closure, meaning that the purpose for which the connection was established has been fulfilled.
-     *
-     * @var int
      */
     public const NORMAL_CLOSURE = 1000;
     
     /**
      * Indicates that an endpoint is terminating the connection due to a protocol error.
-     *
-     * @var int
      */
     public const PROTOCOL_ERROR = 1002;
     
     /**
      * Indicates that an endpoint is terminating the connection because it has received data within a message that was not
      * consistent with the type of the message (e.g., non-UTF-8 data within a text message).
-     *
-     * @var int
      */
     public const INCONSISTENT_MESSAGE = 1007;
     
     /**
      * Indicates that an endpoint is terminating the connection because it has received a message that violates its policy.
-     *
-     * @var int
      */
     public const POLICY_VIOLATION = 1008;
     
     /**
      * Indicates that an endpoint is terminating the connection because it has received a message that is too big for it to process.
-     *
-     * @var int
      */
     public const MESSAGE_TOO_BIG = 1009;
     
     /**
      * Indicates that a server is terminating the connection because it encountered an unexpected condition that
      * prevented it from fulfilling the request.
-     *
-     * @var int
      */
     public const UNEXPECTED_CONDITION = 1011;
     

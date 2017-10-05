@@ -29,43 +29,31 @@ abstract class Http
 {
     /**
      * Format of DateTime fields in HTTP headers.
-     * 
-     * @var string
      */
     public const DATE_RFC1123 = 'D, d M Y H:i:s \G\M\T';
 
     /**
      * Format of expires directive in HTTP cookies.
-     * 
-     * @var string
      */
     public const DATE_COOKIE = 'D, d-M-Y H:i:s \G\M\T';
 
     /**
      * Default port used by HTTP connections.
-     * 
-     * @var int
      */
     public const PORT = 80;
 
     /**
      * Default port used by HTTPS connections.
-     * 
-     * @var int
      */
     public const PORT_SECURE = 443;
 
     /**
      * MIME type of a urlencoded form entity.
-     * 
-     * @var string
      */
     public const FORM_ENCODED = 'application/x-www-form-urlencoded';
 
     /**
      * MIME type of multipart encoded entity that may contain uploaded files.
-     * 
-     * @var string
      */
     public const FORM_MULTIPART_ENCODED = 'multipart/form-data';
 
@@ -76,8 +64,6 @@ abstract class Http
      * used for obtaining metainformation about the entity implied by the request without transferring
      * the entity-body itself. This method is often used for testing hypertext links for
      * validity, accessibility, and recent modification.
-     * 
-     * @var string
      */
     public const HEAD = 'HEAD';
 
@@ -86,16 +72,12 @@ abstract class Http
      * by the Request-URI. If the Request-URI refers to a data-producing process, it is the produced
      * data which shall be returned as the entity in the response and not the source text of the
      * process, unless that text happens to be the output of the process.
-     * 
-     * @var string
      */
     public const GET = 'GET';
 
     /**
      * The POST method is used to request that the origin server accept the entity enclosed in the
      * request as a new subordinate of the resource identified by the Request-URI in the Request-Line.
-     * 
-     * @var string
      */
     public const POST = 'POST';
 
@@ -112,8 +94,6 @@ abstract class Http
      * given that reflects the nature of the problem. The recipient of the entity MUST NOT ignore any
      * Content-* (e.g. Content-Range) headers that it does not understand or implement and MUST return
      * a 501 (Not Implemented) response in such cases.
-     * 
-     * @var string
      */
     public const PUT = 'PUT';
 
@@ -124,8 +104,6 @@ abstract class Http
      * if the status code returned from the origin server indicates that the action has been completed
      * successfully. However, the server SHOULD NOT indicate success unless, at the time the response
      * is given, it intends to delete the resource or move it to an inaccessible location.
-     * 
-     * @var string
      */
     public const DELETE = 'DELETE';
 
@@ -135,8 +113,6 @@ abstract class Http
      * client as the entity-body of a 200 (OK) response. The final recipient is either the origin
      * server or the first proxy or gateway to receive a Max-Forwards value of zero (0) in the request
      * (see section 14.31). A TRACE request MUST NOT include an entity.
-     * 
-     * @var string
      */
     public const TRACE = 'TRACE';
 
@@ -145,16 +121,12 @@ abstract class Http
      * available on the request/response chain identified by the Request-URI. This method allows
      * the client to determine the options and/or requirements associated with a resource, or the
      * capabilities of a server, without implying a resource action or initiating a resource retrieval.
-     * 
-     * @var string
      */
     public const OPTIONS = 'OPTIONS';
 
     /**
      * This specification reserves the method name CONNECT for use with a proxy that can dynamically
      * switch to being a tunnel (e.g. SSL tunneling).
-     * 
-     * @var string
      */
     public const CONNECT = 'CONNECT';
 
@@ -164,8 +136,6 @@ abstract class Http
      * a "patch document" identified by a media type.  If the Request-URI does not point to an existing
      * resource, the server MAY create a new resource, depending on the patch document type (whether it
      * can logically modify a null resource) and permissions, etc.
-     * 
-     * @var string
      */
     public const PATCH = 'PATCH';
 
@@ -177,8 +147,6 @@ abstract class Http
      * this response. The server MUST send a final response after the request has been
      * completed. See section 8.2.3 for detailed discussion of the use and handling
      * of this status code.
-     * 
-     * @var int
      */
     public const CONTINUE = 100;
 
@@ -188,16 +156,12 @@ abstract class Http
      * protocol being used on this connection. The server will switch protocols to those
      * defined by the response's Upgrade header field immediately after the empty line
      * which terminates the 101 response.
-     * 
-     * @var int
      */
     public const SWITCHING_PROTOCOLS = 101;
 
     /**
      * The request has succeeded. The information returned with the response is dependent
      * on the method used in the request.
-     * 
-     * @var int
      */
     public const OK = 200;
 
@@ -210,8 +174,6 @@ abstract class Http
      * specified by the media type given in the Content-Type header field. The origin server
      * MUST create the resource before returning the 201 status code. If the action cannot be
      * carried out immediately, the server SHOULD respond with 202 (Accepted) response instead.
-     * 
-     * @var int
      */
     public const CREATED = 201;
 
@@ -220,8 +182,6 @@ abstract class Http
      * The request might or might not eventually be acted upon, as it might be disallowed when
      * processing actually takes place. There is no facility for re-sending a status code from an
      * asynchronous operation such as this.
-     * 
-     * @var int
      */
     public const ACCEPTED = 202;
 
@@ -232,8 +192,6 @@ abstract class Http
      * information about the resource might result in a superset of the metainformation known by the
      * origin server. Use of this response code is not required and is only appropriate when the
      * response would otherwise be 200 (OK).
-     * 
-     * @var int
      */
     public const NON_AUTHORITATIVE_INFORMATION = 203;
 
@@ -241,8 +199,6 @@ abstract class Http
      * The server has fulfilled the request but does not need to return an entity-body, and might
      * want to return updated metainformation. The response MAY include new or updated metainformation
      * in the form of entity-headers, which if present SHOULD be associated with the requested variant.
-     * 
-     * @var int
      */
     public const NO_CONTENT = 204;
 
@@ -251,8 +207,6 @@ abstract class Http
      * caused the request to be sent. This response is primarily intended to allow input for actions
      * to take place via user input, followed by a clearing of the form in which the input is given so
      * that the user can easily initiate another input action. The response MUST NOT include an entity.
-     * 
-     * @var int
      */
     public const RESET_CONTENT = 205;
 
@@ -260,8 +214,6 @@ abstract class Http
      * The server has fulfilled the partial GET request for the resource. The request MUST have
      * included a Range header field (section 14.35) indicating the desired range, and MAY have
      * included an If-Range header field (section 14.27) to make the request conditional.
-     * 
-     * @var int
      */
     public const PARTIAL_CONTENT = 206;
 
@@ -270,8 +222,6 @@ abstract class Http
      * specific location, and agent- driven negotiation information (section 12) is being provided so
      * that the user (or user agent) can select a preferred representation and redirect its request to
      * that location.
-     * 
-     * @var int
      */
     public const MULTIPLE_CHOICES = 300;
 
@@ -281,8 +231,6 @@ abstract class Http
      * ought to automatically re-link references to the Request-URI to one or more of the new
      * references returned by the server, where possible. This response is cacheable unless
      * indicated otherwise.
-     * 
-     * @var int
      */
     public const MOVED_PERMANENTLY = 301;
 
@@ -290,8 +238,6 @@ abstract class Http
      * The requested resource resides temporarily under a different URI. Since the redirection
      * might be altered on occasion, the client SHOULD continue to use the Request-URI for future
      * requests. This response is only cacheable if indicated by a Cache-Control or Expires header field.
-     * 
-     * @var int
      */
     public const FOUND = 302;
 
@@ -301,8 +247,6 @@ abstract class Http
      * POST-activated script to redirect the user agent to a selected resource. The new URI is not
      * a substitute reference for the originally requested resource. The 303 response MUST NOT be
      * cached, but the response to the second (redirected) request might be cacheable.
-     * 
-     * @var int
      */
     public const SEE_OTHER = 303;
 
@@ -311,8 +255,6 @@ abstract class Http
      * has not been modified, the server SHOULD respond with this status code. The 304 response MUST
      * NOT contain a message-body, and thus is always terminated by the first empty line after the
      * header fields.
-     * 
-     * @var int
      */
     public const NOT_MODIFIED = 304;
 
@@ -320,8 +262,6 @@ abstract class Http
      * The requested resource MUST be accessed through the proxy given by the Location field.
      * The Location field gives the URI of the proxy. The recipient is expected to repeat this
      * single request via the proxy. 305 responses MUST only be generated by origin servers.
-     * 
-     * @var int
      */
     public const USE_PROXY = 305;
 
@@ -330,8 +270,6 @@ abstract class Http
      * MAY be altered on occasion, the client SHOULD continue to use the Request-URI for future
      * requests. This response is only cacheable if indicated by a Cache-Control or Expires
      * header field.
-     * 
-     * @var int
      */
     public const TEMPORARY_REDIRECT = 307;
     
@@ -339,16 +277,12 @@ abstract class Http
      * The request and all future requests should be repeated using another URI. 307 and 308 parallel the
      * behaviors of 302 and 301, but do not allow the HTTP method to change. So, for example, submitting
      * a form to a permanently redirected resource may continue smoothly.
-     * 
-     * @var int
      */
     public const PERMANENT_REDIRECT = 308;
 
     /**
      * The request could not be understood by the server due to malformed syntax. The client
-     * SHOULD NOT repeat the request without modifications. 
-     * 
-     * @var int
+     * SHOULD NOT repeat the request without modifications.
      */
     public const BAD_REQUEST = 400;
 
@@ -362,15 +296,11 @@ abstract class Http
      * at least once, then the user SHOULD be presented the entity that was given in the
      * response, since that entity might include relevant diagnostic information. HTTP access
      * authentication is explained in "HTTP Authentication: Basic and Digest Access Authentication".
-     * 
-     * @var int
      */
     public const UNAUTHORIZED = 401;
 
     /**
      * This code is reserved for future use.
-     * 
-     * @var int
      */
     public const PAYMENT_REQUIRED = 402;
 
@@ -380,8 +310,6 @@ abstract class Http
      * server wishes to make public why the request has not been fulfilled, it SHOULD describe the
      * reason for the refusal in the entity. If the server does not wish to make this information
      * available to the client, the status code 404 (Not Found) can be used instead.
-     * 
-     * @var int
      */
     public const FORBIDDEN = 403;
 
@@ -392,8 +320,6 @@ abstract class Http
      * is permanently unavailable and has no forwarding address. This status code is commonly used
      * when the server does not wish to reveal exactly why the request has been refused, or when
      * no other response is applicable.
-     * 
-     * @var int
      */
     public const NOT_FOUND = 404;
 
@@ -401,16 +327,12 @@ abstract class Http
      * The method specified in the Request-Line is not allowed for the resource identified by the
      * Request-URI. The response MUST include an Allow header containing a list of valid methods
      * for the requested resource.
-     * 
-     * @var int
      */
     public const METHOD_NOT_ALLOWED = 405;
 
     /**
      * The resource identified by the request is only capable of generating response entities which
      * have content characteristics not acceptable according to the accept headers sent in the request.
-     * 
-     * @var int
      */
     public const NOT_ACCEPTABLE = 406;
 
@@ -429,8 +351,6 @@ abstract class Http
     /**
      * The client did not produce a request within the time that the server was prepared to
      * wait. The client MAY repeat the request without modifications at any later time.
-     * 
-     * @var int
      */
     public const REQUEST_TIMEOUT = 408;
 
@@ -441,8 +361,6 @@ abstract class Http
      * information for the user to recognize the source of the conflict. Ideally, the response
      * entity would include enough information for the user or user agent to fix the problem;
      * however, that might not be possible and is not required.
-     * 
-     * @var int
      */
     public const CONFLICT = 409;
 
@@ -453,8 +371,6 @@ abstract class Http
      * does not know, or has no facility to determine, whether or not the condition is
      * permanent, the status code 404 (Not Found) SHOULD be used instead. This response is
      * cacheable unless indicated otherwise.
-     * 
-     * @var int
      */
     public const GONE = 410;
 
@@ -462,8 +378,6 @@ abstract class Http
      * The server refuses to accept the request without a defined Content-Length. The client
      * MAY repeat the request if it adds a valid Content-Length header field containing the length
      * of the message-body in the request message.
-     * 
-     * @var int
      */
     public const LENGTH_REQUIRED = 411;
 
@@ -472,8 +386,6 @@ abstract class Http
      * it was tested on the server. This response code allows the client to place preconditions on
      * the current resource metainformation (header field data) and thus prevent the requested method
      * from being applied to a resource other than the one intended.
-     * 
-     * @var int
      */
     public const PRECONDITION_FAILED = 412;
 
@@ -481,8 +393,6 @@ abstract class Http
      * The server is refusing to process a request because the request entity is larger than the
      * server is willing or able to process. The server MAY close the connection to prevent the
      * client from continuing the request.
-     * 
-     * @var int
      */
     public const PAYLOAD_TOO_LARGE = 413;
 
@@ -494,16 +404,12 @@ abstract class Http
      * that points to a suffix of itself), or when the server is under attack by a client attempting
      * to exploit security holes present in some servers using fixed-length buffers for reading or
      * manipulating the Request-URI.
-     * 
-     * @var int
      */
     public const REQUEST_URI_TOO_LONG = 414;
 
     /**
      * The server is refusing to service the request because the entity of the request is in a format
      * not supported by the requested resource for the requested method.
-     * 
-     * @var int
      */
     public const UNSUPPORTED_MEDIA_TYPE = 415;
 
@@ -513,8 +419,6 @@ abstract class Http
      * overlap the current extent of the selected resource, and the request did not include an
      * If-Range request-header field. (For byte-ranges, this means that the first- byte-pos of all
      * of the byte-range-spec values were greater than the current length of the selected resource.)
-     * 
-     * @var int
      */
     public const REQUEST_RANGE_NOT_SATISFIABLE = 416;
 
@@ -522,22 +426,16 @@ abstract class Http
      * The expectation given in an Expect request-header field (see section 14.20) could not be met
      * by this server, or, if the server is a proxy, the server has unambiguous evidence that the
      * request could not be met by the next-hop server.
-     * 
-     * @var int
      */
     public const EXPECTATION_FAILED = 417;
     
     /**
      * The request was directed at a server that is not able to produce a response (for example because a connection reuse).
-     * 
-     * @var int
      */
     public const MISDIRECTED_REQUEST = 421;
     
     /**
      * The client should switch to a different protocol such as TLS/1.0, given in the Upgrade header field.
-     * 
-     * @var int
      */
     public const UPGRADE_REQUIRED = 426;
 
@@ -549,8 +447,6 @@ abstract class Http
      * clients are working with the correct copies.
      * 
      * @link http://tools.ietf.org/html/rfc6585
-     * 
-     * @var int
      */
     public const PRECONDITION_REQUIRED = 428;
 
@@ -561,8 +457,6 @@ abstract class Http
      * making a new request.
      * 
      * @link http://tools.ietf.org/html/rfc6585
-     * 
-     * @var int
      */
     public const TOO_MANY_REQUESTS = 429;
 
@@ -574,15 +468,11 @@ abstract class Http
      * specify which header field was too large.
      * 
      * @link http://tools.ietf.org/html/rfc6585
-     * 
-     * @var int
      */
     public const REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
 
     /**
      * The server encountered an unexpected condition which prevented it from fulfilling the request.
-     * 
-     * @var int
      */
     public const INTERNAL_SERVER_ERROR = 500;
 
@@ -590,16 +480,12 @@ abstract class Http
      * The server does not support the functionality required to fulfill the request. This is the
      * appropriate response when the server does not recognize the request method and is not capable
      * of supporting it for any resource.
-     * 
-     * @var int
      */
     public const NOT_IMPLEMENTED = 501;
 
     /**
      * The server, while acting as a gateway or proxy, received an invalid response from the
      * upstream server it accessed in attempting to fulfill the request.
-     * 
-     * @var int
      */
     public const BAD_GATEWAY = 502;
 
@@ -609,8 +495,6 @@ abstract class Http
      * will be alleviated after some delay. If known, the length of the delay MAY be indicated in
      * a Retry-After header. If no Retry-After is given, the client SHOULD handle the response as
      * it would for a 500 response.
-     * 
-     * @var int
      */
     public const SERVICE_UNAVAILABLE = 503;
 
@@ -618,8 +502,6 @@ abstract class Http
      * The server, while acting as a gateway or proxy, did not receive a timely response from the
      * upstream server specified by the URI (e.g. HTTP, FTP, LDAP) or some other auxiliary
      * server (e.g. DNS) it needed to access in attempting to complete the request.
-     * 
-     * @var int
      */
     public const GATEWAY_TIMEOUT = 504;
 
@@ -630,8 +512,6 @@ abstract class Http
      * section 3.1, other than with this error message. The response SHOULD contain an entity
      * describing why that version is not supported and what other protocols are supported by
      * that server.
-     * 
-     * @var int
      */
     public const HTTP_VERSION_NOT_SUPPORTED = 505;
 
@@ -641,15 +521,11 @@ abstract class Http
      * itself, and is therefore not a proper end point in the negotiation process.
      * 
      * @link http://tools.ietf.org/html/rfc2295
-     * 
-     * @var int
      */
     public const VARIANT_ALSO_NEGOTIATES = 506;
 
     /**
      * This status code, while used by many servers, is not specified in any RFCs.
-     * 
-     * @var int
      */
     public const BANDWIDTH_LIMIT_EXCEEDED = 509;
 
@@ -659,8 +535,6 @@ abstract class Http
      * is outside the scope of this specification to specify how the extensions inform the client.
      * 
      * @link http://tools.ietf.org/html/rfc2774
-     * 
-     * @var int
      */
     public const NOT_EXTENDED = 510;
 
@@ -672,8 +546,6 @@ abstract class Http
      * with the originally requested URL, which may cause confusion.
      * 
      * @link http://tools.ietf.org/html/rfc6585
-     * 
-     * @var int
      */
     public const NETWORK_AUTHENTICATION_REQUIRED = 511;
 

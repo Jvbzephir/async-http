@@ -31,15 +31,11 @@ class Connection implements InputChannel
     
     /**
      * Connection preface that must be sent by clients.
-     *
-     * @var string
      */
     public const PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     
     /**
      * Connection preface HTTP body that is sent by clients.
-     *
-     * @var string
      */
     public const PREFACE_BODY = "SM\r\n\r\n";
 

@@ -101,19 +101,23 @@ class MessageReader implements Disposable
             throw new ConnectionException('Text frame received where continuation frame was expected', Frame::PROTOCOL_ERROR);
         }
         
+        if ($this->deflate && $frame->reserved & Frame::RESERVED1) {
+            if ($frame->finished) {
+                $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
+            } else {
+                $frame->data = \inflate_add($this->compression, $frame->data, \ZLIB_SYNC_FLUSH);
+                $this->compressed = true;
+            }
+        }
+        
         if (\strlen($frame->data) > $this->maxSize) {
             throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
         }
         
         if (!$frame->finished) {
             $this->buffer = $frame->data;
-            $this->compressed = $this->deflate && (($frame->reserved & Frame::RESERVED1) ? true : false);
             
             return null;
-        }
-        
-        if ($this->deflate && $frame->reserved & Frame::RESERVED1) {
-            $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
         }
         
         if (!\preg_match('//u', $frame->data)) {
@@ -127,10 +131,6 @@ class MessageReader implements Disposable
     {
         if ($this->buffer !== null) {
             throw new ConnectionException('Binary frame received where continuation frame was expected', Frame::PROTOCOL_ERROR);
-        }
-        
-        if (\strlen($frame->data) > $this->maxSize) {
-            throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
         }
         
         if ($this->deflate && $frame->reserved & Frame::RESERVED1) {
@@ -159,19 +159,15 @@ class MessageReader implements Disposable
             throw new ConnectionException('', Frame::PROTOCOL_ERROR);
         }
         
-        if ((\strlen($this->buffer) + \strlen($frame->data)) > $this->maxSize) {
-            throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
+        if ($this->compressed) {
+            if ($frame->finished) {
+                $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
+            } else {
+                $frame->data = \inflate_add($this->compression, $frame->data, \ZLIB_SYNC_FLUSH);
+            }
         }
         
         if ($this->buffer instanceof Channel) {
-            if ($this->compressed) {
-                if ($frame->finished) {
-                    $frame->data = \inflate_add($this->compression, $frame->data . "\x00\x00\xFF\xFF", $this->flushMode);
-                } else {
-                    $frame->data = \inflate_add($this->compression, $frame->data, \ZLIB_SYNC_FLUSH);
-                }
-            }
-            
             if (!$this->buffer->isClosed()) {
                 try {
                     yield $this->buffer->send($context, $frame->data);
@@ -191,24 +187,22 @@ class MessageReader implements Disposable
             return;
         }
         
+        if ((\strlen($this->buffer) + \strlen($frame->data)) > $this->maxSize) {
+            throw new ConnectionException(\sprintf('Maximum text message size of %u bytes exceeded', $this->maxSize), Frame::MESSAGE_TOO_BIG);
+        }
+        
         $this->buffer .= $frame->data;
         
-        if (!$frame->finished) {
-            return;
-        }
-        
-        if ($this->compressed) {
-            $this->buffer = \inflate_add($this->compressionContext, $this->buffer . "\x00\x00\xFF\xFF", $this->flushMode);
-        }
-        
-        if (!\preg_match('//u', $this->buffer)) {
-            throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
-        }
-        
-        try {
-            return $this->buffer;
-        } finally {
-            $this->buffer = null;
+        if ($frame->finished) {
+            if (!\preg_match('//u', $this->buffer)) {
+                throw new ConnectionException('Text message contains invalid UTF-8 data', Frame::INCONSISTENT_MESSAGE);
+            }
+            
+            try {
+                return $this->buffer;
+            } finally {
+                $this->buffer = null;
+            }
         }
     }
 }

@@ -19,7 +19,7 @@ use KoolKode\Async\Http\Http1\Http1Driver;
 use KoolKode\Async\Http\WebSocket\Connection;
 use KoolKode\Async\Http\WebSocket\WebSocketClient;
 use KoolKode\Async\Http\WebSocket\WebSocketEndpoint;
-use KoolKode\Async\Http\WebSocket\WebSocketHandler;
+use KoolKode\Async\Http\WebSocket\WebSocketServer;
 use KoolKode\Async\Log\PipeLogHandler;
 
 error_reporting(-1);
@@ -32,11 +32,9 @@ $factory->registerLogger(new PipeLogHandler());
 
 $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
-    $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)));
+    $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)), true);
     
-    $server = new HttpEndpoint(new Http1Driver([
-        new WebSocketHandler()
-    ]));
+    $server = new HttpEndpoint((new Http1Driver())->withUpgradeResultHandler(new WebSocketServer(true)));
     
     $server = $server->withAddress('tcp://127.0.0.1:8080');
     

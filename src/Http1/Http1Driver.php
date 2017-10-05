@@ -26,11 +26,14 @@ use KoolKode\Async\Stream\ReadableMemoryStream;
 
 class Http1Driver implements HttpDriver
 {
-    protected $upgradeResultHandlers;
+    protected $upgradeResultHandlers = [];
     
-    public function __construct(array $upgradeHandlers = [])
+    public function withUpgradeResultHandler(UpgradeResultHandler $handler): self
     {
-        $this->upgradeResultHandlers = $upgradeHandlers;
+        $driver = clone $this;
+        $driver->upgradeResultHandlers[] = $handler;
+        
+        return $driver;
     }
     
     /**

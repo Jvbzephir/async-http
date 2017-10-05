@@ -22,9 +22,14 @@ use KoolKode\Async\Http\Http1\UpgradeResultHandler;
 use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStream;
 
-class WebSocketHandler implements UpgradeResultHandler
+class WebSocketServer implements UpgradeResultHandler
 {
-    protected $deflateSupported = false;
+    protected $deflateSupported;
+    
+    public function __construct(bool $deflateSupported = false)
+    {
+        $this->deflateSupported = $deflateSupported;
+    }
     
     /**
      * {@inheritdoc}
@@ -85,11 +90,9 @@ class WebSocketHandler implements UpgradeResultHandler
             throw new \InvalidArgumentException('No endpoint object passed to WebSocket handler');
         }
         
-        $conn = new Connection($context, false, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'));
+        $deflate = $response->getAttribute(PerMessageDeflate::class);
         
-        if ($deflate = $response->getAttribute(PerMessageDeflate::class)) {
-            $conn->enablePerMessageDeflate($deflate);
-        }
+        $conn = new Connection($context, false, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
         
         try {
             $endpoint->onOpen($conn);
@@ -134,6 +137,39 @@ class WebSocketHandler implements UpgradeResultHandler
             throw new StatusException(Http::BAD_REQUEST, 'Secure websocket version 13 required', [
                 'Sec-Websocket-Version' => '13'
             ]);
+        }
+    }
+
+    /**
+     * Negotiate permessage-deflate WebSocket extensio if supported by the clientn.
+     *
+     * @param HttpRequest $request
+     * @return PerMessageDeflate Or null when not supported by client / server or invalid window sizes are specified.
+     */
+    protected function negotiatePerMessageDeflate(HttpRequest $request): ?PerMessageDeflate
+    {
+        static $zlib;
+        
+        $extension = null;
+        
+        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+            foreach ($request->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
+                if (\strtolower($ext->getValue()) === 'permessage-deflate') {
+                    $extension = $ext;
+                    
+                    break;
+                }
+            }
+        }
+        
+        if ($extension === null) {
+            return null;
+        }
+        
+        try {
+            return PerMessageDeflate::fromHeaderToken($extension);
+        } catch (\OutOfRangeException $e) {
+            return null;
         }
     }
 }

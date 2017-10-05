@@ -13,7 +13,6 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
-use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Channel\Channel;
@@ -33,8 +32,6 @@ class Connection implements InputChannel
 {
     /**
      * WebSocket GUID needed during handshake.
-     *
-     * @var string
      */
     public const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     
@@ -86,20 +83,32 @@ class Connection implements InputChannel
     
     protected $reader;
     
+    protected $deflate;
+    
+    protected $compression;
+    
+    protected $flushMode;
+    
     protected $messages;
     
     protected $cancel;
     
     protected $background;
     
-    public function __construct(Context $context, bool $client = true, DuplexStream $stream, string $protocol = '')
+    public function __construct(Context $context, bool $client = true, DuplexStream $stream, string $protocol = '', ?PerMessageDeflate $deflate = null)
     {
         $this->client = $client;
         $this->stream = $stream;
         $this->protocol = $protocol;
         
-        $this->reader = new MessageReader($this->maxTextMessageSize);
+        $this->reader = new MessageReader($this->maxTextMessageSize, $deflate);
         $this->messages = new Channel();
+        
+        if ($deflate) {
+            $this->deflate = $deflate;
+            $this->compression = $deflate->getCompressionContext();
+            $this->flushMode = $deflate->getCompressionFlushMode();
+        }
         
         $context = $context->background();
         $context = $context->cancellable($this->cancel = $context->cancellationHandler());
@@ -147,17 +156,31 @@ class Connection implements InputChannel
         
         return $this->executor->submit($context, function (Context $context) use ($text) {
             $type = Frame::TEXT;
+            $reserved = $this->deflate ? Frame::RESERVED1 : 0;
             $len = 0;
             
             $chunks = \str_split($text, 8192);
             
             for ($size = \count($chunks) - 1, $i = 0; $i < $size; $i++) {
-                $len += yield $this->writeFrame($context, new Frame($type, $chunks[$i], false));
+                if ($this->deflate) {
+                    $chunks[$i] = \deflate_add($this->compression, $chunks[$i], \ZLIB_SYNC_FLUSH);
+                }
                 
+                $len += yield $this->writeFrame($context, new Frame($type, $chunks[$i], false, $reserved));
                 $type = Frame::CONTINUATION;
+                
+                if ($reserved) {
+                    $reserved = 0;
+                }
             }
             
-            return $len + yield $this->writeFrame($context, new Frame($type, $chunks[$i]));
+            if ($this->deflate) {
+                $chunks = \substr(\deflate_add($this->compression, $chunks[$i], $this->flushMode), 0, -4);
+            } else {
+                $chunks = $chunks[$i];
+            }
+            
+            return $len + yield $this->writeFrame($context, new Frame($type, $chunks, true, $reserved));
         }, $priority);
     }
     
@@ -172,20 +195,37 @@ class Connection implements InputChannel
     {
         return $this->executor->submit(function (Context $context) use ($stream) {
             $type = Frame::BINARY;
+            $reserved = $this->deflate ? Frame::RESERVED1 : 0;
             $len = 0;
             
             try {
                 $chunk = yield $stream->readBuffer($context, 8192);
                 
+                if ($chunk === null) {
+                    return $len;
+                }
+                
                 while (null !== ($next = yield $stream->readBuffer($context, 8192))) {
-                    $len += yield $this->writeFrame($context, new Frame($type, $chunk, false));
+                    if ($this->deflate) {
+                        $chunk = \deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH);
+                    }
+                    
+                    $len += yield $this->writeFrame($context, new Frame($type, $chunk, false, $reserved));
                     
                     $chunk = $next;
                     $type = Frame::CONTINUATION;
+                    
+                    if ($reserved) {
+                        $reserved = 0;
+                    }
                 }
                 
                 if ($chunk !== null) {
-                    $len += yield $this->writeFrame($context, new Frame($type, $chunk));
+                    if ($this->deflate) {
+                        $chunk = \substr(\deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH), 0, -4);
+                    }
+                    
+                    $len += yield $this->writeFrame($context, new Frame($type, $chunk, true, $reserved));
                 }
             } finally {
                 $stream->close();
@@ -229,7 +269,9 @@ class Connection implements InputChannel
                         $message = yield from $this->reader->appendContinuationFrame($context, $frame);
                         break;
                     case Frame::PING:
-                        $this->executor->submit($context, $this->writeFrame($context, new Frame(Frame::PONG, $frame->data), 1000));
+                        $this->executor->submit($context, function (Context $context, $frame) {
+                            return yield $this->writeFrame($context, new Frame(Frame::PONG, $frame->data));
+                        }, 100);
                         break;
                     case Frame::PONG:
                         // TODO: Re-implement pings...
@@ -242,11 +284,21 @@ class Connection implements InputChannel
                     yield $this->messages->send($context, $message);
                 }
             }
-        } catch (CancellationException $e) {
-            $this->stream->close($e);
-            $this->reader->close($e);
-            $this->messages->close($e);
+        } catch (ConnectionException $e) {
+            if ($e->getCode() !== Frame::CONNECTION_CLOSE) {
+                try {
+                    yield $this->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $e->getCode())));
+                } catch (\Throwable $ex) {
+                    // Ignore this error.
+                }
+            }
+        } catch (\Throwable $e) {
+            // Forward error to close operations.
         }
+        
+        $this->stream->close($e);
+        $this->reader->close($e);
+        $this->messages->close($e);
     }
     
     /**

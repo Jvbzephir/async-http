@@ -31,9 +31,9 @@ class WebSocketClient
     /**
      * Enable permessage-deflate WebSocket extension?
      *
-     * @var string
+     * @var bool
      */
-    protected $deflateSupported = false;
+    protected $deflateSupported;
     
     /**
      * HTTP client being used to perform the initial handshake.
@@ -102,15 +102,13 @@ class WebSocketClient
                 }
             }
             
-            $conn = new Connection($context, true, $upgrade->stream, $response->getHeaderLine('Sec-WebSocket-Protocol'));
+            $deflate = $this->negotiatePerMessageDeflate($response);
             
-            if ($deflate = $this->negotiatePerMessageDeflate($response)) {
-                if (!$this->deflateSupported) {
-                    throw new \RuntimeException('Server enabled permessage-deflate but client does not support the extension');
-                }
-                
-                $conn->enablePerMessageDeflate($deflate);
+            if ($deflate && !$this->deflateSupported) {
+                throw new \RuntimeException('Server enabled permessage-deflate but client does not support the extension');
             }
+            
+            $conn = new Connection($context, true, $upgrade->stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
         } catch (\Throwable $e) {
             $upgrade->stream->close($e);
             
