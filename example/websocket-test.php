@@ -60,7 +60,7 @@ $factory->createContext()->run(function (Context $context) {
         yield $server->listen($context);
     }));
     
-    $conn = yield $client->connect($context, 'http://localhost:8080/websocket');
+    $conn = yield $client->connect($context, 'ws://localhost:8080/websocket');
     
     try {
         yield $conn->sendText($context, 'Hello World :)');

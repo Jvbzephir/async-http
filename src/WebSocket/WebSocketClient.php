@@ -52,16 +52,38 @@ class WebSocketClient
         $this->httpClient = $httpClient;
         $this->deflateSupported = $deflateSupported;
     }
-    
+
     /**
      * Connect to the given WebSocket endpoint.
      *
+     * @param Context $context Async execution context.
      * @param string $uri WebSocket ws(s):// or http(s):// URL.
      * @param array $protocols Optional application protocols to be advertised to the remote endpoint.
-     * @return Connection
+     * @return Connection WebSocket connection.
+     * 
+     * @throws \InvalidArgumentException When an invalid WebSocket URL is given.
      */
     public function connect(Context $context, string $uri, array $protocols = []): Promise
     {
+        $m = null;
+        
+        if (!\preg_match("'^([^:]+)://(.+)$'", $uri, $m)) {
+            throw new \InvalidArgumentException(\sprintf('Invalid WebSocket URL: "%s"', $uri));
+        }
+        
+        switch (\strtolower($m[1])) {
+            case 'ws':
+            case 'http':
+                $uri = 'http://' . $m[2];
+                break;
+            case 'wss':
+            case 'https':
+                $uri = 'https://' . $m[2];
+                break;
+            default:
+                throw new \InvalidArgumentException(\sprintf('Protocol "%s" is not supported in WebSocket client', $m[1]));
+        }
+        
         return $context->task($this->connectTask($context, $uri, $protocols));
     }
     
@@ -70,13 +92,6 @@ class WebSocketClient
      */
     protected function connectTask(Context $context, string $uri, array $protocols): \Generator
     {
-        $location = $uri;
-        $m = null;
-        
-        if (\preg_match("'^(wss?)://.+$'i", $uri, $m)) {
-            $uri = ((\strtolower($m[1]) === 'ws') ? 'http' : 'https') . \substr($m[0], \strlen($m[1]));
-        }
-        
         $nonce = \base64_encode(\random_bytes(16));
         $request = $this->createHandshakeRequest($uri, $nonce, $protocols);
         

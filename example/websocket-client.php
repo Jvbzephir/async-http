@@ -30,7 +30,7 @@ $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
     $client = new WebSocketClient(new HttpClient(new Http1Connector($manager)));
     
-    $conn = yield $client->connect($context, 'https://echo.websocket.org/');
+    $conn = yield $client->connect($context, 'wss://echo.websocket.org/');
     
     try {
         yield $conn->sendText($context, 'Hello World :)');

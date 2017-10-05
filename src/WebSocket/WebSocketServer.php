@@ -118,7 +118,7 @@ class WebSocketServer implements UpgradeResultHandler
     /**
      * Assert that the given HTTP request can be upgraded to the WebSocket protocol.
      */
-    protected function assertUpgradePossible(HttpRequest $request)
+    protected function assertUpgradePossible(HttpRequest $request): void
     {
         if ($request->getMethod() !== Http::GET) {
             throw new StatusException(Http::METHOD_NOT_ALLOWED, 'WebSocket upgrade requires an HTTP GET request', [
