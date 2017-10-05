@@ -29,6 +29,8 @@ class Stream implements Disposable
 {
     protected $id;
     
+    protected $closed = false;
+    
     protected $connection;
     
     protected $hpack;
@@ -68,7 +70,10 @@ class Stream implements Disposable
             $this->outputDefer->fail(new StreamClosedException('Stream has been closed', 0, $e));
         }
         
-        $this->connection->closeStream($this->id);
+        if (!$this->closed) {
+            $this->closed = true;
+            $this->connection->closeStream($this->id, true);
+        }
     }
     
     public function prepareForReceive(Context $context): void
@@ -151,7 +156,7 @@ class Stream implements Disposable
                 }
             }
         } catch (\Throwable $e) {
-            $this->close();
+            $this->close($e);
             
             throw $e;
         }
@@ -180,7 +185,11 @@ class Stream implements Disposable
             }
         } catch (\Throwable $e) {
             $this->close($e);
+            
+            throw $e;
         }
+        
+        $this->close();
     }
     
     protected function getFirstHeader(string $name, array $headers, string $default = ''): string
@@ -259,8 +268,6 @@ class Stream implements Disposable
     protected function sendBody(Context $context, ReadableStream $body): \Generator
     {
         $chunkSize = 8192;
-        
-        $done = false;
         $sent = 0;
         
         try {
@@ -281,22 +288,13 @@ class Stream implements Disposable
                     yield $this->connection->waitForWindowUpdate();
                 }
                 
-                if ($len < $chunkSize) {
-                    $done = true;
-                    $frame = new Frame(Frame::DATA, $this->id, $chunk, Frame::END_STREAM);
-                } else {
-                    $frame = new Frame(Frame::DATA, $this->id, $chunk);
-                }
-                
-                $written = yield $this->stream->writeFrame($context, $frame);
+                $written = yield $this->stream->writeFrame($context, new Frame(Frame::DATA, $this->id, $chunk));
                 
                 $sent += $written;
                 $this->outputWindow -= $written;
             }
             
-            if (!$done) {
-                yield $this->stream->writeFrame($context, new Frame(Frame::DATA, $this->id, '', Frame::END_STREAM));
-            }
+            yield $this->stream->writeFrame($context, new Frame(Frame::DATA, $this->id, '', Frame::END_STREAM));
         } finally {
             $body->close();
         }
@@ -317,6 +315,10 @@ class Stream implements Disposable
         if ($frame->flags & Frame::END_HEADERS) {
             if ($frame->flags & Frame::END_STREAM) {
                 $this->entity->finish();
+                
+                if (!$this->connection->isServer()) {
+                    $this->closed = true;
+                }
             }
             
             try {
@@ -346,6 +348,10 @@ class Stream implements Disposable
         
         if ($frame->flags & Frame::END_STREAM) {
             $this->entity->finish();
+            
+            if (!$this->connection->isServer()) {
+                $this->closed = true;
+            }
         }
     }
 

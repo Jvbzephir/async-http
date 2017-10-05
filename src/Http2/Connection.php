@@ -108,15 +108,23 @@ class Connection implements InputChannel
         if ($this->outputDefer) {
             $this->outputDefer->fail(new StreamClosedException('Connection has been closed', 0, $e));
         }
+        
+        foreach ($this->streams as $stream) {
+            $stream->close($e);
+        }
     }
-    
-    public function closeStream(int $id): void
+
+    public function closeStream(int $id, bool $sendEnd = false): void
     {
         if (isset($this->streams[$id])) {
             unset($this->streams[$id]);
         }
+        
+        if ($sendEnd) {
+            $this->stream->writeFrame($this->background, new Frame(Frame::RST_STREAM, $id, ''));
+        }
     }
-    
+
     public function isServer(): bool
     {
         return $this->mode == self::SERVER;
@@ -131,7 +139,7 @@ class Connection implements InputChannel
                     new Frame(Frame::WINDOW_UPDATE, $stream, \pack('N', $size))
                 ]));
             } else {
-                Context::rethrow($this->stream->writeFrame($this->background, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', $size))));
+                Context::rethrow($this->stream->writeFrame($this->background, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', $size)), 50));
             }
         }
     }
@@ -166,7 +174,7 @@ class Connection implements InputChannel
         
         $this->pings[$payload] = $placeholder;
         
-        $promise = $this->stream->writeFrame($context, new Frame(Frame::PING, 0, $payload));
+        $promise = $this->stream->writeFrame($context, new Frame(Frame::PING, 0, $payload), 100);
         
         $promise->when(function (\Throwable $e = null) use ($placeholder, $payload) {
             if ($e) {
@@ -185,98 +193,110 @@ class Connection implements InputChannel
 
     protected function processFrames(Context $context): \Generator
     {
-        while (true) {
-            $frame = yield $this->stream->readFrame($context);
-            
-            if ($frame->stream === 0) {
-                switch ($frame->type) {
-                    case Frame::CONTINUATION:
-                    case Frame::DATA:
-                    case Frame::HEADERS:
-                    case Frame::PRIORITY:
-                    case Frame::PUSH_PROMISE:
-                    case Frame::RST_STREAM:
-                        throw new ConnectionException($frame->getTypeName() . ' must not be sent to a connection', Frame::PROTOCOL_ERROR);
-                    case Frame::GOAWAY:
-                        return;
-                    case Frame::PING:
-                        $this->processPingFrame($context, $frame);
-                        break;
-                    case Frame::SETTINGS:
-                        break;
-                    case Frame::WINDOW_UPDATE:
-                        $this->processWindowUpdateFrame($frame);
-                        break;
+        try {
+            while (true) {
+                $frame = yield $this->stream->readFrame($context);
+                
+                if ($frame->stream === 0) {
+                    switch ($frame->type) {
+                        case Frame::CONTINUATION:
+                        case Frame::DATA:
+                        case Frame::HEADERS:
+                        case Frame::PRIORITY:
+                        case Frame::PUSH_PROMISE:
+                        case Frame::RST_STREAM:
+                            throw new ConnectionException($frame->getTypeName() . ' must not be sent to a connection', Frame::PROTOCOL_ERROR);
+                        case Frame::GOAWAY:
+                            return;
+                        case Frame::PING:
+                            $this->processPingFrame($context, $frame);
+                            break;
+                        case Frame::SETTINGS:
+                            break;
+                        case Frame::WINDOW_UPDATE:
+                            $this->processWindowUpdateFrame($frame);
+                            break;
+                    }
+                    
+                    continue;
                 }
                 
-                continue;
-            }
-            
-            switch ($frame->type) {
-                case Frame::CONTINUATION:
-                case Frame::GOAWAY:
-                case Frame::PING:
-                case Frame::SETTINGS:
-                    throw new ConnectionException($frame->getTypeName() . ' must not be sent to a stream', Frame::PROTOCOL_ERROR);
-                case Frame::PRIORITY:
-                    continue 2;
-                case Frame::RST_STREAM:
-                    $this->closeStream($frame->stream);
-                    continue 2;
-            }
-            
-            if (null === ($stream = $this->streams[$frame->stream] ?? null)) {
                 switch ($frame->type) {
+                    case Frame::CONTINUATION:
+                    case Frame::GOAWAY:
+                    case Frame::PING:
+                    case Frame::SETTINGS:
+                        throw new ConnectionException($frame->getTypeName() . ' must not be sent to a stream', Frame::PROTOCOL_ERROR);
+                    case Frame::PRIORITY:
+                        continue 2;
                     case Frame::RST_STREAM:
-                    case Frame::WINDOW_UPDATE:
+                        $this->closeStream($frame->stream);
                         continue 2;
                 }
                 
-                if ($this->mode == self::SERVER) {
+                if (null === ($stream = $this->streams[$frame->stream] ?? null)) {
+                    switch ($frame->type) {
+                        case Frame::RST_STREAM:
+                        case Frame::WINDOW_UPDATE:
+                            continue 2;
+                    }
+                    
+                    if ($this->mode == self::SERVER) {
+                        switch ($frame->type) {
+                            case Frame::HEADERS:
+                            case Frame::PRIORITY:
+                                if (!($frame->stream & 1)) {
+                                    throw new ConnectionException('Invalid stream id provided by client', Frame::PROTOCOL_ERROR);
+                                }
+                                
+                                $stream = new Stream($context, $frame->stream, $this, $this->stream, $this->hpack, self::INITIAL_WINDOW_SIZE);
+                                
+                                $this->streams[$frame->stream] = $stream;
+                                break;
+                            default:
+                                throw new ConnectionException("Stream {$frame->stream} does not exist");
+                        }
+                    } else {
+                        throw new ConnectionException("Stream {$frame->stream} does not exist");
+                    }
+                }
+                
+                $done = null;
+                
+                try {
                     switch ($frame->type) {
                         case Frame::HEADERS:
-                        case Frame::PRIORITY:
-                            if (!($frame->stream & 1)) {
-                                throw new ConnectionException('Invalid stream id provided by client', Frame::PROTOCOL_ERROR);
-                            }
+                            $stream->processHeadersFrame($frame);
+                            $done = $frame->flags & Frame::END_HEADERS;
                             
-                            $stream = new Stream($context, $frame->stream, $this, $this->stream, $this->hpack, self::INITIAL_WINDOW_SIZE);
-                            
-                            $this->streams[$frame->stream] = $stream;
                             break;
-                        default:
-                            throw new ConnectionException("Stream {$frame->stream} does not exist");
+                        case Frame::CONTINUATION:
+                            $stream->processContinuationFrame($frame);
+                            $done = $frame->flags & Frame::END_HEADERS;
+                            
+                            break;
+                        case Frame::DATA:
+                            $stream->processDataFrame($frame);
+                            break;
+                        case Frame::WINDOW_UPDATE:
+                            $stream->processWindowUpdateFrame($frame);
+                            break;
                     }
-                } else {
-                    throw new ConnectionException("Stream {$frame->stream} does not exist");
+                } catch (\Throwable $e) {
+                    $stream->close($e);
+                    
+                    continue;
+                }
+                
+                if ($done && $this->mode == self::SERVER) {
+                    yield $this->channel->send($context, $stream);
                 }
             }
-            
-            $done = null;
-            
-            switch ($frame->type) {
-                case Frame::HEADERS:
-                    $stream->processHeadersFrame($frame);
-                    $done = $frame->flags & Frame::END_HEADERS;
-                    
-                    break;
-                case Frame::CONTINUATION:
-                    $stream->processContinuationFrame($frame);
-                    $done = $frame->flags & Frame::END_HEADERS;
-                    
-                    break;
-                case Frame::DATA:
-                    $stream->processDataFrame($frame);
-                    break;
-                case Frame::WINDOW_UPDATE:
-                    $stream->processWindowUpdateFrame($frame);
-                    break;
-            }
-            
-            if ($done && $this->mode == self::SERVER) {
-                yield $this->channel->send($context, $stream);
-            }
+        } catch (\Throwable $e) {
+            // Send error into close operation.
         }
+        
+        $this->close($e ?? null);
     }
 
     protected function processPingFrame(Context $context, Frame $frame): void
@@ -294,7 +314,7 @@ class Connection implements InputChannel
                 }
             }
         } else {
-            Context::rethrow($this->stream->writeFrame($context, new Frame(Frame::PING, 0, $frame->data, Frame::ACK)));
+            Context::rethrow($this->stream->writeFrame($context, new Frame(Frame::PING, 0, $frame->data, Frame::ACK), 100));
         }
     }
 

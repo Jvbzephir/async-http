@@ -22,6 +22,7 @@ use KoolKode\Async\Socket\Listener;
 use KoolKode\Async\Socket\ServerEncryption;
 use KoolKode\Async\Socket\ServerFactory;
 use KoolKode\Async\Socket\Socket;
+use Psr\Log\LogLevel;
 
 class HttpEndpoint
 {
@@ -38,6 +39,8 @@ class HttpEndpoint
     protected $hosts = [];
     
     protected $proxy;
+    
+    protected $errorLogging;
 
     public function __construct(HttpDriver ...$drivers)
     {
@@ -124,6 +127,14 @@ class HttpEndpoint
         
         return $endpoint;
     }
+    
+    public function withErrorLogging(?string $level = LogLevel::ERROR): self
+    {
+        $endpoint = clone $this;
+        $endpoint->errorLogging = $level;
+        
+        return $endpoint;
+    }
 
     public function listen(Context $context): Promise
     {
@@ -199,7 +210,7 @@ class HttpEndpoint
         } else {
             foreach ($this->hosts as $host) {
                 if ($host->isEncrypted()) {
-                    $bind['tcp:/127.0.0.1:80'] = false;
+                    $bind['tcp:/127.0.0.1:443'] = false;
                     
                     break;
                 }
@@ -218,8 +229,10 @@ class HttpEndpoint
         $listeners = [];
         
         try {
+            $ctx = $this->errorLogging ? $context->withErrorLogging($this->errorLogging) : $context;
+            
             foreach ($servers as $server) {
-                $listeners[] = $server->listen($context, \Closure::fromCallable([
+                $listeners[] = $server->listen($ctx, \Closure::fromCallable([
                     $this,
                     'handleConnection'
                 ]), $accept);
