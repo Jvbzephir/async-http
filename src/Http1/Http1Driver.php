@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Http\Http;
@@ -26,8 +27,32 @@ use KoolKode\Async\Stream\StreamClosedException;
 
 class Http1Driver implements HttpDriver
 {
+    /**
+     * Maximum number of HTTP requests to be received over a single connection.
+     * 
+     * @var int
+     */
+    protected $keepAlive = 100;
+    
+    /**
+     * Max idle time between multiple HTTP requests over the same connection (in seconds).
+     * 
+     * @var int
+     */
+    protected $maxIdleTime = 30;
+    
+    /**
+     * HTTP message parser being used to decode incoming HTTP requests.
+     * 
+     * @var MessageParser
+     */
     protected $parser;
     
+    /**
+     * Registered HTTP upgrade handlers that implement a connection update based on a value returned from an HTTP handler.
+     * 
+     * @var array
+     */
     protected $upgradeResultHandlers = [];
     
     public function __construct(?MessageParser $parser = null)
@@ -35,6 +60,30 @@ class Http1Driver implements HttpDriver
         $this->parser = $parser ?? new MessageParser();
     }
     
+    public function withKeepAlive(int $keepAlive): self
+    {
+        if ($keepAlive < 0) {
+            throw new \InvalidArgumentException('Number of dispatchable keep-alive HTTP requests must not be negative');
+        }
+        
+        $driver = clone $this;
+        $driver->keepAlive = $keepAlive;
+        
+        return $driver;
+    }
+
+    public function withMaxIdleTime(int $idle): self
+    {
+        if ($idle < 1) {
+            throw new \InvalidArgumentException('Max idle time between HTTP requests must not be less than 1 second');
+        }
+        
+        $driver = clone $this;
+        $driver->maxIdleTime = $idle;
+        
+        return $driver;
+    }
+
     public function withUpgradeResultHandler(UpgradeResultHandler $handler): self
     {
         $driver = clone $this;
@@ -81,51 +130,72 @@ class Http1Driver implements HttpDriver
     public function listen(Context $context, DuplexStream $stream, callable $action): Promise
     {
         return $context->task(function (Context $context) use ($stream, $action) {
-            try {
+            $remaining = $this->keepAlive;
+            
+            do {
                 try {
-                    $request = yield from $this->parser->parseRequest($context, $stream);
-                } catch (StreamClosedException $e) {
-                    return;
+                    $ctx = $this->keepAlive ? $context->cancelAfter($this->maxIdleTime * 1000) : $context;
+                    $request = yield from $this->parser->parseRequest($ctx->unreference(), $stream);
+                } catch (StreamClosedException | CancellationException $e) {
+                    return $stream->close($e);
                 }
                 
-                $body = $this->parser->parseBodyStream($request, $stream, false);
-                
-                $request = $request->withoutHeader('Content-Length');
-                $request = $request->withoutHeader('Transfer-Encoding');
-                $request = $request->withBody($body = new StreamBody($body));
-                
-                $upgrade = null;
-                
-                $response = $action($context, $request, function (Context $context, $response) use ($request, & $upgrade) {
+                try {
+                    $close = $this->shouldConnectionBeClosed($request);
+                    $body = $this->parser->parseBodyStream($request, $stream, false);
+                    
+                    $request = $request->withoutHeader('Content-Length');
+                    $request = $request->withoutHeader('Transfer-Encoding');
+                    $request = $request->withBody($body = new StreamBody($body));
+                    
+                    $upgrade = null;
+                    
+                    $response = $action($context, $request, function (Context $context, $response) use ($request, & $upgrade) {
+                        if ($response instanceof \Generator) {
+                            $response = yield from $response;
+                        }
+                        
+                        return $this->respond($request, $response, $upgrade);
+                    });
+                    
                     if ($response instanceof \Generator) {
                         $response = yield from $response;
                     }
                     
-                    return $this->respond($request, $response, $upgrade);
-                });
-                
-                if ($response instanceof \Generator) {
-                    $response = yield from $response;
+                    if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
+                        $upgrade = null;
+                    }
+                    
+                    yield $body->discard($context);
+                    
+                    if ($request->getMethod() == Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode())) {
+                        yield $response->getBody()->discard($context);
+                        
+                        $response = $response->withBody(new StringBody());
+                    }
+                    
+                    $response = $this->normalizeResponse($request, $response);
+                    $response = $response->withHeader('Connection', $upgrade ? 'upgrade' : ($close ? 'close' : 'keep-alive'));
+                    
+                    if (!$upgrade && !$close) {
+                        $response = $response->withHeader('Keep-Alive', \sprintf('timeout=%u, max=%u', $this->maxIdleTime, --$remaining));
+                    }
+                    
+                    yield from $this->sendRespone($context, $request, $response, $stream);
+                    
+                    if ($upgrade) {
+                        yield from $upgrade->upgradeConnection($context, $stream, $request, $response);
+                        
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    $stream->close($e);
+                    
+                    throw $e;
                 }
-                
-                if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
-                    $upgrade = false;
-                    $close = true;
-                }
-                
-                yield $body->discard($context);
-                
-                $response = $this->normalizeResponse($request, $response);
-                $response = $response->withHeader('Connection', $upgrade ? 'upgrade' : 'close');
-                
-                yield from $this->sendRespone($context, $request, $response, $stream);
-                
-                if ($upgrade) {
-                    yield from $upgrade->upgradeConnection($context, $stream, $request, $response);
-                }
-            } finally {
-                $stream->close();
-            }
+            } while (!$close && $remaining > 0);
+            
+            $stream->close();
         });
     }
 
@@ -150,6 +220,31 @@ class Http1Driver implements HttpDriver
         }
         
         return new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+    }
+    
+    protected function shouldConnectionBeClosed(HttpRequest $request): bool
+    {
+        if ($this->keepAlive === 0) {
+            return true;
+        }
+        
+        $conn = $request->getHeaderTokenValues('Connection');
+        
+        if ($request->getProtocolVersion() == '1.0') {
+            if (!\in_array('keep-alive', $conn, true) || \in_array('upgrade', $conn, true)) {
+                return true;
+            }
+        } else {
+            foreach ($conn as $token) {
+                switch ($token) {
+                    case 'close':
+                    case 'upgrade':
+                        return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse

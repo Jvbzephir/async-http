@@ -40,6 +40,24 @@ class Http1DriverTest extends AsyncTestCase
         $this->assertTrue($driver->isSupported(''));
         $this->assertFalse($driver->isSupported('h2'));
     }
+    
+    public function testDetectsInvalidKeepAlive()
+    {
+        $driver = new Http1Driver();
+        
+        $this->expectException(\InvalidArgumentException::class);
+        
+        $driver->withKeepAlive(-1);
+    }
+    
+    public function testDetectsInvalidMaxIdleTimeout()
+    {
+        $driver = new Http1Driver();
+        
+        $this->expectException(\InvalidArgumentException::class);
+        
+        $driver->withMaxIdleTime(0);
+    }
 
     public function testWillSilentlyDropConnectionOnEofBeforeHeaders(Context $context)
     {
@@ -84,12 +102,12 @@ class Http1DriverTest extends AsyncTestCase
                 return yield from $responder($context, \call_user_func(function () {
                     yield null;
                     
-                    return new HttpResponse(Http::NOT_FOUND);
+                    return new HttpResponse(Http::NOT_FOUND, [], new StringBody('FOO'));
                 }));
             });
         });
     }
-    
+
     public function testDetectsResultThatCannotBeConvertedIntoResponse(Context $context)
     {
         yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
@@ -117,7 +135,7 @@ class Http1DriverTest extends AsyncTestCase
             });
         });
     }
-    
+
     public function testCanUpgradeConnection(Context $context)
     {
         yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
@@ -215,6 +233,61 @@ class Http1DriverTest extends AsyncTestCase
         });
     }
     
+    public function testCanFailAfterUpgrade(Context $context)
+    {
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $parser = new MessageParser();
+            
+            yield $socket->write($context, implode("\r\n", [
+                'GET / HTTP/1.1',
+                'Content-Length: 0',
+                'Connection: upgrade',
+                'Upgrade: foo',
+                'Foo: bar',
+                "\r\n"
+            ]));
+            
+            $response = yield from $parser->parseResponse($context, $socket);
+            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::SWITCHING_PROTOCOLS, $response->getStatusCode());
+            $this->assertEquals('', yield $response->getBody()->getContents($context));
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) {
+            $driver = new Http1Driver();
+            $driver = $driver->withUpgradeResultHandler(new class() implements UpgradeResultHandler {
+
+                public function isUpgradeSupported(string $protocol, HttpRequest $request, $result): bool
+                {
+                    return $protocol == 'foo' && \is_array($result);
+                }
+
+                public function createUpgradeResponse(HttpRequest $request, $result): HttpResponse
+                {
+                    return new HttpResponse(Http::SWITCHING_PROTOCOLS, [
+                        'Upgrad' => 'foo'
+                    ]);
+                }
+
+                public function upgradeConnection(Context $context, DuplexStream $stream, HttpRequest $request, HttpResponse $response): \Generator
+                {
+                    yield null;
+                    
+                    throw new \LogicException('Fail');
+                }
+            });
+            
+            $this->expectException(\LogicException::class);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
+                return yield from $responder($context, []);
+            });
+        });
+    }
+
     public function testCanSendBodyWithContentLength(Context $context)
     {
         yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
@@ -223,20 +296,22 @@ class Http1DriverTest extends AsyncTestCase
             yield $socket->write($context, implode("\r\n", [
                 'GET / HTTP/1.1',
                 'Content-Length: 0',
-                'Connection: close',
                 "\r\n"
             ]));
             
             $response = yield from $parser->parseResponse($context, $socket);
-            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket)));
+            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
             
             $this->assertTrue($response instanceof HttpResponse);
             $this->assertEquals('1.1', $response->getProtocolVersion());
             $this->assertEquals(Http::OK, $response->getStatusCode());
             $this->assertEquals(11, (int) $response->getHeaderLine('Content-Length'));
             $this->assertEquals('Hello World', yield $response->getBody()->getContents($context));
+            
+            $this->assertNull(yield $socket->read($context));
         }, function (Context $context, Socket $socket) {
             $driver = new Http1Driver();
+            $driver = $driver->withKeepAlive(0);
             
             yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
                 $this->assertEquals(Http::GET, $request->getMethod());
@@ -250,7 +325,7 @@ class Http1DriverTest extends AsyncTestCase
             });
         });
     }
-    
+
     public function testCanSendChunkEncodedBody(Context $context)
     {
         $message = str_repeat('A', 0xFFFF);
@@ -285,6 +360,71 @@ class Http1DriverTest extends AsyncTestCase
                 return yield from $responder($context, new HttpResponse(Http::OK, [
                     'Conent-Type' => 'text/plain'
                 ], new StreamBody(new ReadableMemoryStream($message))));
+            });
+        });
+    }
+
+    public function testServerEnforcesMaxNumberOfRequests(Context $context)
+    {
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $parser = new MessageParser();
+            
+            for ($i = 0; $i < 2; $i++) {
+                yield $socket->write($context, implode("\r\n", [
+                    'GET / HTTP/1.1',
+                    'Content-Length: 0',
+                    "\r\n"
+                ]));
+                
+                $response = yield from $parser->parseResponse($context, $socket);
+                $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals('1.1', $response->getProtocolVersion());
+                $this->assertEquals(Http::NO_CONTENT, $response->getStatusCode());
+                $this->assertTrue($response->hasHeader('keep-Alive'));
+                $this->assertEquals('', yield $response->getBody()->getContents($context));
+            }
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) {
+            $driver = new Http1Driver();
+            $driver = $driver->withKeepAlive(2);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
+                return yield from $responder($context, new HttpResponse(Http::NO_CONTENT));
+            });
+        });
+    }
+
+    public function testServerEnforcesIdleTimeoutInRequests(Context $context)
+    {
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $parser = new MessageParser();
+            
+            for ($i = 0; $i < 2; $i++) {
+                yield $socket->write($context, implode("\r\n", [
+                    'GET / HTTP/1.1',
+                    'Content-Length: 0',
+                    "\r\n"
+                ]));
+                
+                $response = yield from $parser->parseResponse($context, $socket);
+                $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+                
+                $this->assertTrue($response instanceof HttpResponse);
+                $this->assertEquals('1.1', $response->getProtocolVersion());
+                $this->assertEquals(Http::NO_CONTENT, $response->getStatusCode());
+                $this->assertEquals('', yield $response->getBody()->getContents($context));
+            }
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) {
+            $driver = new Http1Driver();
+            $driver = $driver->withMaxIdleTime(1);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
+                return yield from $responder($context, new HttpResponse(Http::NO_CONTENT));
             });
         });
     }
