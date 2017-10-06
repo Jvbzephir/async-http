@@ -244,18 +244,19 @@ class Http1Connector implements HttpConnector
     protected function sendRequest(Context $context, HttpRequest $request, DuplexStream $stream): \Generator
     {
         $body = $request->getBody();
-        $size = yield $body->getSize($context);
         
         $bodyStream = yield $body->getReadableStream($context);
         
         try {
-            $chunk = yield $bodyStream->readBuffer($context, 8192, false);
+            $chunk = yield $bodyStream->readBuffer($context, 0x7FFF, false);
             $len = \strlen($chunk ?? '');
             
             if ($chunk === null) {
                 $size = 0;
-            } elseif ($len < 8192) {
+            } elseif ($len < 0x7FFF) {
                 $size = $len;
+            } else {
+                $size = yield $body->getSize($context);
             }
             
             $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");

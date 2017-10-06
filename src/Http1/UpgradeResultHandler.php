@@ -39,8 +39,6 @@ interface UpgradeResultHandler
      * Create an HTTP/1 upgrade response that will be sent before switching protocol.
      *
      * Passing data to the connection upgrade method shoud use HTTP response attributes.
-     * 
-     * The driver will automatically set the status code to 101 and add an appropriate Connection header.
      *
      * @param HttpRequest $request HTTP request that triggered the connection upgrade.
      * @param mixed $result The value returned by an HTTP handler that triggered the connection upgrade.

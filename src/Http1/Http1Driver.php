@@ -101,32 +101,16 @@ class Http1Driver implements HttpDriver
                         $response = yield from $response;
                     }
                     
-                    if (!$response instanceof HttpResponse) {
-                        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'), true)) {
-                            $protocols = $request->getHeaderTokenValues('Upgrade', true);
-                            
-                            foreach ($protocols as $protocol) {
-                                foreach ($this->upgradeResultHandlers as $handler) {
-                                    if ($handler->isUpgradeSupported($protocol, $request, $response)) {
-                                        $response = $handler->createUpgradeResponse($request, $response);
-                                        $upgrade = $handler;
-                                        
-                                        break 2;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (!$response instanceof HttpResponse) {
-                            $response = new HttpResponse(Http::INTERNAL_SERVER_ERROR);
-                        }
-                    }
-                    
-                    return $response;
+                    return $this->respond($request, $response, $upgrade);
                 });
                 
                 if ($response instanceof \Generator) {
                     $response = yield from $response;
+                }
+                
+                if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
+                    $upgrade = false;
+                    $close = true;
                 }
                 
                 yield $body->discard($context);
@@ -144,7 +128,30 @@ class Http1Driver implements HttpDriver
             }
         });
     }
-    
+
+    protected function respond(HttpRequest $request, $response, & $upgrade = null): HttpResponse
+    {
+        if ($response instanceof HttpResponse) {
+            return $response;
+        }
+        
+        if (\in_array('upgrade', $request->getHeaderTokenValues('Connection'), true)) {
+            $protocols = $request->getHeaderTokenValues('Upgrade', true);
+            
+            foreach ($protocols as $protocol) {
+                foreach ($this->upgradeResultHandlers as $handler) {
+                    if ($handler->isUpgradeSupported($protocol, $request, $response)) {
+                        $upgrade = $handler;
+                        
+                        return $handler->createUpgradeResponse($request, $response);
+                    }
+                }
+            }
+        }
+        
+        return new HttpResponse(Http::INTERNAL_SERVER_ERROR);
+    }
+
     protected function normalizeResponse(HttpRequest $request, HttpResponse $response): HttpResponse
     {
         static $remove = [
@@ -167,7 +174,6 @@ class Http1Driver implements HttpDriver
     protected function sendRespone(Context $context, HttpRequest $request, HttpResponse $response, DuplexStream $stream): \Generator
     {
         $body = $response->getBody();
-        $size = yield $body->getSize($context);
         
         if (Http::isResponseWithoutBody($response->getStatusCode())) {
             yield $body->discard($context);
@@ -179,13 +185,15 @@ class Http1Driver implements HttpDriver
         }
         
         try {
-            $chunk = yield $bodyStream->readBuffer($context, 8192, false);
+            $chunk = yield $bodyStream->readBuffer($context, 0x7FFF, false);
             $len = \strlen($chunk ?? '');
             
             if ($chunk === null) {
                 $size = 0;
-            } elseif ($len < 8192) {
+            } elseif ($len < 0x7FFF) {
                 $size = $len;
+            } else {
+                $size = yield $body->getSize($context);
             }
             
             $sent = yield $stream->write($context, $this->serializeHeaders($response, $size) . "\r\n");

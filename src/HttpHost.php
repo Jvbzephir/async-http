@@ -70,7 +70,7 @@ class HttpHost
     public function handleRequest(Context $context, HttpRequest $request, callable $responder): \Generator
     {
         $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($responder) {
-            return $responder($context, ($this->action)($context, $request));
+            return yield from $responder($context, ($this->action)($context, $request));
         });
         
         return yield from $next($context, $request);
