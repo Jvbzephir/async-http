@@ -30,22 +30,16 @@ $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
     $client = new HttpClient(new Http1Connector($manager));
     
-    $request = new HttpRequest('http://httpbin.org/anything', Http::PUT, [
-        'Content-Type' => 'application/json',
-        'User-Agent' => 'PHP/' . PHP_VERSION
-    ], new StringBody('{"message":"Hello Server :)"}'));
-    
-    $count = yield $client->sendAll($context, [
-        $request,
+    $requests = [
+        new HttpRequest('http://httpbin.org/anything', Http::PUT, [
+            'Content-Type' => 'application/json',
+            'User-Agent' => 'PHP/' . PHP_VERSION
+        ], new StringBody('{"message":"Hello Server :)"}')),
         new HttpRequest('http://httpbin.org/anything'),
         new HttpRequest('http://httpbin.org/anything')
-    ], function (Context $context, ?\Throwable $e, ?HttpResponse $response = null) {
-        if ($response) {
-            echo yield $response->getBody()->getContents($context);
-        } else {
-            fwrite(STDERR, "\n$e\n");
-        }
-    });
+    ];
     
-    var_dump($count, count($manager));
+    yield $client->pipe($requests)->map(function (Context $context, HttpResponse $response) {
+        echo yield $response->getBody()->getContents($context);
+    })->dispatch($context);
 });

@@ -14,10 +14,10 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
-use KoolKode\Async\Coroutine;
-use KoolKode\Async\Deferred;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Channel\IterableChannel;
+use KoolKode\Async\Channel\Pipeline;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
@@ -107,24 +107,13 @@ class HttpClient
         return $context->task($next($context, $request));
     }
     
-    public function sendAll(Context $context, array $requests, callable $callback): Promise
+    public function pipe(array $requests, int $concurrency = 8): Pipeline
     {
-        $defer = new Deferred($context);
-        $pending = $count = \count($requests);
+        $pipeline = new Pipeline(new IterableChannel($requests), new \stdClass(), $concurrency);
         
-        foreach ($requests as $request) {
-            $this->send($context, $request)->when(static function ($e, $v = null) use ($context, $defer, $count, & $pending, $callback) {
-                $generator = Coroutine::generate($callback, $context, $e, $v);
-                
-                $context->task($generator)->when(static function () use ($defer, $count, & $pending) {
-                    if (--$pending === 0) {
-                        $defer->resolve($count);
-                    }
-                });
-            });
-        }
-        
-        return $defer->promise();
+        return $pipeline->map(function (Context $context, HttpRequest $request) {
+            return $this->send($context, $request);
+        });
     }
     
     public function get(Context $context, $uri): Promise
