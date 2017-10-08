@@ -126,7 +126,7 @@ class Http2Driver implements HttpDriver
             }
             
             $stream = new FramedStream($stream, $stream);
-            $frame = yield $stream->readFrame($context);
+            $frame = yield from $stream->readFrame($context);
             
             if ($frame->stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');

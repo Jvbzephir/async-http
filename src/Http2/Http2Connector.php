@@ -165,7 +165,7 @@ class Http2Connector implements HttpConnector
             yield $stream->writeFrame($context, new Frame(Frame::SETTINGS, 0, $settings));
             yield $stream->writeFrame($context, new Frame(Frame::WINDOW_UPDATE, 0, \pack('N', 0x0FFFFFFF)));
             
-            $frame = yield $stream->readFrame($context);
+            $frame = yield from $stream->readFrame($context);
             
             if ($frame->stream !== 0 || $frame->type !== Frame::SETTINGS) {
                 throw new ConnectionException('Failed to establish HTTP/2 connection');

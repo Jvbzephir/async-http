@@ -36,18 +36,16 @@ class FramedStream implements Disposable
         $this->executor = new Executor();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function close(?\Throwable $e = null): void
     {
         $this->readStream->close($e);
         $this->writeStream->close($e);
     }
 
-    public function readFrame(Context $context): Promise
-    {
-        return $context->task($this->readFrameTask($context));
-    }
-
-    protected function readFrameTask(Context $context): \Generator
+    public function readFrame(Context $context): \Generator
     {
         $header = yield $this->readStream->readBuffer($context, 9);
         
@@ -68,7 +66,7 @@ class FramedStream implements Disposable
         return $this->executor->submit($context, $this->writeTask($context, $frame->encode()), $priority);
     }
 
-    public function writeFrames(Context $context, array $frames): Promise
+    public function writeFrames(Context $context, array $frames, int $priority = 0): Promise
     {
         $buffer = '';
         
@@ -76,7 +74,7 @@ class FramedStream implements Disposable
             $buffer .= $frame->encode();
         }
         
-        return $this->executor->submit($context, $this->writeTask($context, $buffer));
+        return $this->executor->submit($context, $this->writeTask($context, $buffer), $priority);
     }
 
     protected function writeTask(Context $context, string $buffer): \Generator

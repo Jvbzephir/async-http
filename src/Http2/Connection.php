@@ -191,7 +191,7 @@ class Connection implements InputChannel
     {
         try {
             while (true) {
-                $frame = yield $this->stream->readFrame($context);
+                $frame = yield from $this->stream->readFrame($context);
                 
                 if ($frame->stream === 0) {
                     switch ($frame->type) {

@@ -14,11 +14,11 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\WebSocket;
 
 use KoolKode\Async\Context;
+use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Channel\Channel;
 use KoolKode\Async\Channel\InputChannel;
 use KoolKode\Async\Concurrent\Executor;
-use KoolKode\Async\Stream\DuplexStream;
 use KoolKode\Async\Stream\ReadableStream;
 
 /**
@@ -38,7 +38,7 @@ class Connection implements InputChannel
     /**
      * Socket stream being used to transmit frames.
      *
-     * @var DuplexStream
+     * @var FramedStream
      */
     protected $stream;
     
@@ -79,23 +79,70 @@ class Connection implements InputChannel
      */
     protected $pings = [];
     
+    /**
+     * Executor being used to synchronize transmitted messages.
+     * 
+     * @var Executor
+     */
     protected $executor;
     
+    /**
+     * Reader being used to read incoming messages.
+     * 
+     * @var MessageReader
+     */
     protected $reader;
     
+    /**
+     * Per-message deflate extension.
+     * 
+     * @var PerMessageDeflate
+     */
     protected $deflate;
     
+    /**
+     * Zlib compression context.
+     * 
+     * @var resource
+     */
     protected $compression;
     
+    /**
+     * Zlib flush mode of the final frame of a message.
+     * 
+     * @var int
+     */
     protected $flushMode;
-    
+
+    /**
+     * Channel being used to receive incoming messages.
+     * 
+     * @var Channel
+     */
     protected $messages;
     
+    /**
+     * Cancellation handler being used to cancel the incoming frame processing task.
+     */
     protected $cancel;
     
+    /**
+     * Background context that runs the frame processing task.
+     * 
+     * @var Context
+     */
     protected $background;
     
-    public function __construct(Context $context, bool $client = true, DuplexStream $stream, string $protocol = '', ?PerMessageDeflate $deflate = null)
+    /**
+     * Create a new WebSocket connection.
+     * 
+     * @param Context $context Async execution context.
+     * @param bool $client Establish a connection in client mode?
+     * @param FramedStream $stream Stream being used to read and write frames.
+     * @param string $protocol Negotiated application protocol.
+     * @param PerMessageDeflate $deflate Compression extension.
+     */
+    public function __construct(Context $context, bool $client = true, FramedStream $stream, string $protocol = '', ?PerMessageDeflate $deflate = null)
     {
         $this->client = $client;
         $this->stream = $stream;
@@ -166,7 +213,7 @@ class Connection implements InputChannel
                     $chunks[$i] = \deflate_add($this->compression, $chunks[$i], \ZLIB_SYNC_FLUSH);
                 }
                 
-                $len += yield $this->writeFrame($context, new Frame($type, $chunks[$i], false, $reserved));
+                $len += yield $this->stream->writeFrame($context, new Frame($type, $chunks[$i], false, $reserved));
                 $type = Frame::CONTINUATION;
                 
                 if ($reserved) {
@@ -180,7 +227,7 @@ class Connection implements InputChannel
                 $chunks = $chunks[$i];
             }
             
-            return $len + yield $this->writeFrame($context, new Frame($type, $chunks, true, $reserved));
+            return $len + yield $this->stream->writeFrame($context, new Frame($type, $chunks, true, $reserved));
         }, $priority);
     }
     
@@ -210,7 +257,7 @@ class Connection implements InputChannel
                         $chunk = \deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH);
                     }
                     
-                    $len += yield $this->writeFrame($context, new Frame($type, $chunk, false, $reserved));
+                    $len += yield $this->stream->writeFrame($context, new Frame($type, $chunk, false, $reserved));
                     
                     $chunk = $next;
                     $type = Frame::CONTINUATION;
@@ -225,7 +272,7 @@ class Connection implements InputChannel
                         $chunk = \substr(\deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH), 0, -4);
                     }
                     
-                    $len += yield $this->writeFrame($context, new Frame($type, $chunk, true, $reserved));
+                    $len += yield $this->stream->writeFrame($context, new Frame($type, $chunk, true, $reserved));
                 }
             } finally {
                 $stream->close();
@@ -235,9 +282,30 @@ class Connection implements InputChannel
         }, $priority);
     }
     
-    protected function writeFrame(Context $context, Frame $frame): Promise
+    /**
+     * Send a PING frame to the server and await the PONG frame response.
+     * 
+     * @param Context $context Async execution context.
+     * @param int $timeout Maximum acceptable ping time in seconds.
+     * @return float Roundtrip time of the ping in seconds.
+     */
+    public function ping(Context $context, int $timeout = 2): Promise
     {
-        return $this->stream->write($context, $frame->encode($this->client ? \random_bytes(4) : null));
+        return $context->task(function (Context $context) use ($timeout) {
+            yield $this->stream->writeFrame($context, new Frame(Frame::PING, $payload = \random_bytes(8)), 100);
+            
+            $time = \microtime(true);
+            
+            $this->pings[$payload] = new Placeholder($context->cancelAfter($timeout * 1000));
+            
+            try {
+                yield $context->keepBusy($this->pings[$payload]->promise());
+            } finally {
+                unset($this->pings[$payload]);
+            }
+            
+            return \microtime(true) - $time;
+        });
     }
     
     /**
@@ -253,10 +321,34 @@ class Connection implements InputChannel
      */
     protected function processFrames(Context $context): \Generator
     {
+        $message = null;
+        
         try {
             while (true) {
-                $frame = yield from $this->readNextFrame($context);
-                $message = null;
+                $frame = yield from $this->stream->readFrame($context);
+                
+                switch ($frame->opcode) {
+                    case Frame::PING:
+                        $this->executor->submit($context, function (Context $context, $frame) {
+                            return yield $this->stream->writeFrame($context, new Frame(Frame::PONG, $frame->data), 100);
+                        }, 100);
+                        continue 2;
+                    case Frame::PONG:
+                        if (isset($this->pings[$frame->data])) {
+                            $this->pings[$frame->data]->resolve();
+                        }
+                        continue 2;
+                    case Frame::CONNECTION_CLOSE:
+                        throw new ConnectionException('Remote peer closes connection', Frame::CONNECTION_CLOSE);
+                }
+                
+                if ($message !== null) {
+                    try {
+                        yield $message;
+                    } finally {
+                        $message = null;
+                    }
+                }
                 
                 switch ($frame->opcode) {
                     case Frame::TEXT:
@@ -268,26 +360,16 @@ class Connection implements InputChannel
                     case Frame::CONTINUATION:
                         $message = yield from $this->reader->appendContinuationFrame($context, $frame);
                         break;
-                    case Frame::PING:
-                        $this->executor->submit($context, function (Context $context, $frame) {
-                            return yield $this->writeFrame($context, new Frame(Frame::PONG, $frame->data));
-                        }, 100);
-                        break;
-                    case Frame::PONG:
-                        // TODO: Re-implement pings...
-                        break;
-                    case Frame::CONNECTION_CLOSE:
-                        throw new ConnectionException('Remote peer closes connection', Frame::CONNECTION_CLOSE);
                 }
                 
                 if ($message !== null) {
-                    yield $this->messages->send($context, $message);
+                    $message = $this->messages->send($context, $message);
                 }
             }
         } catch (ConnectionException $e) {
             if ($e->getCode() !== Frame::CONNECTION_CLOSE) {
                 try {
-                    yield $this->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $e->getCode())));
+                    yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $e->getCode())));
                 } catch (\Throwable $ex) {
                     // Ignore this error.
                 }
@@ -299,69 +381,5 @@ class Connection implements InputChannel
         $this->stream->close($e);
         $this->reader->close($e);
         $this->messages->close($e);
-    }
-    
-    /**
-     * Reads the next WebSocket frame from the socket.
-     *
-     * This method will unmask frames as needed and asserts frame size constraints.
-     *
-     * @return Frame
-     */
-    protected function readNextFrame(Context $context): \Generator
-    {
-        list ($byte1, $byte2) = \array_map('ord', \str_split(yield $this->stream->readBuffer($context, 2), 1));
-        
-        $masked = ($byte2 & Frame::MASKED) ? true : false;
-        
-        if ($this->client && $masked) {
-            throw new ConnectionException('Received masked frame from server', Frame::PROTOCOL_ERROR);
-        }
-        
-        if (!$this->client && !$masked) {
-            throw new ConnectionException('Received unmasked frame from client', Frame::PROTOCOL_ERROR);
-        }
-        
-        // Parse extended length fields:
-        $len = $byte2 & Frame::LENGTH;
-        
-        if ($len === 0x7E) {
-            $len = \unpack('n', yield $this->stream->readBuffer($context, 2))[1];
-        } elseif ($len === 0x7F) {
-            $lp = \unpack('N2', yield $this->stream->readBuffer($context, 8));
-            
-            // 32 bit int check:
-            if (\PHP_INT_MAX === 0x7FFFFFFF) {
-                if ($lp[1] !== 0 || $lp[2] < 0) {
-                    throw new ConnectionException('Max payload size exceeded', Frame::MESSAGE_TOO_BIG);
-                }
-                
-                $len = $lp[2];
-            } else {
-                $len = $lp[1] << 32 | $lp[2];
-                
-                if ($len < 0) {
-                    throw new ConnectionException('Cannot use most significant bit in 64 bit length field', Frame::MESSAGE_TOO_BIG);
-                }
-            }
-        }
-        
-        if ($len < 0) {
-            throw new ConnectionException('Payload length must not be negative', Frame::MESSAGE_TOO_BIG);
-        }
-        
-        if ($len > $this->maxFrameSize) {
-            throw new ConnectionException(\sprintf('Maximum frame size of %u bytes exceeded', $this->maxFrameSize), Frame::MESSAGE_TOO_BIG);
-        }
-        
-        // Read and unmask frame data.
-        if ($this->client) {
-            $data = yield $this->stream->readBuffer($context, $len);
-        } else {
-            $mask = yield $this->stream->readBuffer($context, 4);
-            $data = (yield $this->stream->readBuffer($context, $len)) ^ \str_pad($mask, $len, $mask, STR_PAD_RIGHT);
-        }
-        
-        return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false, $byte1 & Frame::RESERVED);
     }
 }

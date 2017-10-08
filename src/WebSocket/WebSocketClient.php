@@ -123,7 +123,9 @@ class WebSocketClient
                 throw new \RuntimeException('Server enabled permessage-deflate but client does not support the extension');
             }
             
-            $conn = new Connection($context, true, $upgrade->stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
+            $stream = new FramedStream($upgrade->stream, $upgrade->stream, true);
+            
+            $conn = new Connection($context, true, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
         } catch (\Throwable $e) {
             $upgrade->stream->close($e);
             

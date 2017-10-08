@@ -35,6 +35,10 @@ $factory->createContext()->run(function (Context $context) {
     try {
         yield $conn->sendText($context, 'Hello World :)');
         
+        $context->info('Ping roundtrip time: {time} ms', [
+            'time' => ceil(1000 * yield $conn->ping($context))
+        ]);
+        
         $context->info('Received: {message}', [
             'message' => yield $conn->receive($context)
         ]);

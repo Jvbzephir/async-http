@@ -90,12 +90,17 @@ class WebSocketServer implements UpgradeResultHandler
             throw new \InvalidArgumentException('No endpoint object passed to WebSocket handler');
         }
         
+        $stream = new FramedStream($stream, $stream);
         $deflate = $response->getAttribute(PerMessageDeflate::class);
         
         $conn = new Connection($context, false, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
         
         try {
-            $endpoint->onOpen($conn);
+            $result = $endpoint->onOpen($conn);
+            
+            if ($result instanceof \Generator) {
+                yield from $result;
+            }
             
             while (null !== ($message = yield $conn->receive($context))) {
                 if ($message instanceof ReadableStream) {
@@ -109,7 +114,11 @@ class WebSocketServer implements UpgradeResultHandler
                 }
             }
         } finally {
-            $endpoint->onClose($conn);
+            $result = $endpoint->onClose($conn);
+            
+            if ($result instanceof \Generator) {
+                yield from $result;
+            }
             
             $conn->close();
         }

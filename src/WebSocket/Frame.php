@@ -188,32 +188,30 @@ class Frame
     /**
      * Encode the given frame for transmission.
      *
-     * @param string $mask Optional random mask to be applied to the frame (length must be 4 bytes exactly).
+     * @param bool $mask Mask frame with a 4 byte random mask?
      * @return string
      */
-    public function encode(?string $mask = null): string
+    public function encode(bool $mask = false): string
     {
         $header = \chr(($this->finished ? self::FINISHED : 0) | $this->reserved | $this->opcode);
-        $mbit = ($mask === null) ? 0 : self::MASKED;
+        $mbit = $mask ? self::MASKED : 0;
         $len = \strlen($this->data);
         
         if ($len > 0xFFFF) {
-            $header .= \chr($mbit | 127) . \pack('NN', $len, $len << 32);
+            $header .= \pack('CNN', $mbit | 127, $len, $len << 32);
         } elseif ($len > 125) {
-            $header .= \chr($mbit | 126) . \pack('n', $len);
+            $header .= \pack('Cn', $mbit | 126, $len);
         } else {
             $header .= \chr($mbit | $len);
         }
         
-        if ($mask === null) {
+        if (!$mask) {
             return $header . $this->data;
         }
         
-        if (\strlen($mask) !== 4) {
-            throw new \InvalidArgumentException(\sprintf('Mask must consist of 4 bytes, given %u bytes', \strlen($mask)));
-        }
+        $scramble = \random_bytes(4);
         
-        return $header . $mask . ($this->data ^ \str_pad($mask, $len, $mask, \STR_PAD_RIGHT));
+        return $header . $scramble . ($this->data ^ \str_pad($scramble, $len, $scramble, \STR_PAD_RIGHT));
     }
     
     /**
