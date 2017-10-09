@@ -189,27 +189,31 @@ class Connection implements InputChannel
     /**
      * Send a text message to the remote endpoint.
      *
+     * @param Context $context Async execution context.
      * @param string $text The text to be sent (must be UTF-8 encoded).
      * @param int $priority Message priority.
+     * @param bool $compress Use compression if available?
      * @return int Number of transmitted bytes.
      *
      * @throws \InvalidArgumentException When the given message is not UTF-8 encoded.
      */
-    public function sendText(Context $context, string $text, int $priority = 0): Promise
+    public function sendText(Context $context, string $text, bool $compress = false, int $priority = 0): Promise
     {
         if (!\preg_match('//u', $text)) {
             return new \InvalidArgumentException('Message is not UTF-8 encoded');
         }
         
-        return $this->executor->submit($context, function (Context $context) use ($text) {
+        $compress = $compress && $this->deflate;
+        
+        return $this->executor->submit($context, function (Context $context) use ($text, $compress) {
             $type = Frame::TEXT;
-            $reserved = $this->deflate ? Frame::RESERVED1 : 0;
+            $reserved = $compress ? Frame::RESERVED1 : 0;
             $len = 0;
             
             $chunks = \str_split($text, 8192);
             
             for ($size = \count($chunks) - 1, $i = 0; $i < $size; $i++) {
-                if ($this->deflate) {
+                if ($compress) {
                     $chunks[$i] = \deflate_add($this->compression, $chunks[$i], \ZLIB_SYNC_FLUSH);
                 }
                 
@@ -221,7 +225,7 @@ class Connection implements InputChannel
                 }
             }
             
-            if ($this->deflate) {
+            if ($compress) {
                 $chunks = \substr(\deflate_add($this->compression, $chunks[$i], $this->flushMode), 0, -4);
             } else {
                 $chunks = $chunks[$i];
@@ -234,15 +238,19 @@ class Connection implements InputChannel
     /**
      * Send contents of the given stream as binary message.
      *
+     * @param Context $context Async execution context.
      * @param ReadableStream $stream Source of data to be sent (will be closed after all bytes have been consumed).
+     * @param bool $compress Use compression if available?
      * @param int $priority Message priority.
      * @return int Number of transmitted bytes.
      */
-    public function sendBinary(Context $context, ReadableStream $stream, int $priority = 0): Promise
+    public function sendBinary(Context $context, ReadableStream $stream, bool $compress = false, int $priority = 0): Promise
     {
-        return $this->executor->submit(function (Context $context) use ($stream) {
+        $compress = $compress && $this->deflate;
+        
+        return $this->executor->submit(function (Context $context) use ($stream, $compress) {
             $type = Frame::BINARY;
-            $reserved = $this->deflate ? Frame::RESERVED1 : 0;
+            $reserved = $compress ? Frame::RESERVED1 : 0;
             $len = 0;
             
             try {
@@ -253,7 +261,7 @@ class Connection implements InputChannel
                 }
                 
                 while (null !== ($next = yield $stream->readBuffer($context, 8192))) {
-                    if ($this->deflate) {
+                    if ($compress) {
                         $chunk = \deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH);
                     }
                     
@@ -268,7 +276,7 @@ class Connection implements InputChannel
                 }
                 
                 if ($chunk !== null) {
-                    if ($this->deflate) {
+                    if ($compress) {
                         $chunk = \substr(\deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH), 0, -4);
                     }
                     
