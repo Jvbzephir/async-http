@@ -132,70 +132,74 @@ class Http1Driver implements HttpDriver
         return $context->task(function (Context $context) use ($stream, $action) {
             $remaining = $this->keepAlive;
             
-            do {
-                try {
-                    $ctx = $this->keepAlive ? $context->cancelAfter($this->maxIdleTime * 1000) : $context;
-                    $request = yield from $this->parser->parseRequest($ctx->unreference(), $stream);
-                } catch (StreamClosedException | CancellationException $e) {
-                    return $stream->close($e);
-                }
-                
-                try {
-                    $close = $this->shouldConnectionBeClosed($request);
-                    $body = $this->parser->parseBodyStream($request, $stream, false);
+            try {
+                do {
+                    try {
+                        $ctx = $this->keepAlive ? $context->cancelAfter($this->maxIdleTime * 1000) : $context;
+                        $request = yield from $this->parser->parseRequest($ctx, $stream);
+                    } catch (CancellationException $e) {
+                        return;
+                    }
                     
-                    $request = $request->withoutHeader('Content-Length');
-                    $request = $request->withoutHeader('Transfer-Encoding');
-                    $request = $request->withBody($body = new StreamBody($body));
-                    
-                    $upgrade = null;
-                    
-                    $response = $action($context, $request, function (Context $context, $response) use ($request, & $upgrade) {
+                    try {
+                        $close = $this->shouldConnectionBeClosed($request);
+                        $body = $this->parser->parseBodyStream($request, $stream, false);
+                        
+                        $request = $request->withoutHeader('Content-Length');
+                        $request = $request->withoutHeader('Transfer-Encoding');
+                        $request = $request->withBody($body = new StreamBody($body));
+                        
+                        $upgrade = null;
+                        
+                        $response = $action($context, $request, function (Context $context, $response) use ($request, & $upgrade) {
+                            if ($response instanceof \Generator) {
+                                $response = yield from $response;
+                            }
+                            
+                            return $this->respond($request, $response, $upgrade);
+                        });
+                        
                         if ($response instanceof \Generator) {
                             $response = yield from $response;
                         }
                         
-                        return $this->respond($request, $response, $upgrade);
-                    });
-                    
-                    if ($response instanceof \Generator) {
-                        $response = yield from $response;
-                    }
-                    
-                    if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
-                        $upgrade = null;
-                    }
-                    
-                    yield $body->discard($context);
-                    
-                    if ($request->getMethod() == Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode())) {
-                        yield $response->getBody()->discard($context);
+                        if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
+                            $upgrade = null;
+                        }
                         
-                        $response = $response->withBody(new StringBody());
-                    }
-                    
-                    $response = $this->normalizeResponse($request, $response);
-                    $response = $response->withHeader('Connection', $upgrade ? 'upgrade' : ($close ? 'close' : 'keep-alive'));
-                    
-                    if (!$upgrade && !$close) {
-                        $response = $response->withHeader('Keep-Alive', \sprintf('timeout=%u, max=%u', $this->maxIdleTime, --$remaining));
-                    }
-                    
-                    yield from $this->sendRespone($context, $request, $response, $stream);
-                    
-                    if ($upgrade) {
-                        yield from $upgrade->upgradeConnection($context, $stream, $request, $response);
+                        yield $body->discard($context);
                         
-                        break;
+                        if ($request->getMethod() == Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode())) {
+                            yield $response->getBody()->discard($context);
+                            
+                            $response = $response->withBody(new StringBody());
+                        }
+                        
+                        $response = $this->normalizeResponse($request, $response);
+                        $response = $response->withHeader('Connection', $upgrade ? 'upgrade' : ($close ? 'close' : 'keep-alive'));
+                        
+                        if (!$upgrade && !$close) {
+                            $response = $response->withHeader('Keep-Alive', \sprintf('timeout=%u, max=%u', $this->maxIdleTime, --$remaining));
+                        }
+                        
+                        yield from $this->sendRespone($context, $request, $response, $stream);
+                        
+                        if ($upgrade) {
+                            yield from $upgrade->upgradeConnection($context, $stream, $request, $response);
+                            
+                            break;
+                        }
+                    } catch (\Throwable $e) {
+                        $stream->close($e);
+                        
+                        throw $e;
                     }
-                } catch (\Throwable $e) {
-                    $stream->close($e);
-                    
-                    throw $e;
-                }
-            } while (!$close && $remaining > 0);
-            
-            $stream->close();
+                } while (!$close && $remaining > 0);
+            } catch (StreamClosedException $e) {
+                // Client disconnected.
+            } finally {
+                $stream->close();
+            }
         });
     }
 

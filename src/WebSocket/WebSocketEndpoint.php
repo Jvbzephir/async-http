@@ -54,24 +54,19 @@ abstract class WebSocketEndpoint
     /**
      * WebSocket client connection has been established.
      *
+     * @param Context $context
      * @param Connection $conn
      */
-    public function onOpen(Connection $conn) { }
+    public function onOpen(Context $context, Connection $conn) { }
     
     /**
      * A client has disconnected.
      *
-     * @param Connection $conn
-     */
-    public function onClose(Connection $conn) { }
-    
-    /**
-     * An error occured while processing data from the given client.
-     *
+     * @param Context $context
      * @param Connection $conn
      * @param \Throwable $e
      */
-    public function onError(Connection $conn, \Throwable $e) { }
+    public function onClose(Context $context, Connection $conn, ?\Throwable $e = null) { }
     
     /**
      * Received a text message from the client.

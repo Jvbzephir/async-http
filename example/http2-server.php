@@ -41,7 +41,7 @@ $factory->createContext()->run(function (Context $context) {
     try {
         $socket = yield $server->accept($context);
         
-        yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
+        $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
             return new JsonResponse([
                 'dispatcher' => __FILE__
             ]);

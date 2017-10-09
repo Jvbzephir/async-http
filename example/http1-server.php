@@ -36,7 +36,7 @@ $factory->createContext()->run(function (Context $context) {
         while (true) {
             $socket = yield $server->accept($context);
             
-            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
+            $driver->listen($context, $socket, function (Context $context, HttpRequest $request) {
                 if ($request->getUri()->getPath() != '/') {
                     return new HttpResponse(Http::NOT_FOUND);
                 }

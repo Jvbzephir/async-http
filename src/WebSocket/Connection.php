@@ -330,6 +330,7 @@ class Connection implements InputChannel
     protected function processFrames(Context $context): \Generator
     {
         $message = null;
+        $e = null;
         
         try {
             while (true) {
@@ -347,7 +348,7 @@ class Connection implements InputChannel
                         }
                         continue 2;
                     case Frame::CONNECTION_CLOSE:
-                        throw new ConnectionException('Remote peer closes connection', Frame::CONNECTION_CLOSE);
+                        break 2;
                 }
                 
                 if ($message !== null) {
@@ -374,16 +375,16 @@ class Connection implements InputChannel
                     $message = $this->messages->send($context, $message);
                 }
             }
-        } catch (ConnectionException $e) {
-            if ($e->getCode() !== Frame::CONNECTION_CLOSE) {
-                try {
-                    yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $e->getCode())));
-                } catch (\Throwable $ex) {
-                    // Ignore this error.
-                }
-            }
         } catch (\Throwable $e) {
             // Forward error to close operations.
+        }
+        
+        try {
+            $code = ($e instanceof ConnectionException) ? $e->getCode() : Frame::NORMAL_CLOSURE;
+            
+            yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $code)));
+        } catch (\Throwable $ex) {
+            // Ignore this error.
         }
         
         $this->stream->close($e);

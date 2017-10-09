@@ -19,6 +19,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Stream\DuplexStream;
+use KoolKode\Async\Stream\StreamClosedException;
 
 class Http2Driver implements HttpDriver
 {
@@ -67,6 +68,8 @@ class Http2Driver implements HttpDriver
                 while (null !== ($stream = yield $conn->receive($context))) {
                     Context::rethrow($context->task($this->processRequest($context, $stream, $action)));
                 }
+            } catch (StreamClosedException $e) {
+                // Client disconnected.
             } finally {
                 $conn->close();
             }

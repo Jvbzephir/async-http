@@ -94,9 +94,10 @@ class WebSocketServer implements UpgradeResultHandler
         $deflate = $response->getAttribute(PerMessageDeflate::class);
         
         $conn = new Connection($context, false, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
+        $e = null;
         
         try {
-            $result = $endpoint->onOpen($conn);
+            $result = $endpoint->onOpen($context, $conn);
             
             if ($result instanceof \Generator) {
                 yield from $result;
@@ -113,14 +114,20 @@ class WebSocketServer implements UpgradeResultHandler
                     yield from $result;
                 }
             }
-        } finally {
-            $result = $endpoint->onClose($conn);
-            
-            if ($result instanceof \Generator) {
-                yield from $result;
-            }
-            
-            $conn->close();
+        } catch (\Throwable $e) {
+            // Will be passed to close.
+        }
+        
+        $result = $endpoint->onClose($context, $conn, $e);
+        
+        if ($result instanceof \Generator) {
+            yield from $result;
+        }
+        
+        $conn->close();
+        
+        if ($e) {
+            throw $e;
         }
     }
 
