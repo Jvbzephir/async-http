@@ -47,7 +47,7 @@ class WebSocketClient
      *
      * @param HttpClient $httpClient HTTP client to be used for handshake request (requires HTTP/1 connector).
      */
-    public function __construct(HttpClient $httpClient, bool $deflateSupported = false)
+    public function __construct(HttpClient $httpClient, bool $deflateSupported = true)
     {
         $this->httpClient = $httpClient;
         $this->deflateSupported = $deflateSupported;

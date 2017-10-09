@@ -28,14 +28,13 @@ $factory = new ContextFactory();
 $factory->registerLogger(new PipeLogHandler(PipeLogHandler::STDOUT));
 
 $factory->createContext()->run(function (Context $context) {
-    $endpoint = require __DIR__ . '/endpoint.php';
-    
     $tpl = file_get_contents(__DIR__ . '/index.html');
+    $websocket = require __DIR__ . '/endpoint.php';
     
-    $host = new HttpHost(function (Context $context, HttpRequest $request) use ($endpoint, $tpl) {
+    $host = new HttpHost(function (Context $context, HttpRequest $request) use ($tpl, $websocket) {
         switch ($request->getUri()->getPath()) {
             case '/chat.sock':
-                return $endpoint;
+                return $websocket;
             case '/chat.js':
                 return new FileResponse(__DIR__ . '/chat.js');
             case '/':

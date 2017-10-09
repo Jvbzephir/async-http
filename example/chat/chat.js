@@ -8,11 +8,12 @@
  */
 
 window.onload = function() {
-
 	function logMessage(message) {
 		var el = document.createElement('pre');
 		el.appendChild(document.createTextNode(message));
-		document.getElementById('websocket-log').appendChild(el);
+
+		var log = document.getElementById('websocket-log');
+		log.insertBefore(el, log.childNodes[0]);
 	}
 
 	var body = document.getElementsByTagName('body')[0];
