@@ -109,7 +109,7 @@ class HttpClient
     
     public function pipe(array $requests, int $concurrency = 8): Pipeline
     {
-        $pipeline = new Pipeline(new IterableChannel($requests), new \stdClass(), $concurrency);
+        $pipeline = new Pipeline(new IterableChannel($requests), $concurrency);
         
         return $pipeline->map(function (Context $context, HttpRequest $request) {
             return $this->send($context, $request);
