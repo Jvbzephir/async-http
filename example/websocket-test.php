@@ -42,6 +42,11 @@ $factory->createContext()->run(function (Context $context) {
         if ($request->getUri()->getPath() == '/websocket') {
             return new class() extends WebSocketEndpoint {
 
+                public function negotiateProtocol(array $protocols): string
+                {
+                    return \in_array('bar', $protocols, true) ? 'bar' : '';
+                }
+                
                 public function onTextMessage(Context $context, Connection $conn, string $message)
                 {
                     $context->info('Server received: {message}', [
@@ -60,9 +65,16 @@ $factory->createContext()->run(function (Context $context) {
         yield $server->listen($context);
     }));
     
-    $conn = yield $client->connect($context, 'ws://localhost:8080/websocket');
+    $conn = yield $client->connect($context, 'ws://localhost:8080/websocket', [
+        'foo',
+        'bar'
+    ]);
     
     try {
+        $context->info('Negotiated application protocol: {proto}', [
+            'proto' => $conn->getProtocol()
+        ]);
+        
         yield $conn->sendText($context, 'Hello World :)', true);
         
         $context->info('Client received: {message}', [
