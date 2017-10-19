@@ -14,7 +14,8 @@ namespace KoolKode\Async\Http;
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
 use KoolKode\Async\Http\Http1\Http1Driver;
-use KoolKode\Async\Http\Response\FileResponse;
+use KoolKode\Async\Http\Middleware\PathMatcher;
+use KoolKode\Async\Http\Middleware\PublishFiles;
 use KoolKode\Async\Http\Response\TextResponse;
 use KoolKode\Async\Http\WebSocket\WebSocketServer;
 use KoolKode\Async\Log\PipeLogHandler;
@@ -35,8 +36,6 @@ $factory->createContext()->run(function (Context $context) {
         switch ($request->getUri()->getPath()) {
             case '/chat.sock':
                 return $websocket;
-            case '/chat.js':
-                return new FileResponse(__DIR__ . '/chat.js');
             case '/':
                 return new TextResponse(strtr($tpl, [
                     '###URI###' => $request->getUri()
@@ -52,6 +51,8 @@ $factory->createContext()->run(function (Context $context) {
     $endpoint = new HttpEndpoint($driver);
     $endpoint = $endpoint->withAddress('tcp://127.0.0.1:8080');
     $endpoint = $endpoint->withDefaultHost($host);
+    
+    $endpoint = $endpoint->withMiddleware(new PathMatcher('/asset/(.+)', new PublishFiles(__DIR__ . '/asset')));
     
     yield $endpoint->listen($context);
 });
