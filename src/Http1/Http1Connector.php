@@ -18,6 +18,7 @@ use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpRequest;
@@ -36,10 +37,13 @@ class Http1Connector implements HttpConnector
     
     protected $parser;
     
+    protected $filesystem;
+    
     public function __construct(ConnectionManager $manager, ?MessageParser $parser = null)
     {
         $this->manager = $manager;
         $this->parser = $parser ?? new MessageParser();
+        $this->filesystem = new FilesystemProxy();
     }
     
     /**
@@ -244,7 +248,6 @@ class Http1Connector implements HttpConnector
     protected function sendRequest(Context $context, HttpRequest $request, DuplexStream $stream): \Generator
     {
         $body = $request->getBody();
-        
         $bodyStream = yield $body->getReadableStream($context);
         
         try {
@@ -257,6 +260,22 @@ class Http1Connector implements HttpConnector
                 $size = $len;
             } else {
                 $size = yield $body->getSize($context);
+            }
+            
+            if ($size === null && $request->getProtocolVersion() == '1.0') {
+                $temp = yield $this->filesystem->tempStream();
+                
+                try {
+                    do {
+                        $sent += yield $temp->write($context, $chunk);
+                    } while (null !== ($chunk = yield $bodyStream->read($context)));
+                } finally {
+                    $temp->close();
+                }
+                
+                $size = yield $temp->size($context);
+                $bodyStream = yield $temp->readStream($context);
+                $chunk = yield $bodyStream->read($context);
             }
             
             $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");

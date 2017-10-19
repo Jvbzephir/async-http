@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http1;
 use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Promise;
+use KoolKode\Async\Filesystem\FilesystemProxy;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
@@ -48,6 +49,8 @@ class Http1Driver implements HttpDriver
      */
     protected $parser;
     
+    protected $filesystem;
+    
     /**
      * Registered HTTP upgrade handlers that implement a connection update based on a value returned from an HTTP handler.
      * 
@@ -58,6 +61,7 @@ class Http1Driver implements HttpDriver
     public function __construct(?MessageParser $parser = null)
     {
         $this->parser = $parser ?? new MessageParser();
+        $this->filesystem = new FilesystemProxy();
     }
     
     public function withKeepAlive(int $keepAlive): self
@@ -293,6 +297,22 @@ class Http1Driver implements HttpDriver
                 $size = $len;
             } else {
                 $size = yield $body->getSize($context);
+            }
+            
+            if ($size === null && $request->getProtocolVersion() == '1.0') {
+                $temp = yield $this->filesystem->tempStream();
+                
+                try {
+                    do {
+                        $sent += yield $temp->write($context, $chunk);
+                    } while (null !== ($chunk = yield $bodyStream->read($context)));
+                } finally {
+                    $temp->close();
+                }
+                
+                $size = yield $temp->size($context);
+                $bodyStream = yield $temp->readStream($context);
+                $chunk = yield $bodyStream->read($context);
             }
             
             $sent = yield $stream->write($context, $this->serializeHeaders($response, $size) . "\r\n");

@@ -24,6 +24,7 @@ class FileBodyTest extends AsyncTestCase
         $body = new FileBody(__FILE__);
         
         $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents($context));
+        $this->assertEquals(file_get_contents(__FILE__), yield $body->getContents($context));
     }
 
     public function testCanInjectFilesystem(Context $context)
