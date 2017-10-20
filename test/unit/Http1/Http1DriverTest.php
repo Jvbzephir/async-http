@@ -40,7 +40,7 @@ class Http1DriverTest extends AsyncTestCase
         $this->assertTrue($driver->isSupported(''));
         $this->assertFalse($driver->isSupported('h2'));
     }
-    
+
     public function testDetectsInvalidKeepAlive()
     {
         $driver = new Http1Driver();
@@ -49,7 +49,7 @@ class Http1DriverTest extends AsyncTestCase
         
         $driver->withKeepAlive(-1);
     }
-    
+
     public function testDetectsInvalidMaxIdleTimeout()
     {
         $driver = new Http1Driver();
@@ -232,7 +232,7 @@ class Http1DriverTest extends AsyncTestCase
             });
         });
     }
-    
+
     public function testCanFailAfterUpgrade(Context $context)
     {
         yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
@@ -364,6 +364,46 @@ class Http1DriverTest extends AsyncTestCase
         });
     }
 
+    public function testBodyWithUnknownLengthIsBufferedForHttp10(Context $context)
+    {
+        $payload = str_repeat('A', 8192 * 10);
+        
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) use ($payload) {
+            $parser = new MessageParser();
+            
+            yield $socket->write($context, implode("\r\n", [
+                'GET / HTTP/1.0',
+                'Content-Length: 0',
+                "\r\n"
+            ]));
+            
+            $response = yield from $parser->parseResponse($context, $socket);
+            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.0', $response->getProtocolVersion());
+            $this->assertEquals(Http::OK, $response->getStatusCode());
+            $this->assertEquals(strlen($payload), (int) $response->getHeaderLine('Content-Length'));
+            $this->assertEquals($payload, yield $response->getBody()->getContents($context));
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) use ($payload) {
+            $driver = new Http1Driver();
+            $driver = $driver->withKeepAlive(0);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) use ($payload) {
+                $this->assertEquals(Http::GET, $request->getMethod());
+                $this->assertEquals('1.0', $request->getProtocolVersion());
+                $this->assertEquals('/', $request->getRequestTarget());
+                $this->assertEquals('', yield $request->getBody()->getContents($context));
+                
+                return yield from $responder($context, new HttpResponse(Http::OK, [
+                    'Conent-Type' => 'text/plain'
+                ], new StreamBody(new ReadableMemoryStream($payload))));
+            });
+        });
+    }
+
     public function testServerEnforcesMaxNumberOfRequests(Context $context)
     {
         yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
@@ -425,6 +465,88 @@ class Http1DriverTest extends AsyncTestCase
             
             yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
                 return yield from $responder($context, new HttpResponse(Http::NO_CONTENT));
+            });
+        });
+    }
+
+    public function testExpectContinueWillSendContinue(Context $context)
+    {
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $parser = new MessageParser();
+            
+            yield $socket->write($context, implode("\r\n", [
+                'PUT /test HTTP/1.1',
+                'Content-Type: text/plain',
+                'Content-Length: 14',
+                'Expect: 100-continue',
+                "\r\n"
+            ]) . 'Hello World :)');
+            
+            $response = yield from $parser->parseResponse($context, $socket);
+            $this->assertEquals(Http::CONTINUE, $response->getStatusCode());
+            
+            $response = yield from $parser->parseResponse($context, $socket);
+            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::CREATED, $response->getStatusCode());
+            $this->assertEquals(4, (int) $response->getHeaderLine('Content-Length'));
+            $this->assertEquals('DONE', yield $response->getBody()->getContents($context));
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) {
+            $driver = new Http1Driver();
+            $driver = $driver->withKeepAlive(0);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
+                $this->assertEquals(Http::PUT, $request->getMethod());
+                $this->assertEquals('1.1', $request->getProtocolVersion());
+                $this->assertEquals('/test', $request->getRequestTarget());
+                $this->assertEquals('Hello World :)', yield $request->getBody()->getContents($context));
+                
+                return yield from $responder($context, new HttpResponse(Http::CREATED, [
+                    'Conent-Type' => 'text/plain'
+                ], new StringBody('DONE')));
+            });
+        });
+    }
+
+    public function testExpectContinueCanSendFinalResponse(Context $context)
+    {
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $parser = new MessageParser();
+            
+            yield $socket->write($context, implode("\r\n", [
+                'PUT /test HTTP/1.1',
+                'Content-Type: text/plain',
+                'Content-Length: 14',
+                'Expect: 100-continue',
+                "\r\n"
+            ]) . 'Hello World :)');
+            
+            $response = yield from $parser->parseResponse($context, $socket);
+            $response = $response->withBody(new StreamBody($parser->parseBodyStream($response, $socket, false)));
+            
+            $this->assertTrue($response instanceof HttpResponse);
+            $this->assertEquals('1.1', $response->getProtocolVersion());
+            $this->assertEquals(Http::CREATED, $response->getStatusCode());
+            $this->assertEquals(4, (int) $response->getHeaderLine('Content-Length'));
+            $this->assertEquals('DONE', yield $response->getBody()->getContents($context));
+            
+            $this->assertNull(yield $socket->read($context));
+        }, function (Context $context, Socket $socket) {
+            $driver = new Http1Driver();
+            $driver = $driver->withKeepAlive(0);
+            
+            yield $driver->listen($context, $socket, function (Context $context, HttpRequest $request, callable $responder) {
+                $this->assertEquals(Http::PUT, $request->getMethod());
+                $this->assertEquals('1.1', $request->getProtocolVersion());
+                $this->assertEquals('/test', $request->getRequestTarget());
+                
+                return yield from $responder($context, new HttpResponse(Http::CREATED, [
+                    'Conent-Type' => 'text/plain'
+                ], new StringBody('DONE')));
             });
         });
     }

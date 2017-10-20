@@ -26,13 +26,16 @@ class MessageParser
 {
     public function parseRequest(Context $context, ReadableStream $stream): \Generator
     {
-        if (null === ($line = yield $stream->readLine($context))) {
+        $lines = yield $stream->readTo($context, "\r\n\r\n");
+        
+        if ($lines === null) {
             throw new StreamClosedException('Stream closed before request line was read');
         }
         
+        $lines = \explode("\n", \ltrim($lines));
         $m = null;
         
-        if (!\preg_match("'^(\S+)\s+?(\S+)\s+?HTTP/(1\\.[01])$'iU", \trim($line), $m)) {
+        if (!\preg_match("'^(\S+)\s+?(\S+)\s+?HTTP/(1\\.[01])$'iU", \trim($lines[0]), $m)) {
             throw new \RuntimeException('Invalid HTTP request line received');
         }
         
@@ -40,7 +43,7 @@ class MessageParser
         $target = $m[2];
         $version = $m[3];
         
-        $request = new HttpRequest($target, $method, yield from $this->parseHeaders($context, $stream), null, $version);
+        $request = new HttpRequest($target, $method, $this->parseHeaders(\array_slice($lines, 1)), null, $version);
         $request = $request->withRequestTarget($target);
         
         if ($target != '*' && $request->hasHeader('Host', false)) {
@@ -58,13 +61,16 @@ class MessageParser
 
     public function parseResponse(Context $context, ReadableStream $stream): \Generator
     {
-        if (null === ($line = yield $stream->readLine($context))) {
+        $lines = yield $stream->readTo($context, "\r\n\r\n");
+        
+        if ($lines === null) {
             throw new StreamClosedException('Stream closed before response line was read');
         }
         
+        $lines = \explode("\n", \ltrim($lines));
         $m = null;
         
-        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($line), $m)) {
+        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($lines[0]), $m)) {
             throw new \RuntimeException('Invalid HTTP response line received');
         }
         
@@ -72,7 +78,7 @@ class MessageParser
         $status = (int) $m[2];
         $reason = \trim($m[3] ?? '');
         
-        $response = new HttpResponse($status, yield from $this->parseHeaders($context, $stream), null, $version);
+        $response = new HttpResponse($status, $this->parseHeaders(\array_slice($lines, 1)), null, $version);
         $response = $response->withReason($reason);
         
         return $response;
@@ -91,20 +97,16 @@ class MessageParser
         return $close ? $stream : new ReadableMemoryStream();
     }
 
-    protected function parseHeaders(Context $context, ReadableStream $stream): \Generator
+    protected function parseHeaders(array $lines): array
     {
-        if (null === ($lines = yield $stream->readTo($context, "\r\n\r\n"))) {
-            throw new StreamClosedException('Stream closed before headers were read');
-        }
-        
-        $lines = \explode("\n", $lines);
         $headers = [];
         
-        for ($count = \count($lines), $i = 0; $i < $count; $i++) {
-            list ($k, $v) = \explode(':', $lines[$i], 2);
-            $k = \trim($k);
+        foreach ($lines as $line) {
+            if (false === ($pos = \strpos($line, ':'))) {
+                throw new StreamClosedException('Stream closed before headers were read');
+            }
             
-            $headers[$k][] = $v;
+            $headers[\substr($line, 0, $pos)][] = \substr($line, $pos + 1);
         }
         
         return $headers;

@@ -151,7 +151,12 @@ class Http1Driver implements HttpDriver
                         
                         $request = $request->withoutHeader('Content-Length');
                         $request = $request->withoutHeader('Transfer-Encoding');
-                        $request = $request->withBody($body = new StreamBody($body));
+                        
+                        if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {
+                            $request = $request->withBody(new ServerBody($body, $stream));
+                        } else {
+                            $request = $request->withBody(new StreamBody($body));
+                        }
                         
                         $upgrade = null;
                         
@@ -170,8 +175,6 @@ class Http1Driver implements HttpDriver
                         if ($upgrade && $response->getStatusCode() !== Http::SWITCHING_PROTOCOLS) {
                             $upgrade = null;
                         }
-                        
-                        yield $body->discard($context);
                         
                         if ($request->getMethod() == Http::HEAD || Http::isResponseWithoutBody($response->getStatusCode())) {
                             yield $response->getBody()->discard($context);
@@ -299,12 +302,14 @@ class Http1Driver implements HttpDriver
                 $size = yield $body->getSize($context);
             }
             
+            yield $request->getBody()->discard($context);
+            
             if ($size === null && $request->getProtocolVersion() == '1.0') {
-                $temp = yield $this->filesystem->tempStream();
+                $temp = yield $this->filesystem->tempStream($context);
                 
                 try {
                     do {
-                        $sent += yield $temp->write($context, $chunk);
+                        yield $temp->write($context, $chunk);
                     } while (null !== ($chunk = yield $bodyStream->read($context)));
                 } finally {
                     $temp->close();

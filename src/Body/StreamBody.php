@@ -74,36 +74,38 @@ class StreamBody implements HttpBody
     public function getContents(Context $context): Promise
     {
         return $context->task(function (Context $context) {
+            $stream = yield $this->getReadableStream($context);
             $buffer = '';
             
             try {
-                while (null !== ($chunk = yield $this->stream->read($context))) {
+                while (null !== ($chunk = yield $stream->read($context))) {
                     $buffer .= $chunk;
                 }
             } finally {
-                $this->stream->close();
+                $stream->close();
             }
             
             return $buffer;
         });
     }
-    
+
     /**
      * {@inheritdoc}
      */
     public function discard(Context $context): Promise
     {
         return $context->task(function (Context $context) {
+            $stream = yield $this->getReadableStream($context);
             $len = 0;
             
             try {
-                while (null !== ($chunk = yield $this->stream->read($context))) {
+                while (null !== ($chunk = yield $stream->read($context))) {
                     $len += \strlen($chunk);
                 }
             } catch (StreamClosedException $e) {
                 // Ignore closed stream during discard.
             } finally {
-                $this->stream->close();
+                $stream->close();
             }
             
             return $len;

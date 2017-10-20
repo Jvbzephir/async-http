@@ -135,7 +135,7 @@ class Http1Connector implements HttpConnector
             }
             
             $defer = new Deferred($context);
-            $body = new StreamBody(new EntityStream($stream, true, $defer));
+            $body = new StreamBody(new EntityStream($stream, $defer));
             
             $response = $response->withoutHeader('Content-Length');
             $response = $response->withoutHeader('Transfer-Encoding');

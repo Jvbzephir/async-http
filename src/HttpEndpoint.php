@@ -295,30 +295,26 @@ class HttpEndpoint
             }
             
             $name = $request->getUri()->getHostWithPort(true);
-            $handler = null;
+            $host = null;
             
-            foreach ($this->hosts as $matcher => $host) {
-                if ($secure && !$host->isEncrypted()) {
+            foreach ($this->hosts as $matcher => $candidate) {
+                if ($secure && !$candidate->isEncrypted()) {
                     continue;
                 }
                 
-                if ($host->isEncrypted()) {
-                    continue;
-                }
-                
-                if (\preg_match($matcher, $name)) {
-                    $handler = $host;
+                if (!$candidate->isEncrypted() && \preg_match($matcher, $name)) {
+                    $host = $candidate;
                     
                     break;
                 }
             }
             
-            if ($handler === null) {
-                $handler = $secure ? $this->defaultEncryptedHost : $this->defaultHost[1];
+            if ($host === null) {
+                $host = $secure ? $this->defaultEncryptedHost : $this->defaultHost[1];
             }
             
-            $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($handler, $responder) {
-                return yield from $handler->handleRequest($context, $request, $responder);
+            $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($host, $responder) {
+                return yield from $host->handleRequest($context, $request, $responder);
             });
             
             return yield from $next($context, $request);
