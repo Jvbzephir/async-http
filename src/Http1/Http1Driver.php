@@ -21,6 +21,7 @@ use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpDriver;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
+use KoolKode\Async\Http\Body\ContinuationBody;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Stream\DuplexStream;
@@ -153,7 +154,11 @@ class Http1Driver implements HttpDriver
                         $request = $request->withoutHeader('Transfer-Encoding');
                         
                         if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {
-                            $request = $request->withBody(new ServerBody($body, $stream));
+                            $request = $request->withBody(new ContinuationBody($body, function (Context $context, $result) use ($stream) {
+                                yield $stream->write($context, Http::getStatusLine(Http::CONTINUE) . "\r\n\r\n");
+                                
+                                return $result;
+                            }));
                         } else {
                             $request = $request->withBody(new StreamBody($body));
                         }

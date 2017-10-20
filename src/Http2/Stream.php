@@ -17,12 +17,13 @@ use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Http\Http;
+use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Uri;
+use KoolKode\Async\Http\Body\ContinuationBody;
 use KoolKode\Async\Http\Body\StreamBody;
-use KoolKode\Async\Stream\ReadableStream;
 use KoolKode\Async\Stream\StreamClosedException;
 
 class Stream implements Disposable
@@ -97,7 +98,7 @@ class Stream implements Disposable
                 $uri = Uri::parse(\sprintf('%s://%s/%s', $scheme, $authority, \ltrim($path, '/')));
             }
             
-            $request = new HttpRequest($uri, $method, [], new StreamBody($this->entity), '2.0');
+            $request = new HttpRequest($uri, $method, [], null, '2.0');
             $request = $request->withRequestTarget($path);
             
             foreach ($headers as $header) {
@@ -107,6 +108,21 @@ class Stream implements Disposable
             }
             
             $request = $request->withHeader('Host', $authority);
+            
+            if (\in_array('100-continue', $request->getHeaderTokenValues('Expect'), true)) {
+                $request = $request->withBody(new ContinuationBody($this->entity, function (Context $context, $stream) {
+                    yield from $this->sendHeaders($context, $this->hpack->encode([
+                        [
+                            ':status',
+                            Http::CONTINUE
+                        ]
+                    ]));
+                    
+                    return $stream;
+                }));
+            } else {
+                $request = $request->withBody(new StreamBody($this->entity));
+            }
         } catch (\Throwable $e) {
             $this->close();
             
@@ -140,7 +156,7 @@ class Stream implements Disposable
                     'host'
                 ]));
                 
-                yield from $this->sendBody($context, yield $request->getBody()->getReadableStream($context));
+                yield from $this->sendBody($context, $request);
                 
                 $headers = $this->hpack->decode(yield $context->keepBusy($this->placeholder->promise()));
             } finally {
@@ -185,7 +201,7 @@ class Stream implements Disposable
             ]), $nobody);
             
             if (!$nobody) {
-                yield from $this->sendBody($context, yield $response->getBody()->getReadableStream($context));
+                yield from $this->sendBody($context, $response, $request->getBody());
             }
         } catch (\Throwable $e) {
             $this->close($e);
@@ -271,14 +287,24 @@ class Stream implements Disposable
         }
     }
 
-    protected function sendBody(Context $context, ReadableStream $body): \Generator
+    protected function sendBody(Context $context, HttpMessage $message, ?HttpBody $body = null): \Generator
     {
-        $chunkSize = 8192;
-        $sent = 0;
+        $stream = yield $message->getBody()->getReadableStream($context);
         
         try {
-            while (null !== ($chunk = yield $body->read($context))) {
+            $chunkSize = 8192;
+            $sent = 0;
+            
+            while (null !== ($chunk = yield $stream->read($context))) {
                 $len = \strlen($chunk);
+                
+                if ($body) {
+                    try {
+                        yield $body->discard($context);
+                    } finally {
+                        $body = null;
+                    }
+                }
                 
                 while ($this->outputWindow < $len) {
                     $this->outputDefer = new Placeholder($context);
@@ -302,7 +328,11 @@ class Stream implements Disposable
             
             yield $this->stream->writeFrame($context, new Frame(Frame::DATA, $this->id, '', Frame::END_STREAM));
         } finally {
-            $body->close();
+            $stream->close();
+            
+            if ($body) {
+                yield $body->discard($context);
+            }
         }
         
         return $sent;
