@@ -32,6 +32,8 @@ class HttpClient
     protected $connectors;
     
     protected $connecting = [];
+    
+    protected $clientSettings;
 
     public function __construct(HttpConnector ...$connectors)
     {
@@ -40,10 +42,22 @@ class HttpClient
         }
         
         $this->connectors = $connectors;
+        $this->clientSettings = new ClientSettings();
         
         \usort($this->connectors, function (HttpConnector $a, HttpConnector $b) {
             return $b->getPriority() <=> $a->getPriority();
         });
+    }
+
+    public function request(string $uri, string $method = Http::GET, array $headers = []): RequestBuilder
+    {
+        $builder = new RequestBuilder($this, $uri, $method);
+        
+        foreach ($headers as $k => $v) {
+            $builder->header($k, ...(array) $v);
+        }
+        
+        return $builder->attribute(ClientSettings::class, $this->clientSettings);
     }
     
     public function send(Context $context, HttpRequest $request): Promise

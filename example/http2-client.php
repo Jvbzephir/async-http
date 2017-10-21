@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http1\ConnectionManager;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Http\Http2\Http2Connector;
@@ -55,10 +54,11 @@ $factory->createContext()->run(function (Context $context) {
     
     yield from $log($context, yield $client->get($context, 'https://http2.golang.org/reqinfo'));
     
-    yield from $log($context, yield $client->send($context, new HttpRequest('https://http2.golang.org/ECHO', Http::PUT, [
+    $request = $client->request('https://http2.golang.org/ECHO', Http::PUT, [
         'Content-Type' => 'text/plain'
-    ], new StringBody('Hello World!'))));
+    ])->body('Hello World!')->expectContinue(true);
     
+    yield from $log($context, yield $request->send($context));
     yield from $log($context, yield $client->get($context, 'https://httpbin.org/gzip'));
     
     $context->info('Request JSON from the server', [

@@ -16,6 +16,7 @@ namespace KoolKode\Async\Http\Http2;
 use KoolKode\Async\Context;
 use KoolKode\Async\Disposable;
 use KoolKode\Async\Placeholder;
+use KoolKode\Async\Http\ClientSettings;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpBody;
 use KoolKode\Async\Http\HttpMessage;
@@ -135,6 +136,8 @@ class Stream implements Disposable
     public function sendRequest(Context $context, HttpRequest $request): \Generator
     {
         try {
+            $settings = $request->getAttribute(ClientSettings::class) ?? new ClientSettings();
+            
             $uri = $request->getUri();
             $target = $request->getRequestTarget();
             
@@ -144,17 +147,39 @@ class Stream implements Disposable
                 $path = '/' . \ltrim($request->getRequestTarget(), '/');
             }
             
+            $headers = [
+                ':method' => (array) $request->getMethod(),
+                ':scheme' => (array) $uri->getScheme(),
+                ':authority' => (array) $uri->getAuthority(),
+                ':path' => (array) $path
+            ];
+            
+            if ($settings->isExpectContinue()) {
+                $headers['expect'] = (array) '100-continue';
+                $expect = true;
+            } else {
+                $expect = false;
+            }
+            
             $this->placeholder = new Placeholder($context);
             
             try {
-                yield from $this->sendHeaders($context, $this->encodeHeaders($request, [
-                    ':method' => (array) $request->getMethod(),
-                    ':scheme' => (array) $uri->getScheme(),
-                    ':authority' => (array) $uri->getAuthority(),
-                    ':path' => (array) $path
-                ], [
+                yield from $this->sendHeaders($context, $this->encodeHeaders($request, $headers, [
                     'host'
                 ]));
+                
+                if ($expect) {
+                    $headers = $this->hpack->decode(yield $context->keepBusy($this->placeholder->promise()));
+                    $response = $this->unserializeResponse($headers, false);
+                    
+                    $this->placeholder = new Placeholder($context);
+                    
+                    if ($response->getStatusCode() != Http::CONTINUE) {
+                        yield $request->getBody()->discard($context);
+                        
+                        return $response;
+                    }
+                }
                 
                 yield from $this->sendBody($context, $request);
                 
@@ -163,20 +188,31 @@ class Stream implements Disposable
                 $this->placeholder = null;
             }
             
-            $status = (int) $this->getFirstHeader(':status', $headers);
-            
-            $response = new HttpResponse($status, [], new StreamBody($this->entity), '2.0');
-            $response = $response->withReason(Http::getReason($status));
-            
-            foreach ($headers as $header) {
-                if (\substr($header[0], 0, 1) !== ':') {
-                    $response = $response->withAddedHeader(...$header);
-                }
-            }
+            $response = $this->unserializeResponse($headers);
         } catch (\Throwable $e) {
             $this->close($e);
             
             throw $e;
+        }
+        
+        return $response;
+    }
+    
+    protected function unserializeResponse(array $headers, bool $body = true)
+    {
+        $status = (int) $this->getFirstHeader(':status', $headers);
+        
+        $response = new HttpResponse($status, [], null, '2.0');
+        $response = $response->withReason(Http::getReason($status));
+        
+        foreach ($headers as $header) {
+            if (\substr($header[0], 0, 1) !== ':') {
+                $response = $response->withAddedHeader(...$header);
+            }
+        }
+        
+        if ($body) {
+            $response = $response->withBody(new StreamBody($this->entity));
         }
         
         return $response;

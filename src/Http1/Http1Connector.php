@@ -20,6 +20,7 @@ use KoolKode\Async\Deferred;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Success;
 use KoolKode\Async\Filesystem\FilesystemProxy;
+use KoolKode\Async\Http\ClientSettings;
 use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpConnector;
 use KoolKode\Async\Http\HttpRequest;
@@ -247,6 +248,8 @@ class Http1Connector implements HttpConnector
 
     protected function sendRequest(Context $context, HttpRequest $request, DuplexStream $stream): \Generator
     {
+        $settings = $request->getAttribute(ClientSettings::class) ?? new ClientSettings();
+        
         $body = $request->getBody();
         $bodyStream = yield $body->getReadableStream($context);
         
@@ -280,8 +283,8 @@ class Http1Connector implements HttpConnector
             
             $expect = false;
             
-            if ($size === null || $size > 0x7FFF) { 
-                if ($request->getProtocolVersion() != '1.0') {
+            if ($size === null || $size > 0x7FFF) {
+                if ($settings->isExpectContinue() && $request->getProtocolVersion() != '1.0') {
                     $request = $request->withHeader('Expect', '100-continue');
                     $expect = true;
                 }
@@ -290,8 +293,10 @@ class Http1Connector implements HttpConnector
             $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");
             
             while ($expect) {
+                $timeout = $settings->getExpectContinueTimeout();
+                
                 try {
-                    $response = yield from $this->parser->parseResponse($context->cancelAfter($this->expectContinueTimeout), $stream);
+                    $response = yield from $this->parser->parseResponse($context->cancelAfter($timeout), $stream);
                 } catch (CancellationException $e) {
                     break;
                 }
@@ -308,28 +313,39 @@ class Http1Connector implements HttpConnector
                 return $response;
             }
             
-            if ($size === null) {
-                do {
-                    $sent += yield $stream->write($context, \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n");
-                } while (null !== ($chunk = yield $bodyStream->read($context)));
-                
-                yield $stream->write($context, "0\r\n\r\n");
-            } elseif ($size > 0) {
-                do {
-                    $sent += yield $stream->write($context, $chunk);
-                } while (null !== ($chunk = yield $bodyStream->read($context)));
-            }
+            list ($response) = yield $context->all([
+                function (Context $context) use ($stream) {
+                    $response = yield from $this->parser->parseResponse($context, $stream);
+                    
+                    if ($response->getStatusCode() != Http::CONTINUE) {
+                        return $response;
+                    }
+                    
+                    return yield from $this->parser->parseResponse($context, $stream);
+                },
+                function (Context $context) use ($stream, $bodyStream, $size, $chunk) {
+                    $sent = 0;
+                    
+                    if ($size === null) {
+                        do {
+                            $sent += yield $stream->write($context, \dechex(\strlen($chunk)) . "\r\n" . $chunk . "\r\n");
+                        } while (null !== ($chunk = yield $bodyStream->read($context)));
+                        
+                        yield $stream->write($context, "0\r\n\r\n");
+                    } elseif ($size > 0) {
+                        do {
+                            $sent += yield $stream->write($context, $chunk);
+                        } while (null !== ($chunk = yield $bodyStream->read($context)));
+                    }
+                    
+                    return $sent;
+                }
+            ]);
         } finally {
             $bodyStream->close();
         }
         
-        $response = yield from $this->parser->parseResponse($context, $stream);
-        
-        if ($response->getStatusCode() != Http::CONTINUE) {
-            return $response;
-        }
-        
-        return yield from $this->parser->parseResponse($context, $stream);
+        return $response;
     }
 
     protected function serializeHeaders(HttpRequest $request, ?int $size): string
