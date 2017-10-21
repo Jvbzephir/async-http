@@ -60,8 +60,16 @@ class HttpClient
         return $builder->attribute(ClientSettings::class, $this->clientSettings);
     }
     
-    public function send(Context $context, HttpRequest $request): Promise
+    public function send(Context $context, $request): Promise
     {
+        if ($request instanceof RequestBuilder) {
+            $request = $request->build();
+        }
+        
+        if (!$request instanceof HttpRequest) {
+            throw new \InvalidArgumentException('HttpRequest or RequestBuilder expected');
+        }
+        
         $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) {
             $uri = $request->getUri();
             $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
@@ -123,7 +131,21 @@ class HttpClient
     
     public function sendAll(array $requests, int $concurrency = 8): Pipeline
     {
-        $pipeline = new Pipeline(new IterableChannel($requests), $concurrency);
+        $input = [];
+        
+        foreach ($requests as $request) {
+            if ($request instanceof RequestBuilder) {
+                $request = $request->build();
+            }
+            
+            if (!$request instanceof HttpRequest) {
+                throw new \InvalidArgumentException('HttpRequest or RequestBuilder expected');
+            }
+            
+            $input[] = $request;
+        }
+        
+        $pipeline = new Pipeline(new IterableChannel($input), $concurrency);
         
         return $pipeline->map(function (Context $context, HttpRequest $request) {
             return $this->send($context, $request);

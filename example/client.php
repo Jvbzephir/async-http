@@ -13,7 +13,6 @@ namespace KoolKode\Async\Http;
 
 use KoolKode\Async\Context;
 use KoolKode\Async\ContextFactory;
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Http1\ConnectionManager;
 use KoolKode\Async\Http\Http1\Http1Connector;
 use KoolKode\Async\Log\PipeLogHandler;
@@ -31,12 +30,12 @@ $factory->createContext()->run(function (Context $context) {
     $client = new HttpClient(new Http1Connector($manager));
     
     $requests = [
-        new HttpRequest('http://httpbin.org/anything', Http::PUT, [
+        $client->request('http://httpbin.org/anything', Http::PUT, [
             'Content-Type' => 'application/json',
             'User-Agent' => 'PHP/' . PHP_VERSION
-        ], new StringBody('{"message":"Hello Server :)"}')),
-        new HttpRequest('http://httpbin.org/anything'),
-        new HttpRequest('http://httpbin.org/anything')
+        ])->body('{"message":"Hello Server :)"}'),
+        $client->request('http://httpbin.org/anything'),
+        $client->request('http://httpbin.org/anything')
     ];
     
     yield $client->sendAll($requests)->map(function (Context $context, HttpResponse $response) {
