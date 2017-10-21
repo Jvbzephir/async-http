@@ -107,7 +107,7 @@ class HttpClient
         return $context->task($next($context, $request));
     }
     
-    public function pipe(array $requests, int $concurrency = 8): Pipeline
+    public function sendAll(array $requests, int $concurrency = 8): Pipeline
     {
         $pipeline = new Pipeline(new IterableChannel($requests), $concurrency);
         

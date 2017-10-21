@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\Http1;
 
+use KoolKode\Async\CancellationException;
 use KoolKode\Async\CancellationToken;
 use KoolKode\Async\Context;
 use KoolKode\Async\Deferred;
@@ -32,6 +33,8 @@ class Http1Connector implements HttpConnector
     protected $keepAlive = true;
     
     protected $maxLifetime = 30;
+    
+    protected $expectContinueTimeout = 2000;
  
     protected $manager;
     
@@ -119,12 +122,9 @@ class Http1Connector implements HttpConnector
         } while ($conn === null);
         
         try {
-            $request = $this->normalizeRequest($request);
+            $request = $token->throwIfCancelled($this->normalizeRequest($request));
+            $response = $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $conn->stream));
             
-            $token->throwIfCancelled();
-            $token->throwIfCancelled(yield from $this->sendRequest($context, $request, $conn->stream));
-            
-            $response = $token->throwIfCancelled(yield from $this->parser->parseResponse($context, $conn->stream));
             $upgrade = ($response->getStatusCode() == Http::SWITCHING_PROTOCOLS);
             $close = (!$upgrade && $this->shouldConnectionBeClosed($response));
             
@@ -278,7 +278,35 @@ class Http1Connector implements HttpConnector
                 $chunk = yield $bodyStream->read($context);
             }
             
+            $expect = false;
+            
+            if ($size === null || $size > 0x7FFF) { 
+                if ($request->getProtocolVersion() != '1.0') {
+                    $request = $request->withHeader('Expect', '100-continue');
+                    $expect = true;
+                }
+            }
+            
             $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");
+            
+            while ($expect) {
+                try {
+                    $response = yield from $this->parser->parseResponse($context->cancelAfter($this->expectContinueTimeout), $stream);
+                } catch (CancellationException $e) {
+                    break;
+                }
+                
+                switch ($response->getStatusCode()) {
+                    case Http::CONTINUE:
+                        break 2;
+                    case Http::EXPECTATION_FAILED:
+                        $request = $request->withoutHeader('Expect');
+                        $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");
+                        break 2;
+                }
+                
+                return $response;
+            }
             
             if ($size === null) {
                 do {
@@ -295,7 +323,13 @@ class Http1Connector implements HttpConnector
             $bodyStream->close();
         }
         
-        return $sent;
+        $response = yield from $this->parser->parseResponse($context, $stream);
+        
+        if ($response->getStatusCode() != Http::CONTINUE) {
+            return $response;
+        }
+        
+        return yield from $this->parser->parseResponse($context, $stream);
     }
 
     protected function serializeHeaders(HttpRequest $request, ?int $size): string

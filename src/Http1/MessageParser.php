@@ -14,6 +14,7 @@ declare(strict_types = 1);
 namespace KoolKode\Async\Http\Http1;
 
 use KoolKode\Async\Context;
+use KoolKode\Async\Http\Http;
 use KoolKode\Async\Http\HttpMessage;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
@@ -61,16 +62,17 @@ class MessageParser
 
     public function parseResponse(Context $context, ReadableStream $stream): \Generator
     {
-        $lines = yield $stream->readTo($context, "\r\n\r\n");
+        do {
+            $line = yield $stream->readLine($context);
+            
+            if ($line === null) {
+                throw new StreamClosedException('Stream closed before response line was read');
+            }
+        } while ($line === '');
         
-        if ($lines === null) {
-            throw new StreamClosedException('Stream closed before response line was read');
-        }
-        
-        $lines = \explode("\n", \ltrim($lines));
         $m = null;
         
-        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($lines[0]), $m)) {
+        if (!\preg_match("'^HTTP/(1\\.[01])\s+?([0-9]+)(\s+?.*)?$'iU", \trim($line), $m)) {
             throw new \RuntimeException('Invalid HTTP response line received');
         }
         
@@ -78,7 +80,19 @@ class MessageParser
         $status = (int) $m[2];
         $reason = \trim($m[3] ?? '');
         
-        $response = new HttpResponse($status, $this->parseHeaders(\array_slice($lines, 1)), null, $version);
+        if ($status == Http::CONTINUE) {
+            return new HttpResponse($status, [], null, $version);
+        }
+        
+        $lines = yield $stream->readTo($context, "\r\n\r\n");
+        
+        if ($lines === null) {
+            throw new StreamClosedException('Stream closed before response line was read');
+        }
+        
+        $lines = \explode("\n", \ltrim($lines));
+        
+        $response = new HttpResponse($status, $this->parseHeaders($lines), null, $version);
         $response = $response->withReason($reason);
         
         return $response;

@@ -39,7 +39,7 @@ $factory->createContext()->run(function (Context $context) {
         new HttpRequest('http://httpbin.org/anything')
     ];
     
-    yield $client->pipe($requests)->map(function (Context $context, HttpResponse $response) {
+    yield $client->sendAll($requests)->map(function (Context $context, HttpResponse $response) {
         echo yield $response->getBody()->getContents($context);
     })->dispatch($context);
 });
