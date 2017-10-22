@@ -432,7 +432,7 @@ class Uri implements \JsonSerializable
             return \rawurlencode($m[0]);
         }, $path);
         
-        return '/' . \ltrim($path, '/');
+        return $path;
     }
 
     protected function filterQuery(string $query): string

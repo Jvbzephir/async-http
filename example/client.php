@@ -28,14 +28,16 @@ $factory->registerLogger(new PipeLogHandler());
 $factory->createContext()->run(function (Context $context) {
     $manager = new ConnectionManager($context->getLoop());
     $client = new HttpClient(new Http1Connector($manager));
+    $client = $client->withBaseUri('http://httpbin.org/');
     
     $requests = [
-        $client->request('http://httpbin.org/anything', Http::PUT, [
-            'Content-Type' => 'application/json',
+        $client->request('/anything', Http::PUT, [
             'User-Agent' => 'PHP/' . PHP_VERSION
-        ])->body('{"message":"Hello Server :)"}'),
-        $client->request('http://httpbin.org/anything'),
-        $client->request('http://httpbin.org/anything')
+        ])->json([
+            'message' => 'Hello Server :)'
+        ]),
+        $client->request('https://httpbin.org/anything'),
+        $client->request('anything')
     ];
     
     yield $client->sendAll($requests)->map(function (Context $context, HttpResponse $response) {

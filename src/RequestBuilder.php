@@ -25,7 +25,7 @@ class RequestBuilder
     
     protected $request;
     
-    public function __construct(HttpClient $client, string $uri, string $method = Http::GET)
+    public function __construct(HttpClient $client, $uri, string $method = Http::GET)
     {
         $this->client = $client;
         $this->request = new HttpRequest($uri, $method);
@@ -56,6 +56,44 @@ class RequestBuilder
         }
         
         return $this;
+    }
+    
+    public function text(string $body, string $encoding = 'utf-8'): self
+    {
+        $this->request = $this->request->withHeader('Content-Type', \sprintf('application/json; charset="%s"', $encoding));
+        $this->request = $this->request->withBody(new StringBody($body));
+        
+        return $this;
+    }
+    
+    public function json($body, int $flags = \JSON_UNESCAPED_SLASHES): self
+    {
+        $body = new StringBody(\json_encode($body, $flags));
+        
+        $this->request = $this->request->withHeader('Content-Type', 'application/json');
+        $this->request = $this->request->withBody($body);
+        
+        return $this;
+    }
+    
+    public function form(array $fields): RequestBuilder
+    {
+        $body = new StringBody(\http_build_query($fields, '', '&', \PHP_QUERY_RFC3986));
+        
+        $this->request = $this->request->withHeader('Content-Type', Http::FORM_ENCODED);
+        $this->request = $this->request->withBody($body);
+        
+        return $this;
+    }
+    
+    public function loadJson(Context $context): Promise
+    {
+        return $context->task(function (Context $context) {
+            $request = $this->request->withHeader('Accept', 'application/json, */*;q=.5');
+            $response = yield $this->client->send($context, $request);
+            
+            return \json_decode(yield $response->getBody()->getContents($context));
+        });
     }
 
     public function attribute(string $name, $value): self

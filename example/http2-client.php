@@ -51,17 +51,22 @@ $factory->createContext()->run(function (Context $context) {
     
     $client = new HttpClient(new Http1Connector($manager), new Http2Connector());
     $client = $client->withMiddleware(new ResponseContentDecoder());
+    $client = $client->withBaseUri('https://http2.golang.org/');
     
-    yield from $log($context, yield $client->get($context, 'https://http2.golang.org/reqinfo'));
+    yield from $log($context, yield $client->request('reqinfo')->send($context));
     
-    $request = $client->request('https://http2.golang.org/ECHO', Http::PUT, [
-        'Content-Type' => 'text/plain'
-    ])->body('Hello World!')->expectContinue(true);
+    $request = $client->request('ECHO', Http::PUT);
+    $request->text('Hello World!')->expectContinue(true);
     
     yield from $log($context, yield $request->send($context));
-    yield from $log($context, yield $client->get($context, 'https://httpbin.org/gzip'));
+    
+    $client = $client->withBaseUri('http://httpbin.org/');
+    
+    yield from $log($context, yield $client->request('anything', Http::POST)->form([
+        'foo' => 'bar'
+    ])->send($context));
     
     $context->info('Request JSON from the server', [
-        'result' => yield $client->getJson($context, 'http://httpbin.org/deflate')
+        'result' => yield $client->request('/gzip')->loadJson($context)
     ]);
 });

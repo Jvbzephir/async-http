@@ -177,7 +177,7 @@ class UriTest extends TestCase
         $uri = Uri::parse('http://localhost/');
         $this->assertEquals('/', $uri->getPath());
         
-        $this->assertNotSame($uri, $uri = $uri->withPath('foo'));
+        $this->assertNotSame($uri, $uri = $uri->withPath('/foo'));
         $this->assertEquals('/foo', $uri->getPath());
     }
     

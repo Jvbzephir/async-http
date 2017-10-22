@@ -18,7 +18,6 @@ use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
 use KoolKode\Async\Channel\IterableChannel;
 use KoolKode\Async\Channel\Pipeline;
-use KoolKode\Async\Http\Body\StringBody;
 use KoolKode\Async\Http\Middleware\MiddlewareSupported;
 use KoolKode\Async\Http\Middleware\NextMiddleware;
 use KoolKode\Async\Socket\ClientEncryption;
@@ -32,6 +31,8 @@ class HttpClient
     protected $connectors;
     
     protected $connecting = [];
+    
+    protected $baseUri;
     
     protected $clientSettings;
 
@@ -48,10 +49,18 @@ class HttpClient
             return $b->getPriority() <=> $a->getPriority();
         });
     }
+    
+    public function withBaseUri($uri): self
+    {
+        $client = clone $this;
+        $client->baseUri = Uri::parse($uri)->withQueryParams([])->withFragment('');
+        
+        return $client;
+    }
 
     public function request(string $uri, string $method = Http::GET, array $headers = []): RequestBuilder
     {
-        $builder = new RequestBuilder($this, $uri, $method);
+        $builder = new RequestBuilder($this, $this->normalizeUri(Uri::parse($uri)), $method);
         
         foreach ($headers as $k => $v) {
             $builder->header($k, ...(array) $v);
@@ -69,6 +78,8 @@ class HttpClient
         if (!$request instanceof HttpRequest) {
             throw new \InvalidArgumentException('HttpRequest or RequestBuilder expected');
         }
+        
+        $request = $request->withUri($this->normalizeUri($request->getUri()));
         
         $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) {
             $uri = $request->getUri();
@@ -152,27 +163,25 @@ class HttpClient
         });
     }
     
-    public function get(Context $context, $uri): Promise
+    protected function normalizeUri(Uri $uri): Uri
     {
-        return $this->send($context, new HttpRequest($uri));
-    }
-    
-    public function getJson(Context $context, $uri): Promise
-    {
-        return $context->task(function (Context $context) use ($uri) {
-            $response = yield $this->send($context, new HttpRequest($uri, Http::GET, [
-                'Accept' => 'application/json, */*;q=0.5'
-            ]));
-            
-            return \json_decode(yield $response->getBody()->getContents($context), true);
-        });
-    }
-    
-    public function postForm(Context $context, $uri, array $fields): Promise
-    {
-        return $this->send($context, new HttpRequest($uri, Http::POST, [
-            'Content-Type' => Http::FORM_ENCODED
-        ], new StringBody(\http_build_query($fields, '', '&', \PHP_QUERY_RFC3986))));
+        $path = $uri->getPath();
+        
+        if ($uri->getHost() !== '') {
+            return $uri;
+        }
+        
+        if ('/' == ($path[0] ?? null)) {
+            $target = $this->baseUri->withPath($path);
+        } else {
+            $path = \rtrim($this->baseUri->getPath(), '/') . '/' . \ltrim($path, '/');
+            $target = $this->baseUri->withPath($path);
+        }
+        
+        $target = $target->withQuery($uri->getQuery());
+        $target = $target->withFragment($uri->getFragment());
+        
+        return $target;
     }
 
     protected function connectSocket(Context $context, Uri $uri, array $protocols): \Generator
