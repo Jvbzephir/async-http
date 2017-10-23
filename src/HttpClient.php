@@ -232,7 +232,7 @@ class HttpClient
         } else {
             $base = $this->baseUri->getPath();
             
-            if ($base == '') {
+            if ($base === '') {
                 $target = $this->baseUri->withPath($path);
             } elseif (\substr($base, -1) == '/') {
                 $target = $this->baseUri->withPath($base . $path);
@@ -241,10 +241,7 @@ class HttpClient
             }
         }
         
-        $target = $target->withQuery($uri->getQuery());
-        $target = $target->withFragment($uri->getFragment());
-        
-        return $target;
+        return $target->withQuery($uri->getQuery())->withFragment($uri->getFragment());
     }
 
     protected function connectSocket(Context $context, Uri $uri, array $protocols): \Generator

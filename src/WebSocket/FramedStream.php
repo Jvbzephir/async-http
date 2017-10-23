@@ -104,7 +104,7 @@ class FramedStream implements Disposable
             $data = yield $this->readStream->readBuffer($context, $len);
         } else {
             $mask = yield $this->readStream->readBuffer($context, 4);
-            $data = (yield $this->readStream->readBuffer($context, $len)) ^ \str_pad($mask, $len, $mask, STR_PAD_RIGHT);
+            $data = \str_pad($mask, $len, $mask, STR_PAD_RIGHT) ^ yield $this->readStream->readBuffer($context, $len);
         }
         
         return new Frame($byte1 & Frame::OPCODE, $data, ($byte1 & Frame::FINISHED) ? true : false, $byte1 & Frame::RESERVED);

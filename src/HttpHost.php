@@ -69,6 +69,10 @@ class HttpHost
 
     public function handleRequest(Context $context, HttpRequest $request, callable $responder): \Generator
     {
+        if (empty($this->middlewares)) {
+            return yield from $responder($context, ($this->action)($context, $request));
+        }
+        
         $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($responder) {
             return yield from $responder($context, ($this->action)($context, $request));
         });

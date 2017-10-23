@@ -313,6 +313,10 @@ class HttpEndpoint
                 $host = $secure ? $this->defaultEncryptedHost : $this->defaultHost[1];
             }
             
+            if (empty($this->middlewares)) {
+                return yield from $host->handleRequest($context, $request, $responder);
+            }
+            
             $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) use ($host, $responder) {
                 return yield from $host->handleRequest($context, $request, $responder);
             });
