@@ -24,18 +24,50 @@ use KoolKode\Async\Socket\ClientEncryption;
 use KoolKode\Async\Socket\ClientFactory;
 use KoolKode\Async\Socket\Connect;
 
+/**
+ * HTTP client that supports multiple HTTP protocol versions via connectors.
+ * 
+ * @author Martin Schröder
+ */
 class HttpClient
 {
     use MiddlewareSupported;
     
-    protected $connectors;
-    
-    protected $connecting = [];
-    
+    /**
+     * Optional base URI for HTTP requests using relative URIs.
+     * 
+     * @var Uri
+     */
     protected $baseUri;
     
+    /**
+     * Client-specific settings to be used for all HTTP requests.
+     * 
+     * @var ClientSettings
+     */
     protected $clientSettings;
-
+    
+    /**
+     * Registered HTTP connectors sorted by priority (higher priorities first).
+     * 
+     * @var array
+     */
+    protected $connectors;
+    
+    /**
+     * Pending connection attempts.
+     * 
+     * @var array
+     */
+    protected $connecting = [];
+    
+    /**
+     * Create a new HTTP client.
+     * 
+     * @param HttpConnector $connectors HTTP connectors.
+     * 
+     * @throws \InvalidArgumentException If no HTTP connector was given.
+     */
     public function __construct(HttpConnector ...$connectors)
     {
         if (empty($connectors)) {
@@ -50,6 +82,13 @@ class HttpClient
         });
     }
     
+    /**
+     * Set a base URI that will be prepended to all HTTP requests with a relative URL.
+     * 
+     * @param mixed $uri String or URI object representing the base URI to be used.
+     * 
+     * @throws \InvalidArgumentException When an invalid or relative URI is given.
+     */
     public function withBaseUri($uri): self
     {
         $uri = Uri::parse($uri)->withQuery('')->withFragment('');
@@ -73,6 +112,13 @@ class HttpClient
         return $client;
     }
 
+    /**
+     * Creates an HTTP request builder backed by the client.
+     * 
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param string $method HTTP request method.
+     * @param array $headers HTTP request headers.
+     */
     public function request(string $uri = '', string $method = Http::GET, array $headers = []): RequestBuilder
     {
         $builder = new RequestBuilder($this, $this->normalizeUri(Uri::parse($uri)), $method);
@@ -84,41 +130,92 @@ class HttpClient
         return $builder->attribute(ClientSettings::class, $this->clientSettings);
     }
 
+    /**
+     * Creates a HTTP OPTIONS request builder backed by the client.
+     * 
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function options(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::OPTIONS, $headers);
     }
 
+    /**
+     * Creates a HTTP HEAD request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function head(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::HEAD, $headers);
     }
 
+    /**
+     * Creates a HTTP GET request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function get(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::GET, $headers);
     }
 
+    /**
+     * Creates a HTTP POST request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function post(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::POST, $headers);
     }
 
+    /**
+     * Creates a HTTP PUT request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function put(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::PUT, $headers);
     }
 
+    /**
+     * Creates a HTTP PATCH request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function patch(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::PATCH, $headers);
     }
 
+    /**
+     * Creates a HTTP DELETE request builder backed by the client.
+     *
+     * @param string $uri The requested URI (relative URIs will be prpended with the client's base URI).
+     * @param array $headers HTTP request headers.
+     */
     public function delete(string $uri = '', array $headers = []): RequestBuilder
     {
         return $this->request($uri, Http::DELETE, $headers);
     }
 
+    /**
+     * Send a single HTTP request and return the response.
+     * 
+     * @param Context $context Async execution context.
+     * @param mixed $request HTTP request or request builder.
+     * @return HttpResponse HTTP response.
+     * 
+     * @throws \InvalidArgumentException If an invalid HTTP request (or builder) has been passed.
+     */
     public function send(Context $context, $request): Promise
     {
         if ($request instanceof RequestBuilder) {
@@ -190,6 +287,15 @@ class HttpClient
         return $context->task($next($context, $request));
     }
     
+    /**
+     * Send multiple HTTP requests in parallel.
+     * 
+     * @param array $requests All HTTP requests (or request builders) to be sent.
+     * @param int $concurrency Maximum concurrency level for parallel HTTP requests.
+     * @return Pipeline HTTP response pipeline (unordered by default to provide maximum concurrency).
+     * 
+     * @throws \InvalidArgumentException If an invalid HTTP request (or builder) has been passed.
+     */
     public function sendAll(array $requests, int $concurrency = 8): Pipeline
     {
         $input = [];
@@ -208,11 +314,18 @@ class HttpClient
         
         $pipeline = new Pipeline(new IterableChannel($input), $concurrency);
         
-        return $pipeline->map(function (Context $context, HttpRequest $request) {
+        return $pipeline->unordered()->map(function (Context $context, HttpRequest $request) {
             return $this->send($context, $request);
         });
     }
     
+    /**
+     * Normalizes relative URIs by prepending them with the client's base URI.
+     * 
+     * @param Uri $uri URI to be normalized.
+     * 
+     * @throws \InvalidArgumentException When a relative request URI is given and no base URI is set.
+     */
     protected function normalizeUri(Uri $uri): Uri
     {
         $path = $uri->getPath();
@@ -244,6 +357,13 @@ class HttpClient
         return $target->withQuery($uri->getQuery())->withFragment($uri->getFragment());
     }
 
+    /**
+     * Establish a socket connection to the remote host.
+     * 
+     * @param Context $context Async execution context.
+     * @param Uri $uri Uri of the remote peer.
+     * @param array $protocols Available client-side ALPN protocols.
+     */
     protected function connectSocket(Context $context, Uri $uri, array $protocols): \Generator
     {
         $tls = null;
@@ -263,6 +383,14 @@ class HttpClient
         return yield $factory->connect($context, $connect);
     }
     
+    /**
+     * Choose an HTTP connector based on negotiated ALPN protocol.
+     * 
+     * @param array $connectors Available HTTP connectors.
+     * @param string $alpn Negotiated ALPN protocol.
+     * 
+     * @throws \RuntimeException When no connector can handle the negotiated ALPN protocol.
+     */
     protected function chooseConnector(array $connectors, string $alpn): HttpConnector
     {
         foreach ($connectors as $connector) {

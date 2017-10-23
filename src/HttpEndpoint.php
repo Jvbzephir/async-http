@@ -24,24 +24,71 @@ use KoolKode\Async\Socket\ServerFactory;
 use KoolKode\Async\Socket\Socket;
 use Psr\Log\LogLevel;
 
+/**
+ * HTTP server endpoint.
+ * 
+ * @author Martin Schröder
+ */
 class HttpEndpoint
 {
     use MiddlewareSupported;
     
+    /**
+     * Registered HTTP drivers (sorted by priority, higher priorities first).
+     * 
+     * @var array
+     */
     protected $drivers;
 
+    /**
+     * Network bind addresses that the endpoint will listen on.
+     * 
+     * @var array
+     */
     protected $bind = [];
     
+    /**
+     * Default HTTP host serving unencrypted HTTP connections.
+     * 
+     * @var HttpHost
+     */
     protected $defaultHost;
     
+    /**
+     * Default HTTP host serving encrypted HTTP connections.
+     * 
+     * @var HttpHost
+     */
     protected $defaultEncryptedHost;
     
+    /**
+     * Additional (named) HTTP hosts.
+     * 
+     * @var array
+     */
     protected $hosts = [];
     
+    /**
+     * Reverse proxy configuration being used to populate HTTP request headers with values sent by proxies.
+     * 
+     * @var ReverseProxySettings
+     */
     protected $proxy;
     
+    /**
+     * PSR log level to be used with error logging.
+     * 
+     * @var string
+     */
     protected $errorLogging;
 
+    /**
+     * Create a new HTTP endpoint backed by the given HTTP drivers.
+     * 
+     * @param HttpDriver $drivers Registered HTTP drivers.
+     * 
+     * @throws \InvalidArgumentException When not HTTP driver was given.
+     */
     public function __construct(HttpDriver ...$drivers)
     {
         if (empty($drivers)) {
@@ -55,6 +102,12 @@ class HttpEndpoint
         });
     }
 
+    /**
+     * Bind the server to the given address.
+     * 
+     * @param string $address Network address (TCP or UNIX server address).
+     * @param bool $encrypted Listen for encrypted connections?
+     */
     public function withAddress(string $address, bool $encrypted = false): self
     {
         $endpoint = clone $this;
@@ -63,6 +116,14 @@ class HttpEndpoint
         return $endpoint;
     }
 
+    /**
+     * Register a default HTTP host to handle unencrypted connections.
+     * 
+     * @param HttpHost $host HTTP host instance.
+     * @param string $name HTTP host name (defaults to the name of the machine running PHP).
+     * 
+     * @throws \InvalidArgumentException When an encrypted host is passed.
+     */
     public function withDefaultHost(HttpHost $host, ?string $name = null): self
     {
         if ($host->isEncrypted()) {
@@ -90,6 +151,14 @@ class HttpEndpoint
         return $endpoint;
     }
     
+    /**
+     * Register a default HTTP host to handle encrypted HTTP requests.
+     * 
+     * @param HttpHost $host HTTP host instance.
+     * @param string $certFile Optional SSL certificate to turn the host into an encrypted host.
+     * 
+     * @throws \InvalidArgumentException When an unencrypted host is given.
+     */
     public function withDefaultEncryptedHost(HttpHost $host, ?string $certFile = null): self
     {
         if ($certFile !== null) {
@@ -106,6 +175,12 @@ class HttpEndpoint
         return $endpoint;
     }
 
+    /**
+     * Register an additional (named) HTTP host with the endpoint.
+     * 
+     * @param string $matcher Host match pattern (matches based on server bind address).
+     * @param HttpHost $host HTTP host instance.
+     */
     public function withHost(string $matcher, HttpHost $host): self
     {
         if (false === \strpos($matcher, ':')) {
@@ -120,6 +195,9 @@ class HttpEndpoint
         return $endpoint;
     }
 
+    /**
+     * Register an HTTP reverse proxy configuration with the server.
+     */
     public function withReverseProxy(ReverseProxySettings $proxy): self
     {
         $endpoint = clone $this;
@@ -128,6 +206,11 @@ class HttpEndpoint
         return $endpoint;
     }
     
+    /**
+     * Enable error logging as default async context error handler.
+     * 
+     * @param string $level PSR log level.
+     */
     public function withErrorLogging(?string $level = LogLevel::ERROR): self
     {
         $endpoint = clone $this;
@@ -136,6 +219,15 @@ class HttpEndpoint
         return $endpoint;
     }
 
+    /**
+     * Start the server, listen for HTTP requests and server them.
+     * 
+     * The promise will only resolve if the endpoint is stopped or triggers an error.
+     * 
+     * @param Context $context Async execution context.
+     * 
+     * @throws \RuntimeException When no HTTP host is defined.
+     */
     public function listen(Context $context): Promise
     {
         if (empty($this->defaultHost) && !$this->defaultEncryptedHost && !$this->hosts) {
