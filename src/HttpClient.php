@@ -52,13 +52,28 @@ class HttpClient
     
     public function withBaseUri($uri): self
     {
+        $uri = Uri::parse($uri)->withQuery('')->withFragment('');
+        
+        switch ($uri->getScheme()) {
+            case 'http':
+            case 'https':
+                // OK
+                break;
+            default:
+                throw new \InvalidArgumentException(\sprintf('Unsupported base URI scheme: "%s"', $uri->getScheme()));
+        }
+        
+        if ($uri->getHost() === '') {
+            throw new \InvalidArgumentException('Base URI must specifiy a host');
+        }
+        
         $client = clone $this;
-        $client->baseUri = Uri::parse($uri)->withQueryParams([])->withFragment('');
+        $client->baseUri = $uri;
         
         return $client;
     }
 
-    public function request(string $uri, string $method = Http::GET, array $headers = []): RequestBuilder
+    public function request(string $uri = '', string $method = Http::GET, array $headers = []): RequestBuilder
     {
         $builder = new RequestBuilder($this, $this->normalizeUri(Uri::parse($uri)), $method);
         
@@ -68,7 +83,42 @@ class HttpClient
         
         return $builder->attribute(ClientSettings::class, $this->clientSettings);
     }
-    
+
+    public function options(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::OPTIONS, $headers);
+    }
+
+    public function head(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::HEAD, $headers);
+    }
+
+    public function get(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::GET, $headers);
+    }
+
+    public function post(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::POST, $headers);
+    }
+
+    public function put(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::PUT, $headers);
+    }
+
+    public function patch(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::PATCH, $headers);
+    }
+
+    public function delete(string $uri = '', array $headers = []): RequestBuilder
+    {
+        return $this->request($uri, Http::DELETE, $headers);
+    }
+
     public function send(Context $context, $request): Promise
     {
         if ($request instanceof RequestBuilder) {
@@ -171,11 +221,24 @@ class HttpClient
             return $uri;
         }
         
+        if ($this->baseUri === null) {
+            throw new \InvalidArgumentException('Cannot use relative request URI without client base URI');
+        }
+        
         if ('/' == ($path[0] ?? null)) {
             $target = $this->baseUri->withPath($path);
+        } elseif ($path === '') {
+            $target = $this->baseUri;
         } else {
-            $path = \rtrim($this->baseUri->getPath(), '/') . '/' . \ltrim($path, '/');
-            $target = $this->baseUri->withPath($path);
+            $base = $this->baseUri->getPath();
+            
+            if ($base == '') {
+                $target = $this->baseUri->withPath($path);
+            } elseif (\substr($base, -1) == '/') {
+                $target = $this->baseUri->withPath($base . $path);
+            } else {
+                $target = $this->baseUri->withPath(\preg_replace("'/[^/]+$'", '/', $base) . $path);
+            }
         }
         
         $target = $target->withQuery($uri->getQuery());
