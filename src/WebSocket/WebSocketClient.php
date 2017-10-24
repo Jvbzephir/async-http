@@ -20,6 +20,7 @@ use KoolKode\Async\Http\HttpClient;
 use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Http1\Upgrade;
+use KoolKode\Async\Http\Http1\UpgradeFailedException;
 
 /**
  * WebSocket client that can be used to establish connections to remote WebSocket endpoints.
@@ -99,28 +100,30 @@ class WebSocketClient
         $upgrade = $response->getAttribute(Upgrade::class);
         
         if ($response->getStatusCode() != Http::SWITCHING_PROTOCOLS || !$upgrade instanceof Upgrade) {
-            throw new \RuntimeException('Missing HTTP upgrade in response with status ' . $response->getStatusCode());
+            throw new UpgradeFailedException('Missing HTTP upgrade in response with status ' . $response->getStatusCode());
         }
         
         try {
             if (!\in_array('websocket', $upgrade->protocols, true)) {
-                throw new \RuntimeException(\sprintf('HTTP upgrade header did not specify websocket: "%s"', $response->getHeaderLine('Upgrade')));
+                throw new UpgradeFailedException(\sprintf('HTTP upgrade header did not specify websocket: "%s"', $response->getHeaderLine('Upgrade')));
             }
             
             if (\base64_encode(\sha1($nonce . Connection::GUID, true)) !== $response->getHeaderLine('Sec-WebSocket-Accept')) {
-                throw new \RuntimeException('Failed to verify Sec-WebSocket-Accept HTTP header');
+                throw new UpgradeFailedException('Failed to verify Sec-WebSocket-Accept HTTP header');
             }
             
             if ($response->hasHeader('Sec-WebSocket-Protocol')) {
                 if (!\in_array($response->getHeaderLine('Sec-WebSocket-Protocol'), $protocols, true)) {
-                    throw new \OutOfRangeException(\sprintf('Unsupported protocol: "%s"', $response->getHeaderLine('Sec-WebSocket-Protocol')));
+                    throw new UpgradeFailedException(\sprintf('Unsupported protocol: "%s"', $response->getHeaderLine('Sec-WebSocket-Protocol')));
                 }
             }
+            
+            yield $response->getBody()->discard($context);
             
             $deflate = $this->negotiatePerMessageDeflate($response);
             
             if ($deflate && !$this->deflateSupported) {
-                throw new \RuntimeException('Server enabled permessage-deflate but client does not support the extension');
+                throw new UpgradeFailedException('Server enabled permessage-deflate but client does not support the extension');
             }
             
             $stream = new FramedStream($upgrade->stream, $upgrade->stream, true);

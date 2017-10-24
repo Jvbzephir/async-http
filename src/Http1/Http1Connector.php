@@ -27,7 +27,6 @@ use KoolKode\Async\Http\HttpRequest;
 use KoolKode\Async\Http\HttpResponse;
 use KoolKode\Async\Http\Body\StreamBody;
 use KoolKode\Async\Stream\DuplexStream;
-use KoolKode\Async\Stream\ReadableMemoryStream;
 
 class Http1Connector implements HttpConnector
 {
@@ -48,6 +47,14 @@ class Http1Connector implements HttpConnector
         $this->manager = $manager;
         $this->parser = $parser ?? new MessageParser();
         $this->filesystem = new FilesystemProxy();
+    }
+
+    public function withKeepAlive(bool $keepAlive): self
+    {
+        $connector = clone $this;
+        $connector->keepAlive = $keepAlive;
+        
+        return $connector;
     }
     
     /**
@@ -131,10 +138,6 @@ class Http1Connector implements HttpConnector
             
             $stream = $this->parser->parseBodyStream($response, $conn->stream, $close);
             
-            if ($stream instanceof ReadableMemoryStream) {
-                $close = true;
-            }
-            
             $defer = new Deferred($context);
             $body = new StreamBody(new EntityStream($stream, $defer));
             
@@ -150,16 +153,14 @@ class Http1Connector implements HttpConnector
         if ($upgrade) {
             try {
                 if (!\in_array('upgrade', $response->getHeaderTokenValues('Connection'), true)) {
-                    throw new \RuntimeException('Cannot switch protocols without upgrade in connection header');
+                    throw new UpgradeFailedException('Cannot switch protocols without upgrade in connection header');
                 }
                 
                 $protocols = $response->getHeaderTokenValues('Upgrade', true);
                 
                 if (empty($protocols)) {
-                    throw new \RuntimeException('Missing Upgrade header needed to switch protocols');
+                    throw new UpgradeFailedException('Missing Upgrade header needed to switch protocols');
                 }
-                
-                yield $body->discard($context);
             } catch (\Throwable $e) {
                 $conn->stream->close($e);
                 
@@ -266,11 +267,11 @@ class Http1Connector implements HttpConnector
             }
             
             if ($size === null && $request->getProtocolVersion() == '1.0') {
-                $temp = yield $this->filesystem->tempStream();
+                $temp = yield $this->filesystem->tempStream($context);
                 
                 try {
                     do {
-                        $sent += yield $temp->write($context, $chunk);
+                        yield $temp->write($context, $chunk);
                     } while (null !== ($chunk = yield $bodyStream->read($context)));
                 } finally {
                     $temp->close();
@@ -301,13 +302,8 @@ class Http1Connector implements HttpConnector
                     break;
                 }
                 
-                switch ($response->getStatusCode()) {
-                    case Http::CONTINUE:
-                        break 2;
-                    case Http::EXPECTATION_FAILED:
-                        $request = $request->withoutHeader('Expect');
-                        $sent = yield $stream->write($context, $this->serializeHeaders($request, $size) . "\r\n");
-                        break 2;
+                if ($response->getStatusCode() == Http::CONTINUE) {
+                    break;
                 }
                 
                 return $response;
