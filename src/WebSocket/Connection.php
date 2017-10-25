@@ -248,19 +248,19 @@ class Connection implements InputChannel
     {
         $compress = $compress && $this->deflate;
         
-        return $this->executor->submit(function (Context $context) use ($stream, $compress) {
+        return $this->executor->submit($context, function (Context $context) use ($stream, $compress) {
             $type = Frame::BINARY;
             $reserved = $compress ? Frame::RESERVED1 : 0;
             $len = 0;
             
             try {
-                $chunk = yield $stream->readBuffer($context, 8192);
+                $chunk = yield $stream->readBuffer($context, 8192, false);
                 
                 if ($chunk === null) {
                     return $len;
                 }
                 
-                while (null !== ($next = yield $stream->readBuffer($context, 8192))) {
+                while (null !== ($next = yield $stream->readBuffer($context, 8192, false))) {
                     if ($compress) {
                         $chunk = \deflate_add($this->compression, $chunk, \ZLIB_SYNC_FLUSH);
                     }

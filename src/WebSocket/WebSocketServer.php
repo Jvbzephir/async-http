@@ -62,7 +62,7 @@ class WebSocketServer implements UpgradeResultHandler
             'Upgrade' => 'websocket',
             'Sec-WebSocket-Version' => '13',
             'Sec-WebSocket-Accept' => $accept
-        ]);
+        ], null, '1.1');
         
         $response = $response->withReason('WebSocket Handshake');
         $response = $response->withAttribute(WebSocketEndpoint::class, $endpoint);
@@ -146,13 +146,13 @@ class WebSocketServer implements UpgradeResultHandler
         }
         
         if (!$request->hasHeader('Sec-Websocket-Key')) {
-            throw new StatusException(Http::BAD_REQUEST, 'Missing Sec-Websocket-Key HTTP header', [
+            throw new StatusException(Http::BAD_REQUEST, 'Missing Sec-WebSocket-Key HTTP header', [
                 'Sec-Websocket-Version' => '13'
             ]);
         }
         
         if (!\in_array('13', $request->getHeaderTokenValues('Sec-Websocket-Version'), true)) {
-            throw new StatusException(Http::BAD_REQUEST, 'Secure websocket version 13 required', [
+            throw new StatusException(Http::BAD_REQUEST, 'WebSocket version 13 required', [
                 'Sec-Websocket-Version' => '13'
             ]);
         }
