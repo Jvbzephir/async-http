@@ -36,6 +36,8 @@ class WebSocketClient
      */
     protected $deflateSupported;
     
+    protected $zlib = \KOOLKODE_ASYNC_ZLIB;
+    
     /**
      * HTTP client being used to perform the initial handshake.
      *
@@ -68,21 +70,19 @@ class WebSocketClient
     {
         $m = null;
         
-        if (!\preg_match("'^([^:]+)://(.+)$'", $uri, $m)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid WebSocket URL: "%s"', $uri));
-        }
-        
-        switch (\strtolower($m[1])) {
-            case 'ws':
-            case 'http':
-                $uri = 'http://' . $m[2];
-                break;
-            case 'wss':
-            case 'https':
-                $uri = 'https://' . $m[2];
-                break;
-            default:
-                throw new \InvalidArgumentException(\sprintf('Protocol "%s" is not supported in WebSocket client', $m[1]));
+        if (\preg_match("'^([^:]+)://(.+)$'", $uri, $m)) {
+            switch (\strtolower($m[1])) {
+                case 'ws':
+                case 'http':
+                    $uri = 'http://' . $m[2];
+                    break;
+                case 'wss':
+                case 'https':
+                    $uri = 'https://' . $m[2];
+                    break;
+                default:
+                    throw new \InvalidArgumentException(\sprintf('Protocol "%s" is not supported in WebSocket client', $m[1]));
+            }
         }
         
         return $context->task($this->connectTask($context, $uri, $protocols));
@@ -127,7 +127,6 @@ class WebSocketClient
             }
             
             $stream = new FramedStream($upgrade->stream, $upgrade->stream, true);
-            
             $conn = new Connection($context, true, $stream, $response->getHeaderLine('Sec-WebSocket-Protocol'), $deflate);
         } catch (\Throwable $e) {
             $upgrade->stream->close($e);
@@ -148,8 +147,6 @@ class WebSocketClient
      */
     protected function createHandshakeRequest(string $uri, string $nonce, array $protocols): HttpRequest
     {
-        static $zlib;
-        
         $request = new HttpRequest($uri, Http::GET, [
             'Connection' => 'upgrade',
             'Upgrade' => 'websocket',
@@ -161,7 +158,7 @@ class WebSocketClient
             $request = $request->withHeader('Sec-WebSocket-Protocol', \implode(', ', $protocols));
         }
         
-        if ($this->deflateSupported && ($zlib ?? ($zlib = \function_exists('inflate_init')))) {
+        if ($this->deflateSupported && $this->zlib) {
             $request = $request->withAddedHeader('Sec-WebSocket-Extensions', 'permessage-deflate');
         }
         
@@ -176,11 +173,9 @@ class WebSocketClient
      */
     protected function negotiatePerMessageDeflate(HttpResponse $response): ?PerMessageDeflate
     {
-        static $zlib;
-        
         $extension = null;
         
-        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+        if ($this->zlib) {
             foreach ($response->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
                 if (\strtolower($ext->getValue()) === 'permessage-deflate') {
                     $extension = $ext;

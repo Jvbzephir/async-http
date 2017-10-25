@@ -26,6 +26,8 @@ class WebSocketServer implements UpgradeResultHandler
 {
     protected $deflateSupported;
     
+    protected $zlib = \KOOLKODE_ASYNC_ZLIB;
+    
     public function __construct(bool $deflateSupported = false)
     {
         $this->deflateSupported = $deflateSupported;
@@ -164,11 +166,9 @@ class WebSocketServer implements UpgradeResultHandler
      */
     protected function negotiatePerMessageDeflate(HttpRequest $request): ?PerMessageDeflate
     {
-        static $zlib;
-        
         $extension = null;
         
-        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+        if ($this->zlib) {
             foreach ($request->getHeaderTokens('Sec-WebSocket-Extensions') as $ext) {
                 if (\strtolower($ext->getValue()) === 'permessage-deflate') {
                     $extension = $ext;
