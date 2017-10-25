@@ -34,6 +34,8 @@ use KoolKode\Util\InvalidMediaTypeException;
  */
 class ResponseContentEncoder implements Middleware
 {
+    protected $zlib = \KOOLKODE_ASYNC_ZLIB;
+    
     /**
      * Compressable content types.
      * 
@@ -128,11 +130,9 @@ class ResponseContentEncoder implements Middleware
      */
     public function __invoke(Context $context, HttpRequest $request, NextMiddleware $next): \Generator
     {
-        static $zlib;
-        
         $response = yield from $next($context, $request);
         
-        if (($zlib ?? ($zlib = \function_exists('deflate_init'))) && $this->isCompressable($request, $response)) {
+        if ($this->zlib && $this->isCompressable($request, $response)) {
             $compress = null;
             
             foreach ($request->getHeaderTokenValues('Accept-Encoding') as $encoding) {

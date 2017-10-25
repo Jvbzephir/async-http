@@ -29,6 +29,8 @@ use KoolKode\Async\Stream\InflateStream;
  */
 class ResponseContentDecoder implements Middleware
 {
+    protected $zlib = \KOOLKODE_ASYNC_ZLIB;
+    
     /**
      * {@inheritdoc}
      */
@@ -44,15 +46,13 @@ class ResponseContentDecoder implements Middleware
      */
     public function __invoke(Context $context, HttpRequest $request, NextMiddleware $next): \Generator
     {
-        static $zlib;
-        
-        if ($zlib ?? ($zlib = \function_exists('inflate_init'))) {
+        if ($this->zlib) {
             $request = $request->withAddedHeader('Accept-Encoding', 'gzip, deflate');
         }
         
         $response = yield from $next($context, $request);
         
-        if ($zlib && $response->hasHeader('Content-Encoding')) {
+        if ($this->zlib && $response->hasHeader('Content-Encoding')) {
             $encoding = null;
             
             switch (\strtolower($response->getHeaderLine('Content-Encoding'))) {

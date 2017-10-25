@@ -228,61 +228,10 @@ class HttpClient
         
         $request = $request->withUri($this->normalizeUri($request->getUri()));
         
-        $next = new NextMiddleware($this->middlewares, function (Context $context, HttpRequest $request) {
-            $uri = $request->getUri();
-            $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
-            
-            while (isset($this->connecting[$key])) {
-                $this->connecting[$key][] = $placeholder = new Placeholder($context);
-                
-                yield $placeholder->promise();
-            }
-            
-            $supported = [];
-            
-            foreach ($this->connectors as $connector) {
-                if ($connector->isRequestSupported($request)) {
-                    if (yield $connector->isConnected($context, $key)) {
-                        return yield $connector->send($context, $request);
-                    }
-                    
-                    $supported[] = $connector;
-                }
-            }
-            
-            if (empty($supported)) {
-                throw new \RuntimeException('Unable to find connector that supports the given HTTP request');
-            }
-            
-            $protocols = \array_merge(...\array_map(function (HttpConnector $connector) {
-                return $connector->getProtocols();
-            }, $supported));
-            
-            $this->connecting[$key] = [];
-            
-            try {
-                $socket = yield from $this->connectSocket($context, $uri, $protocols);
-                
-                try {
-                    $connector = $this->chooseConnector($supported, $socket->getAlpnProtocol() ?? '');
-                } catch (\Throwable $e) {
-                    $socket->close();
-                    
-                    throw $e;
-                }
-                
-                $promise = $connector->send($context, $request, $socket);
-            } finally {
-                $connecting = $this->connecting[$key];
-                unset($this->connecting[$key]);
-                
-                foreach ($connecting as $placeholder) {
-                    $placeholder->resolve();
-                }
-            }
-            
-            return yield $promise;
-        });
+        $next = new NextMiddleware($this->middlewares, \Closure::fromCallable([
+            $this,
+            'sendRequest'
+        ]));
         
         return $context->task($next($context, $request));
     }
@@ -355,6 +304,63 @@ class HttpClient
         }
         
         return $target->withQuery($uri->getQuery())->withFragment($uri->getFragment());
+    }
+    
+    protected function sendRequest(Context $context, HttpRequest $request): \Generator
+    {
+        $uri = $request->getUri();
+        $key = $uri->getScheme() . '://' . $uri->getHostWithPort(true);
+        
+        while (isset($this->connecting[$key])) {
+            $this->connecting[$key][] = $placeholder = new Placeholder($context);
+            
+            yield $placeholder->promise();
+        }
+        
+        $supported = [];
+        
+        foreach ($this->connectors as $connector) {
+            if ($connector->isRequestSupported($request)) {
+                if (yield $connector->isConnected($context, $key)) {
+                    return yield $connector->send($context, $request);
+                }
+                
+                $supported[] = $connector;
+            }
+        }
+        
+        if (empty($supported)) {
+            throw new \RuntimeException('Unable to find connector that supports the given HTTP request');
+        }
+        
+        $protocols = \array_merge(...\array_map(function (HttpConnector $connector) {
+            return $connector->getProtocols();
+        }, $supported));
+        
+        $this->connecting[$key] = [];
+        
+        try {
+            $socket = yield from $this->connectSocket($context, $uri, $protocols);
+            
+            try {
+                $connector = $this->chooseConnector($supported, $socket->getAlpnProtocol() ?? '');
+            } catch (\Throwable $e) {
+                $socket->close();
+                
+                throw $e;
+            }
+            
+            $promise = $connector->send($context, $request, $socket);
+        } finally {
+            $connecting = $this->connecting[$key];
+            unset($this->connecting[$key]);
+            
+            foreach ($connecting as $placeholder) {
+                $placeholder->resolve();
+            }
+        }
+        
+        return yield $promise;
     }
 
     /**

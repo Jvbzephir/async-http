@@ -27,7 +27,7 @@ class ResponseContentEncoderTest extends AsyncTestCase
     {
         return parent::setUp();
         
-        if (!function_exists('deflate_init')) {
+        if (!\KOOLKODE_ASYNC_ZLIB) {
             return $this->markTestSkipped('Test requires zlib support for incremental compression');
         }
     }
