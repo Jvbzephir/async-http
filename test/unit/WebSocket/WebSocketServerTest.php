@@ -223,6 +223,33 @@ class WebSocketServerTest extends AsyncTestCase
             $this->assertInstanceOf(ReadableStream::class, $message);
             $this->assertEquals('Hello again...', yield $message->readBuffer($context, 1000, false));
             
+            yield $conn->shutdown($context);
+        }, function (Context $context, Socket $socket) use ($endpoint) {
+            $server = new WebSocketServer();
+            
+            $response = new HttpResponse();
+            $response = $response->withAttribute(WebSocketEndpoint::class, $endpoint);
+            
+            yield from $server->upgradeConnection($context, $socket, new HttpRequest('/'), $response);
+        });
+    }
+    
+    public function testCanExitServerWithError(Context $context)
+    {
+        $endpoint = new class() extends WebSocketEndpoint {
+
+            public function onTextMessage(Context $context, Connection $conn, string $message)
+            {
+                yield $conn->sendText($context, strtoupper($message));
+            }
+        };
+        
+        yield from $this->runSocketTest($context, function (Context $context, Socket $socket) {
+            $conn = new Connection($context, true, new FramedStream($socket, $socket, true));
+            
+            yield $conn->sendText($context, 'Hello Server');
+            $this->assertEquals('HELLO SERVER', yield $conn->receive($context));
+            
             $conn->close();
         }, function (Context $context, Socket $socket) use ($endpoint) {
             $server = new WebSocketServer();
@@ -230,11 +257,9 @@ class WebSocketServerTest extends AsyncTestCase
             $response = new HttpResponse();
             $response = $response->withAttribute(WebSocketEndpoint::class, $endpoint);
             
-            try {
-                yield from $server->upgradeConnection($context, $socket, new HttpRequest('/'), $response);
-            } catch (StreamClosedException $e) {
-                // Expected after last chunk...
-            }
+            $this->expectException(StreamClosedException::class);
+            
+            yield from $server->upgradeConnection($context, $socket, new HttpRequest('/'), $response);
         });
     }
 }

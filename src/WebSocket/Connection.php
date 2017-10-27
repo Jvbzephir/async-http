@@ -13,6 +13,7 @@ declare(strict_types = 1);
 
 namespace KoolKode\Async\Http\WebSocket;
 
+use KoolKode\Async\CancellationException;
 use KoolKode\Async\Context;
 use KoolKode\Async\Placeholder;
 use KoolKode\Async\Promise;
@@ -127,11 +128,11 @@ class Connection implements InputChannel
     protected $cancel;
     
     /**
-     * Background context that runs the frame processing task.
+     * Has the connection been closed yet?
      * 
-     * @var Context
+     * @var bool
      */
-    protected $background;
+    protected $closed = false;
     
     /**
      * Create a new WebSocket connection.
@@ -160,7 +161,6 @@ class Connection implements InputChannel
         $context = $context->background();
         $context = $context->cancellable($this->cancel = $context->cancellationHandler());
         
-        $this->background = $context;
         $this->executor = new Executor();
         
         Context::rethrow($context->task($this->processFrames($context)));
@@ -171,7 +171,39 @@ class Connection implements InputChannel
      */
     public function close(?\Throwable $e = null): void
     {
-        $this->cancel->cancel('Connection closed', $e);
+        if ($this->cancel) {
+            $cancel = $this->cancel;
+            $this->cancel = null;
+            
+            $cancel->cancel('Connection closed', $e);
+        }
+    }
+
+    /**
+     * Shutdown connection after all pending messages have been sent.
+     * 
+     * @param Context $context Async execution context.
+     * @param \Throwable $e Optional reason for shutdown.
+     */
+    public function shutdown(Context $context, ?\Throwable $e = null): Promise
+    {
+        $this->closed = true;
+        
+        return $context->task(function (Context $context) use ($e) {
+            $code = ($e instanceof ConnectionException) ? $e->getCode() : Frame::NORMAL_CLOSURE;
+            
+            try {
+                yield $this->executor->submit($context, function (Context $context) use ($code) {
+                    return yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $code)));
+                }, -10);
+            } catch (\Throwable $e) {
+                // Forward error into close.
+            }
+            
+            $this->close($e);
+            
+            yield $this->executor->submit($context, static function () {}, -100);
+        });
     }
     
     /**
@@ -330,15 +362,16 @@ class Connection implements InputChannel
     protected function processFrames(Context $context): \Generator
     {
         $message = null;
+        $frame = null;
         $e = null;
         
         try {
-            while (true) {
+            while ($this->cancel) {
                 $frame = yield from $this->stream->readFrame($context);
                 
                 switch ($frame->opcode) {
                     case Frame::PING:
-                        $this->executor->submit($context, function (Context $context, $frame) {
+                        $this->executor->submit($context, function (Context $context) use ($frame) {
                             return yield $this->stream->writeFrame($context, new Frame(Frame::PONG, $frame->data), 100);
                         }, 100);
                         continue 2;
@@ -375,16 +408,34 @@ class Connection implements InputChannel
                     $message = $this->messages->send($context, $message);
                 }
             }
+        } catch (CancellationException $ex) {
+            // Assume normal close.
         } catch (\Throwable $e) {
             // Forward error to close operations.
         }
         
-        try {
-            $code = ($e instanceof ConnectionException) ? $e->getCode() : Frame::NORMAL_CLOSURE;
+        $this->cancel = null;
+        
+        if (!$this->closed) {
+            $this->closed = true;
             
-            yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $code)));
-        } catch (\Throwable $ex) {
-            // Ignore this error.
+            try {
+                if ($frame && $frame->opcode == Frame::CONNECTION_CLOSE) {
+                    $code = \unpack('n', $frame->data)[1];
+                    
+                    if ($code !== Frame::NORMAL_CLOSURE) {
+                        $e = new ConnectionException('Connection closed by remote peer', $e);
+                    }
+                } else {
+                    $code = ($e instanceof ConnectionException) ? $e->getCode() : Frame::NORMAL_CLOSURE;
+                }
+                
+                yield $this->executor->submit($context, function (Context $context) use ($code) {
+                    return yield $this->stream->writeFrame($context, new Frame(Frame::CONNECTION_CLOSE, \pack('n', $code)));
+                });
+            } catch (\Throwable $ex) {
+                // Ignore this error.
+            }
         }
         
         $this->stream->close($e);

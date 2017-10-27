@@ -126,7 +126,7 @@ class WebSocketServer implements UpgradeResultHandler
             yield from $result;
         }
         
-        $conn->close();
+        $conn->close($e);
         
         if ($e) {
             throw $e;
