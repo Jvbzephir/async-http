@@ -86,11 +86,12 @@ class HPack
     /**
      * Create a new HPACK encoder / decoder.
      */
-    public function __construct(HPackContext $context)
+    public function __construct(?HPackContext $context = null)
     {
-        $this->context = $context;
-        $this->compression = $context->getCompression();
-        $this->compressionEnabled = $context->isCompressionEnabled();
+        $this->context = $context ?? new HPackContext();
+        
+        $this->compression = $this->context->getCompression();
+        $this->compressionEnabled = $this->context->isCompressionEnabled();
     }
     
     /**

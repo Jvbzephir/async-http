@@ -18,7 +18,7 @@ namespace KoolKode\Async\Http\Http2;
  *
  * @author Martin Schröder
  */
-abstract class HPackContext
+class HPackContext
 {
     public const LITERAL = 0;
 
