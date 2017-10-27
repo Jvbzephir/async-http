@@ -262,7 +262,7 @@ class HPackCompression
      *
      * @var array
      */
-    protected const HUFFMAN_CODE = [
+    public const HUFFMAN_CODE = [
         0x1FF8, 0x7FFFD8,  0xFFFFFE2, 0xFFFFFE3, 0xFFFFFE4, 0xFFFFFE5, 0xFFFFFE6, 0xFFFFFE7,
         0xFFFFFE8, 0xFFFFEA, 0x3FFFFFFC, 0xFFFFFE9, 0xFFFFFEA, 0x3FFFFFFD, 0xFFFFFEB, 0xFFFFFEC,
         0xFFFFFED, 0xFFFFFEE, 0xFFFFFEF, 0xFFFFFF0, 0xFFFFFF1, 0xFFFFFF2, 0x3FFFFFFE, 0xFFFFFF3,
@@ -302,7 +302,7 @@ class HPackCompression
      *
      * @var array
      */
-    protected const HUFFMAN_CODE_LENGTHS = [
+    public const HUFFMAN_CODE_LENGTHS = [
         13, 23, 28, 28, 28, 28, 28, 28,
         28, 24, 30, 28, 28, 30, 28, 28,
         28, 28, 28, 28, 28, 28, 30, 28,

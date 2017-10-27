@@ -25,6 +25,9 @@ class StringBodyTest extends AsyncTestCase
         
         $this->assertEquals($contents, (string) $body);
         $this->assertEquals($contents, yield $body->getContents($context));
+        
+        $stream = yield $body->getReadableStream($context);
+        $this->assertEquals($contents, yield $stream->readBuffer($context, 1000, false));
     }
     
     public function testCanAccessMetaData(Context $context)
